@@ -12,7 +12,7 @@ hr="$2"
 
 if [[ $mod_or_vmr == "mod" ]]; then
     dir="mod_files/fpit/oc/vertical"
-    fname="FPIT_20180101_${hr}00Z_36.60N_97.49W.mod"
+    fname="FPIT_20180101${hr}Z_37N_097W.mod"
 elif [[ $mod_or_vmr == "vmr" ]]; then
     dir="vmr_files/fpit/"
     fname="JL1_20180101${hr}Z_37N_097W.vmr"
