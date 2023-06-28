@@ -7,7 +7,7 @@
 name: InvenioRDM GitHub Archiver
 env:
   # 👋🏻 Set the next variable to your InvenioRDM server address 👋🏻
-  INVENIO_SERVER: https://data.caltechlibrary.dev
+  INVENIO_SERVER: https://data.caltech.edu
 
   # Set to an InvenioRDM record ID to mark release as a new version.
   parent_record: none
