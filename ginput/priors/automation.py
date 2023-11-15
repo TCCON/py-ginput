@@ -17,27 +17,47 @@ class MKLThreads(object):
     Limit the number of threads used by C/Fortran backends to numpy functions
 
     Retrieved from https://gist.github.com/technic/80e8d95858b187cd8ff8677bd5cc0fbb on 2019-11-06. User technic is the
-    author.
+    author of the original. Then modified based on https://stackoverflow.com/a/29582987 on 2023-11-14..
     """
-    _mkl_rt = None
+    _thread_rt = None
+    _thread_type = None
 
     @classmethod
-    def _mkl(cls):
-        if cls._mkl_rt is None:
-            try:
-                cls._mkl_rt = ctypes.CDLL('libmkl_rt.so')
-            except OSError:
-                cls._mkl_rt = ctypes.CDLL('mkl_rt.dll')
-        return cls._mkl_rt
+    def _threads(cls):
+        if cls._thread_rt is None:
+            for lib, lib_type in [('libmkl_rt.so', 'MKL'), ('mkl_rt.dll', 'MKL'), ('libopenblas.so', 'BLAS')]:
+                try:
+                    cls._thread_rt = ctypes.CDLL(lib)
+                    cls._thread_type = lib_type
+                    logger.info(f'Will limit threads on library {lib}')
+                    break
+                except OSError:
+                    logger.info(f'Tried to limit threads for library {lib}, library not present')
+        if cls._thread_rt is None:
+            raise OSError('Could not load any of the expected multithreading libraries')
+        return cls._thread_rt, cls._thread_type
     
     @classmethod
-    def get_max_threads(cls):
-        return cls._mkl().mkl_get_max_threads()
+    def get_num_threads(cls):
+        rt, tt = cls._threads()
+        if tt == 'MKL':
+            # TODO: replace this with the correct function to get current number of threads for MKL
+            return rt.mkl_get_max_threads()
+        elif tt == 'BLAS':
+            return rt.openblas_get_num_threads()
+        else:
+            raise NotImplementedError(f'library type {tt}')
 
     @classmethod
     def set_num_threads(cls, n):
         assert type(n) == int
-        cls._mkl().mkl_set_num_threads(ctypes.byref(ctypes.c_int(n)))
+        rt, tt = cls._threads()
+        if tt == 'MKL':
+            rt.mkl_set_num_threads(ctypes.byref(ctypes.c_int(n)))
+        elif tt == 'BLAS':
+            rt.openblas_set_num_threads(n)
+        else:
+            raise NotImplementedError(f'library type {tt}')
 
     def __init__(self, num_threads):
         self._n = num_threads
@@ -46,10 +66,10 @@ class MKLThreads(object):
     def __enter__(self):
         if self._n > 0:
             try:
-                self._saved_n = self.get_max_threads()
+                self._saved_n = self.get_num_threads()
                 self.set_num_threads(self._n)
             except OSError:
-                logger.warning('Could not set number of MKL threads, numpy of numpy threads will not be limited')
+                logger.warning('Could not set number of MKL/BLAS threads, numpy of numpy threads will not be limited')
                 self._n = 0
         return self
 
