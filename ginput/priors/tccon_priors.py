@@ -3059,8 +3059,17 @@ def generate_tccon_priors_driver(mod_data, utc_offsets, species, site_abbrevs='x
         site_date = map_constants['datetime']
 
         if write_vmrs:
-            vmr_name = mod_utils.vmr_file_name(obs_date=site_date, lon=site_lon, lat=site_lat,
-                                               keep_latlon_prec=keep_latlon_prec)
+            if isinstance(mod_data[iprofile], dict):
+                # If model data was passed in directly, we have to figure out the file name from
+                # the coordinates given in that data.
+                vmr_name = mod_utils.vmr_file_name(obs_date=site_date, lon=site_lon, lat=site_lat,
+                                                keep_latlon_prec=keep_latlon_prec)
+            else:
+                # If we got the path to the model file, then it's safer to just reuse the parts of the
+                # name that should match. This avoids the bug described in issue #5 with slightly negative
+                # coordinates (https://github.com/TCCON/py-ginput/issues/5).
+                vmr_name = mod_utils.vmr_file_name_from_mod(os.path.basename(mod_data[iprofile]))
+
             if flat_outdir:
                 vmr_name = os.path.join(vmrs_dir, vmr_name)
             else:

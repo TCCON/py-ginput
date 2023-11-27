@@ -258,9 +258,30 @@ def vmr_file_name(obs_date, lon, lat, keep_latlon_prec=False, date_fmt='%Y%m%d%H
     pad = False if keep_latlon_prec else True
     lat = format_lat(lat, prec=prec, zero_pad=pad)
     lon = format_lon(lon, prec=prec, zero_pad=pad)
-    major_version = const.priors_version.split('.')[0]
+    major_version = _get_priors_major_version()
     return 'JL{ver}_{date}{tz}_{lat}_{lon}.vmr'.format(ver=major_version, date=obs_date.strftime(date_fmt),
                                                        tz='Z' if in_utc else 'L', lat=lat, lon=lon)
+
+
+def vmr_file_name_from_mod(mod_file_name: str) -> str:
+    """
+    Infer the base file name for a .vmr file given the corresponding .mod file.
+
+    :param mod_file_name: The base name (NOT the full path) of the .mod file. This must have the
+     where everything after the first underscore and leading up to the extension is shared with
+     the .vmr file name.
+
+    :returns: the base name for the .vmr file.
+    """
+    # Assume the mod file name is something like "FPIT_2021042300Z_52N_000W.mod" and we want
+    # something like "JL1_2021042300Z_52N_000W.vmr". All we need do is replace the part before
+    # the first underscore.
+    date_loc = mod_file_name.split('_', maxsplit=1)[1].replace('.mod', '')
+    return 'JL{}_{}.vmr'.format(_get_priors_major_version(), date_loc)
+
+
+def _get_priors_major_version():
+    return const.priors_version.split('.')[0]
 
 
 def map_file_name_from_mod_vmr_files(site_abbrev, mod_file, vmr_file, map_fmt):
