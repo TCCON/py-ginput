@@ -15,6 +15,11 @@ The repo includes NOAA flask data from 2018 and earlier in the {file}`ginput/dat
 
 `ginput` natively reads the monthly average flask files available from [NOAA GML](https://gml.noaa.gov/dv/data/index.php?frequency=Monthly%2BAverages&type=Flask). To download more recent files from that link, select the gas(es) of interest in the "Parameter" column (carbon dioxide, nitrous oxide, or methane), then in the "Site" column select "MLO" (Mauna Loa) and "SMO" (American Samoa). For each site, this should provide exactly one file for download in the table at the bottom of the page. Save both the MLO and SMO files to your system.
 
+
+A utility program is included in ginput/download/ to directly download the latest NOAA monthly averaged flask data, it is available via `run_ginput.py`. See usage info with:
+
+`./run_ginput.py getnoaa -h`
+
 ### Generating .vmr files
 
 In ginput v1.1.7, it is only possible to pass alternative NOAA files via the command line for the satellite subcommands (`oco`, `gosat`, `geocarb`). Because of the need to potentially pass multiple gases' files for regular {file}`.vmr` files, supporting this for the `vmr` and `rlvmr` subcommands requires additional development, but is planned for a future ginput version.
