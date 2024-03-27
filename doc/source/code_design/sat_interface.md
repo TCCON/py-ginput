@@ -24,7 +24,7 @@ However, EqL can be a bit tricky to calculate and is not included in many meteor
 
 How met data is stored tends to vary a lot from satellite to satellite, so each satellite supported by `ginput` has its own `read_*_resampled_met` function, and which one is used depends on which satellite instrument is requested via the `instrument` argument to the main function. These `read_*_resampled_met` function can use a helper function, `read_resampled_met`, which knows how to read variables from HDF5 files and map them to variables `ginput` recognizes, given a dictionary mapping HDF5 paths to `ginput` variables. The required `ginput` variables are:
 
-- `pv`: profile of Ertel's potential vorticity, in units of **TODO: provide GEOS units**
+- `pv`: profile of Ertel's potential vorticity, in units of K m+2 kg-1 s-1.
 - `temperature`: profile of temperature, in Kelvin
 - `pressure`: profile of pressure, in hPa (converted from Pa by `read_resampled_met`)
 - `date_strings`: the date/time of the sounding in UTC or GPS time (for `ginput`, the sub-minute difference between them is unlikely to have a big impact).
