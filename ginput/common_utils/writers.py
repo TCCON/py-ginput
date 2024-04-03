@@ -3,12 +3,12 @@ import numpy as np
 import os
 from warnings import warn
 
-# Have trouble with CFUnits when calling from a Jupyter notebook. This allows the module to at least be imported if that
-# happens - the problem seems to be an issue interacting with the C library.
+# Allow the ginput.common_utils.writers module to be imported if there's an issue interacting with the C library. This
+# can happen if it's not installed on the system, or when called from a Jupyter notebook.
 try:
     from cfunits import Units
-except (AssertionError, AttributeError):
-    warn('Could not import cfunits due to an assertion or attribute error. Will not be able to enforce CF units conventions.')
+except (AssertionError, AttributeError, FileNotFoundError) as e:
+    warn(f'Could not import cfunits due to a(n) {type(e).__name__}. Will not be able to enforce CF units conventions.')
     cfunits_imported = False
 else:
     cfunits_imported = True
