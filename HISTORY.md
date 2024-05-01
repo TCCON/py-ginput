@@ -43,6 +43,15 @@ There are two other aspects to this release:
 
 Installing with pip also includes the ginput/data folder without needing to use the editable mode
 
+## v1.1.5e
+
+During testing with GEOS IT files, we found that cases in which 3 EqL interpolators needed passed
+between threads crashed due to a limit on the maximum size of data which can be passed between
+threads in Python 3.6. Because upgrading to Python 3.10 will fix that issue but definitely introduce
+numerical differences, this version implements a workaround in which the EqL interpolators are
+saved to disk as pickle files and read in from the threads, bypassing the inter-thread object
+size limit.
+
 ## v1.1.5d
 
 **`mlo_smo_prep` version 1.1.0**
