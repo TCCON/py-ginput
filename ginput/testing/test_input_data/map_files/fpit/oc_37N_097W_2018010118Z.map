@@ -1,6 +1,6 @@
 12 13
 oc_37N_097W_2018010118Z.map
-GINPUT                    Version 1.1.8     JLL, SR, MK
+GINPUT                    Version 1.2.0     JLL, SR, MK
 Please see https://tccon-wiki.caltech.edu for a complete description of this file and its usage.
 NOTE: The gas concentrations (including H2O) are WET MOLE FRACTIONS. If you require dry mole fractions,
 you must calculate [H2O]_dry = (1/[H2O]_wet - 1)^-1 and then [gas]_dry = [gas]_wet * (1 + [H2O]_dry).

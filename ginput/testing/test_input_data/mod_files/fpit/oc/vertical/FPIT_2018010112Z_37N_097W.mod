@@ -1,8 +1,9 @@
-7  11
+8  11
 6378.137  6.0000e-05  36.604 9.810    0.387 1013.250  193.616
 Pressure  Temperature     Height     MMW        H2O      RH         SLP        TROPPB        TROPPV      TROPPT       TROPT       SZA
 1.005e+03    258.164      0.330    28.9529    1.019e-03  61.8    1.047e+03    1.936e+02    1.925e+02    1.936e+02    210.119    109.907
 mod_maker.py   2019-06-20   SR/JL
+CO source: fpit
   mbar         Kelvin         km       g/mole        DMF          %       K.m+2/kg/s     Kelvin     degrees      kg/kg       mol/mol     
 Pressure     Temperature    Height       MMW         H2O          RH         EPV           PT         EqL         O3           CO        
 9.970e+02        257.577      0.387    28.9531     9.928e-04      61.0    -1.060e-08     257.801    -14.248    5.593e-08    1.127e-07    
