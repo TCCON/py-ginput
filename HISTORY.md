@@ -3,6 +3,18 @@
 ## 1.2.0
 
 This release fully handles generating priors from GEOS IT met and chemistry data.
+Specific changes:
+
+- Tropospheric scaling for CO set to 1 (i.e. no scaling) when using GEOS IT chemistry files
+- A new module, `ginput.priors.automation`, and the corresponding subcommand (`auto`) 
+  constructed as an interface for a system that automatically runs `ginput`.
+- Functions to get information about the most recent commit for logging/file metadata have
+  been updated to work with Git and Mercurial.
+- More flexibility to print download URLs for met files to stdout instead of to a file
+- New subprogram, `getnoaa`, to update the NOAA data used as input (pull request #6 by
+  rocheseb).
+- Additional catch to handle missing `udunits2` system dependency when importing the `writers`
+  module (pull request #8 by chris-msat).
 
 This is a minor version bump for two reasons:
 
