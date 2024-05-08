@@ -3268,18 +3268,26 @@ def parse_runlog_args(parser=None):
                              'multiple IDs from the command line. If --mod-root-dir was specified, this will be used '
                              'to find .mod files in the site subdirectories. If --flat-outdir was not given, this will '
                              'be used to organize the output .vmr files.')
+    parser.add_argument('--allow-missing-mods', action='store_true', help='Set this flag to just skip over required .mod files missing from the mod directory, rather than erroring')
     _add_common_cl_args(parser)
     parser.set_defaults(driver_fxn=runlog_cl_driver)
 
 
-def runlog_cl_driver(runlog, first_date='2000-01-01', site_abbrev=None, **kwargs):
+def runlog_cl_driver(runlog, first_date='2000-01-01', site_abbrev=None, allow_missing_mods: bool = False, **kwargs):
+    missing_files = []
     for drange, abbrv, lon, lat, alt in run_utils.iter_runlog_args(runlog, first_date=first_date, site_abbrv=site_abbrev):
-        cl_driver(date_range=drange, site_lat=lat, site_lon=lon, site_abbrev=abbrv, **kwargs)
+        this_missing = cl_driver(date_range=drange, site_lat=lat, site_lon=lon, site_abbrev=abbrv, allow_missing_mods=allow_missing_mods, **kwargs)
+        missing_files.extend(this_missing)
+
+    if missing_files:
+        # This will only have elements if allow_missing_mods was True
+        missing_list = '\n* {}'.join(missing_files)
+        logger.warning(f'{len(missing_files)} .mod files were missing, their corresponding .vmr files were not generated:\n* {missing_list}')
 
 
 def cl_driver(date_range, mod_dir=None, mod_root_dir=None, save_dir=None, product='fpit',
               site_lat=None, site_lon=None, site_abbrev='xx', keep_latlon_prec=False, 
-              mlo_smo_files: Optional[Union[str, dict]] = None, **kwargs):
+              mlo_smo_files: Optional[Union[str, dict]] = None, allow_missing_mods: bool = False, **kwargs):
 
     # Read the MLO/SMO JSON if given
     if isinstance(mlo_smo_files, (str, Path)):
@@ -3328,13 +3336,17 @@ def cl_driver(date_range, mod_dir=None, mod_root_dir=None, save_dir=None, produc
                 missing_files.append(this_file)
 
     # Ensure that we have all the .mod files we need
-    if len(missing_files) > 0:
+    if len(missing_files) > 0 and not allow_missing_mods:
         msg = 'Could not find the following .mod files required:\n'
         msg += '  * ' + '\n  * '.join(missing_files)
         msg += '\nEither correct the mod path or generate these files'
         raise IOError(msg)
+    else:
+        logger.warning(f'{len(missing_files)} .mod files missing from this date range, will not generate the corresponding .vmr files')
 
     # GO!
     generate_full_tccon_vmr_file(mod_data=mod_files, utc_offsets=dt.timedelta(0), save_dir=save_dir, product=product,
                                  keep_latlon_prec=keep_latlon_prec, site_abbrevs=all_site_abbrevs, mlo_smo_files=mlo_smo_files, **kwargs)
+
+    return missing_files
 
