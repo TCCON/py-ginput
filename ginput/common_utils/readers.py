@@ -9,9 +9,10 @@ import pandas as pd
 
 from . import mod_utils
 from .mod_utils import ModelError
-from .mod_constants import COSource
+from .mod_constants import GeosVersion, GeosSource
 from .ggg_logging import logger
 
+from typing import Dict
 
 def read_out_file(out_file, as_dataframes=False, replace_fills=False):
     """Read a GGG output file
@@ -108,19 +109,21 @@ def read_mod_file(mod_file, as_dataframes=False):
     n_header_lines = mod_utils.get_num_header_lines(mod_file)
     # Read the constants from the second line of the file. There's no header for these, we just have to rely on the
     # same constants being in the same position.
-    constant_vars = pd.read_csv(mod_file, sep='\s+', header=None, nrows=1, skiprows=1,
+    constant_vars = pd.read_csv(mod_file, sep=r'\s+', header=None, nrows=1, skiprows=1,
                                 names=('earth_radius', 'ecc2', 'obs_lat', 'surface_gravity',
                                        'profile_base_geometric_alt', 'base_pressure', 'tropopause_pressure'))
     # Read the scalar variables (e.g. surface pressure, SZA, tropopause) first. We just have to assume their headers are
     # on line 3 and values on line 4 of the file, the first number in the first line gives us the line the profile
     # variables start on.
-    scalar_vars = pd.read_csv(mod_file, sep='\s+', header=2, nrows=1)
+    scalar_vars = pd.read_csv(mod_file, sep=r'\s+', header=2, nrows=1)
 
-    # Get the CO source from the header. If absent, use a deafult
-    constant_vars['co_source'] = _read_mod_file_co_source(mod_file)
+    # Get the GEOS versions from the header. Also extract the CO source, since the priors
+    # code relies on that and we should support pre-version 1.2.1 files.
+    geos_versions = _read_mod_file_geos_sources(mod_file)
+    constant_vars['co_source'] = _read_mod_file_co_source(mod_file, geos_versions)
 
     # Now read the profile vars.
-    profile_vars = pd.read_csv(mod_file, sep='\s+', header=n_header_lines-1)
+    profile_vars = pd.read_csv(mod_file, sep=r'\s+', header=n_header_lines-1)
 
     # Also get the information that's only in the file name (namely date and longitude, we'll also read the latitude
     # because it's there).
@@ -150,11 +153,35 @@ def read_mod_file(mod_file, as_dataframes=False):
         out_dict['constants'] = {k: v.item() for k, v in constant_vars.items()}
         out_dict['scalar'] = {k: v.item() for k, v in scalar_vars.items()}
         out_dict['profile'] = {k: v.values for k, v in profile_vars.items()}
-
+    out_dict['geos_versions'] = geos_versions
     return out_dict
 
 
-def _read_mod_file_co_source(mod_file: str) -> COSource:
+def _read_mod_file_geos_sources(mod_file: str) -> Dict[str, GeosVersion]:
+    nhead = mod_utils.get_num_header_lines(mod_file)
+    sources = dict()
+    with open(mod_file) as f:
+        for idx, line in enumerate(f):
+            if idx == nhead:
+                return sources
+            elif line.startswith('GEOS source'):
+                # Assume a line like "GEOS source : Met3d : {version info}"
+                parts = line.split(':')
+                key = parts[1].strip()
+                info = parts[2].strip()
+                sources[key] = GeosVersion.from_str(info)
+                
+
+
+def _read_mod_file_co_source(mod_file: str, geos_versions: Dict[str, GeosVersion]) -> GeosSource:
+    # >= v1.2.1 .mod files (or those patched to look like them) have all GEOS sources in the header,
+    # so we don't need to re-read the file.
+    if geos_versions:
+        chm_version = geos_versions.get('Chm3d')
+        return GeosSource.UNKNOWN if chm_version is None else chm_version.source
+
+    # v1.2.0 files have the line "CO source" in the header and pre-v1.2.0 files have no indication
+    # of version.
     nhead = mod_utils.get_num_header_lines(mod_file)
     with open(mod_file) as f:
         for idx, line in enumerate(f):
@@ -165,11 +192,11 @@ def _read_mod_file_co_source(mod_file: str) -> COSource:
                 # there's >7 lines, that probably means we messed up.
                 if nhead > 7:
                     logger.warning((f'In .mod file {mod_file}, did not find a "CO source" line in the header, but the header has more than 7 lines. '
-                                     'Unless this is a custom .mod file, this means I may have missed the CO source line.'))
-                return COSource.FPIT
+                                    'Unless this is a custom .mod file, this means I may have missed the CO source line.'))
+                return GeosSource.FPIT
             elif line.startswith('CO source'):
                 source = line.split(':', maxsplit=2)[1].strip()
-                return COSource(source)
+                return GeosSource(source)
 
 
 def read_mod_file_units(mod_file):

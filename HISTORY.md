@@ -1,5 +1,12 @@
 # Ginput Version History
 
+## 1.2.1
+
+Specific changes:
+
+ - Improved tracking of GEOS source; each GEOS file contributing to the `.mod` file
+   has its version written in the `.mod` file header.
+
 ## 1.2.0
 
 This release fully handles generating priors from GEOS IT met and chemistry data.
