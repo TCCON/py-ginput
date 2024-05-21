@@ -2733,6 +2733,10 @@ def generate_single_tccon_prior(mod_file_data, utc_offset, concentration_record,
     file_date = mod_file_data['file']['datetime']
     file_lat = mod_file_data['file']['lat']
     file_lon = mod_file_data['file']['lon']
+    co_source = mod_file_data['constants'].get('co_source', const.GeosSource.UNKNOWN)
+    if co_source == const.GeosSource.IT:
+        raise NotImplementedError('ginput v1.0.6 does not handle GEOS IT files')
+
     # Make the UTC date a datetime object that is rounded to a date (hour/minute/etc = 0)
     obs_utc_date = dt.datetime.combine((file_date - utc_offset).date(), dt.time())
 

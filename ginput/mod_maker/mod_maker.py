@@ -102,7 +102,7 @@ import warnings
 
 from ..common_utils import mod_utils, run_utils
 from ..common_utils.mod_utils import gravity, check_site_lat_lon_alt
-from ..common_utils.mod_constants import ratio_molec_mass as rmm, p_ussa, t_ussa, z_ussa, mass_dry_air
+from ..common_utils.mod_constants import ratio_molec_mass as rmm, p_ussa, t_ussa, z_ussa, mass_dry_air, GeosVersion
 from ..common_utils.ggg_logging import logger
 from .slantify import * # code to make slant paths
 from .tccon_sites import site_dict, tccon_site_info, tccon_site_info_for_date
@@ -211,7 +211,7 @@ def build_mod_fmt_strings(var_order):
     return header_names, header_units, var_name_mapping, data_fmt
 
 
-def write_mod(mod_path, version, site_lat, data=0, surf_data=0, func=None, muted=False, slant=False, chem_vars=False):
+def write_mod(mod_path, version, site_lat, data=0, surf_data=0, func=None, muted=False, slant=False, chem_vars=False, geos_versions=None):
     """
     Creates a GGG-format .mod file
     INPUTS:
@@ -221,7 +221,8 @@ def write_mod(mod_path, version, site_lat, data=0, surf_data=0, func=None, muted
         data: dictionary of the inputs
         surf_data: dictionary of the surface inputs (for merra/geos5)
     """
-
+    if geos_versions is None:
+        geos_versions = dict()
     # Output scaling: define factors to multiply values by before writing to the .mod file. If a column name is not
     # here, 1.0 is assumed. Only used for GEOS-type mod files currently.
     output_scaling = {'RH': 100.0}
@@ -333,7 +334,8 @@ def write_mod(mod_path, version, site_lat, data=0, surf_data=0, func=None, muted
         mod_content = []
 
         # number of header rows, number of data columns
-        mod_content.append('7  {}\n'.format(len(prof_var_order)))
+        nheader = 7 + len(geos_versions)
+        mod_content.append('{}  {}\n'.format(nheader, len(prof_var_order)))
         # constants
         mod_content.append(constants_fmt.format(*mod_constants))
         # surface variables
@@ -341,6 +343,8 @@ def write_mod(mod_path, version, site_lat, data=0, surf_data=0, func=None, muted
         mod_content.append(surface_fmt.format(*[surf_data[key] for key in surf_var_order]))
         # version info
         mod_content.append(version+'\n')
+        for key, version in geos_versions.items():
+            mod_content.append(f'GEOS source : {key} : {version}\n')
         # profile data headers
         mod_content.append(header_units)
         mod_content.append(header_names)
@@ -1929,6 +1933,12 @@ def mod_maker_new(start_date=None, end_date=None, func_dict=None, GEOS_path=None
 
         # write the .mod files
         version = 'mod_maker.py   2019-06-20   SR/JL'
+        geos_versions = {
+            'Met3d': GeosVersion.from_nc_file(select_files[date_ID]),
+            'Met2d': GeosVersion.from_nc_file(select_surf_files[date_ID])
+        }
+        if do_load_chem:
+            geos_versions['Chm3d'] = GeosVersion.from_nc_file(select_chem_files[date_ID])
 
         for site in INTERP_DATA:
             mod_dicts[UTC_date][site] = dict()
@@ -1966,7 +1976,7 @@ def mod_maker_new(start_date=None, end_date=None, func_dict=None, GEOS_path=None
             mod_file_path = os.path.join(vertical_mod_path,mod_name)
             vertical_mod_dict = write_mod(mod_file_path,version,site_lat,data=INTERP_DATA[site]['prof']
                                           ,surf_data=INTERP_DATA[site]['surf'],func=func_dict[UTC_date],
-                                          muted=muted,slant=slant,chem_vars=do_load_chem)
+                                          muted=muted,slant=slant,chem_vars=do_load_chem,geos_versions=geos_versions)
 
             if slant:
                 # write slant mod_file
