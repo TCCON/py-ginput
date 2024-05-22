@@ -1422,7 +1422,7 @@ def show_interp(data,x,y,interp_data,ilev,pres):
 
 
 def load_chem_variables(geos_file, geos_vars, target_site_dicts, pres_levels=None,
-                        muted=False):
+                        muted=False, extrapolate='no'):
     if not mod_utils.is_geos_on_native_grid(geos_file):
         raise NotImplementedError('GEOS chemistry file ({}) does not appear to be on the native eta grid. This case '
                                   'has not been implemented.')
@@ -1446,7 +1446,15 @@ def load_chem_variables(geos_file, geos_vars, target_site_dicts, pres_levels=Non
         geos_data['pres'] = np.flipud(geos_pres)
 
     # Handle the lat/lon interpolation
-    nlevels = np.size(pres_levels) if pres_levels is not None else geos_data['pres'].shape[0]
+    if pres_levels is None:
+        nlevels = geos_data['pres'].shape[0]
+    elif isinstance(pres_levels, dict):
+        nlevels = set(d['prof']['lev'].size for d in pres_levels.values())
+        if len(nlevels) != 1:
+            raise NotImplementedError('Differently sized profile data')
+        nlevels = nlevels.pop()
+    else:
+        nlevels = np.size(pres_levels)
     nsites = len(target_site_dicts)
     site_data = {v: np.full([nlevels, nsites], np.nan) for v in geos_vars}
 
@@ -1462,15 +1470,31 @@ def load_chem_variables(geos_file, geos_vars, target_site_dicts, pres_levels=Non
     # Interpolate to the standard pressure levels. Do this in log-log space since pressure and concentration typically
     # vary exponentially with altitude. If no pressure levels given, then assume we are working with the native files
     # for met as well and can just leave CO on the standard levels.
+    #
+    # Note that this is only really tested with a single site in the target_site_dicts, since this is normally run
+    # with the iteration over sites done by `driver`.
     if pres_levels is not None:
-        std_pres_log = np.log(pres_levels)
+        target_site_ids = list(target_site_dicts)
         for i in range(nsites):
-            pres_log = np.log(interp_geos_data['pres'][:, i])
+            if isinstance(pres_levels, dict):
+                # Means we passed in the INTERP_DATA dictionary from the main function, so we need to extract the
+                # pressure levels for this site.
+                std_pres_log = np.log(pres_levels[target_site_ids[i]]['prof']['lev'])
+            else:
+                std_pres_log = np.log(pres_levels)
+                
+            pres_log = np.flipud(np.log(interp_geos_data['pres'][:, i]))
             for var in geos_vars:
-                var_log = np.log(interp_geos_data[var][:, i])
+                var_log = np.flipud(np.log(interp_geos_data[var][:, i]))
                 # Other parts of modmaker use scipy's interp1d without issue; but I'm more comfortable with the
                 # straightforward linear interpolation np.interp does. Sometime scipy's interpolators behave strangely.
-                var_log = np.interp(std_pres_log, np.flipud(pres_log), np.flipud(var_log), left=np.nan, right=np.nan)
+                if extrapolate == 'no':
+                    left, right = np.nan, np.nan
+                elif extrapolate == 'const':
+                    left, right = var_log[0], var_log[-1]
+                else:
+                    NotImplementedError(f'extrapolate = {extrapolate}')
+                var_log = np.interp(std_pres_log, pres_log, var_log, left=left, right=right)
                 site_data[var][:, i] = np.exp(var_log)
     else:
         for var in geos_vars:
@@ -1756,6 +1780,13 @@ def mod_maker_new(start_date=None, end_date=None, func_dict=None, GEOS_path=None
         mod_dicts[UTC_date] = dict()
         start_it = time.time()
 
+        geos_versions = {
+            'Met3d': GeosVersion.from_nc_file(select_files[date_ID]),
+            'Met2d': GeosVersion.from_nc_file(select_surf_files[date_ID])
+        }
+        if do_load_chem:
+            geos_versions['Chm3d'] = GeosVersion.from_nc_file(select_chem_files[date_ID])
+            
         DATA = {}
         if not muted:
             print('\nNOW DOING date {:4d} / {} :'.format(date_ID+1,len(select_dates)),UTC_date.strftime("%Y-%m-%d %H:%M"),' UTC')
@@ -1857,8 +1888,24 @@ def mod_maker_new(start_date=None, end_date=None, func_dict=None, GEOS_path=None
 
         # If requested, load the chemistry data and incorporate it into the existing dictionaries.
         if do_load_chem:
-            chem_plevs = None if native_files else mod_utils._std_model_pres_levels
-            CHEM_DATA = load_chem_variables(select_chem_files[date_ID], chem_variables, site_dict, pres_levels=chem_plevs)
+            if native_files and geos_versions['Met3d'] == geos_versions['Chm3d']:
+                # Using the eta levels and both 3D files are from the same version of GEOS, so we 
+                # can assume that the lat/lon interpolation will result in chem data on the same levels.
+                chem_plevs = None
+                chem_extrap = 'no'
+            elif native_files:
+                # Otherwise, with different versions of GEOS, the level pressures might change slightly,
+                # so we do need to interpolate. As elsewhere, use constant value extrapolation to ensure
+                # that all levels receive a value, but we won't get runaway interpolation.
+                chem_plevs = INTERP_DATA
+                chem_extrap = 'const'
+            else:
+                # This is a carry-over from earlier versions of mod maker that used fixed pressure levels.
+                # I think we did not want to extrapolate b/c levels outside the native pressure levels should
+                # get fill values (i.e. they are below the terrain, usually).
+                chem_plevs = mod_utils._std_model_pres_levels
+                chem_extrap = 'no'
+            CHEM_DATA = load_chem_variables(select_chem_files[date_ID], chem_variables, site_dict, pres_levels=chem_plevs, extrapolate=chem_extrap)
             for site in INTERP_DATA.keys():
                 INTERP_DATA[site]['prof'].update(CHEM_DATA[site]['prof'])
 
@@ -1999,12 +2046,6 @@ def mod_maker_new(start_date=None, end_date=None, func_dict=None, GEOS_path=None
 
         # write the .mod files
         version = 'mod_maker.py   2019-06-20   SR/JL'
-        geos_versions = {
-            'Met3d': GeosVersion.from_nc_file(select_files[date_ID]),
-            'Met2d': GeosVersion.from_nc_file(select_surf_files[date_ID])
-        }
-        if do_load_chem:
-            geos_versions['Chm3d'] = GeosVersion.from_nc_file(select_chem_files[date_ID])
 
         for site in INTERP_DATA:
             mod_dicts[UTC_date][site] = dict()

@@ -23,6 +23,12 @@ class GeosVersion:
             self.source = GeosSource.from_str(source)
         else:
             self.source = source
+
+    def __eq__(self, other):
+        if not isinstance(other, self.__class__):
+            return False
+        else:
+            return self.version_str == other.version_str and self.source == other.source
             
     def __repr__(self):
         clsname = self.__class__.__name__

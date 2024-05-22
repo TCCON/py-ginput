@@ -83,8 +83,8 @@ class MKLThreads(object):
 class AutomationArgs:
     def __init__(self, **json_dict):
         self.ginput_met_key = json_dict['ginput_met_key']
-        self.start_date = datetime.strptime(json_dict['start_date'], "%Y-%m-%d")
-        self.end_date = datetime.strptime(json_dict['end_date'], '%Y-%m-%d') if json_dict.get('end_date') is not None else self.start_date + timedelta(days=1)
+        self.start_date = self._parse_datestr(json_dict['start_date'])
+        self.end_date = self._parse_datestr(json_dict['end_date']) if json_dict.get('end_date') is not None else self.start_date + timedelta(days=1)
         self.met_path = json_dict['met_path']
         self.chem_path = json_dict['chem_path']
         self.save_path = json_dict['save_path']
@@ -99,6 +99,15 @@ class AutomationArgs:
         self.map_file_format = json_dict['map_file_format'].lower()
 
         self.n_threads = json_dict.get('n_threads', 4)
+
+    @staticmethod
+    def _parse_datestr(s):
+        if len(s) == 10:
+            return datetime.strptime(s, '%Y-%m-%d')
+        elif len(s) == 19:
+            return datetime.strptime(s, '%Y-%m-%d %H:%M:%S')
+        else:
+            raise ValueError(f'Unrecognized datetime format: {s}')
 
 
 def _make_mod_files(all_args: AutomationArgs, force_file_name_fpit: bool = True):
