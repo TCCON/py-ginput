@@ -165,8 +165,8 @@ def _read_mod_file_geos_sources(mod_file: str) -> Dict[str, GeosVersion]:
             if idx == nhead:
                 return sources
             elif line.startswith('GEOS source'):
-                # Assume a line like "GEOS source : Met3d : {version info}"
-                parts = line.split(':')
+                # Assume a line like "GEOS source : Met3d : {version info} : {filename} : {checksum}"
+                parts = line.split(':', maxsplit=2)
                 key = parts[1].strip()
                 info = parts[2].strip()
                 sources[key] = GeosVersion.from_str(info)
