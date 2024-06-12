@@ -1041,8 +1041,11 @@ class SmoMonthlyAverager(InsituMonthlyAverager):
 
     def select_background(self, hourly_df):
         hourly_df = noaa_prelim_flagging(hourly_df, hr_std_dev_max=0.3)
-        hourly_df = merge_insitu_with_wind(hourly_df, self._smo_wind_file, run_settings=self._run_settings, allow_missing_geos_files=self._allow_missing_geos_files)
-        hourly_df = smo_wind_filter(hourly_df)
+        if hourly_df.shape[0] == 0:
+            logger.warn('No hourly data passed initial flagging, skipping filter on wind direction')
+        else:
+            hourly_df = merge_insitu_with_wind(hourly_df, self._smo_wind_file, run_settings=self._run_settings, allow_missing_geos_files=self._allow_missing_geos_files)
+            hourly_df = smo_wind_filter(hourly_df)
         return hourly_df
 
 
