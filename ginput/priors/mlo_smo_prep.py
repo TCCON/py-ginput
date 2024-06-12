@@ -15,7 +15,7 @@ from ..common_utils.ggg_logging import logger, setup_logger
 
 from typing import Tuple, Optional
 
-__version__ = '1.1.0'
+__version__ = '1.1.1'
 
 class MloPrelimMode(Enum):
     TIME_STRICT_DIFF_EITHER = 0
@@ -147,14 +147,15 @@ def _filter_rapid_df(df):
     # and assume that they do not impact the data significantly given the other selection both
     # NOAA and this code does.
     xx_flag = df['flag'].apply(lambda x: x[:2] == '..')
+    xx_fills = (df['value'] < -90) | (df['uncertainty'] < -90)
 
     n_points = df.shape[0]
     n_flagged_out = np.sum(~xx_flag)
-    n_missing_data = np.sum(df['flag'].apply(lambda f: f[0] == 'I'))
+    n_missing_data = np.sum((df['flag'].str[0] == 'I') | xx_fills)
     percent_missing = n_missing_data / n_points * 100
     first_date = df.index.min().strftime('%Y-%m-%d %H:%M')
     last_date = df.index.max().strftime('%Y-%m-%d %H:%M')
-    msg = '{flagged} of {n} data points between {start} and {end} removed by flags. {nmiss} ({pmiss:.2f}%) due to missing data.'.format(
+    msg = '{flagged} of {n} data points between {start} and {end} removed by flags. {nmiss} ({pmiss:.2f}%) data points are missing data.'.format(
         flagged=n_flagged_out, n=n_points, start=first_date, end=last_date, nmiss=n_missing_data, pmiss=percent_missing
     )
     if percent_missing > 50:
@@ -164,7 +165,6 @@ def _filter_rapid_df(df):
 
     df = df.loc[xx_flag, :].copy()
     
-    xx_fills = (df['value'] < -90) | (df['uncertainty'] < -90)
     df.loc[xx_fills, 'value'] = np.nan
     df.loc[xx_fills, 'uncertainty'] = np.nan
     return df
