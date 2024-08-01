@@ -62,6 +62,15 @@ There are two other aspects to this release:
 
 Installing with pip also includes the ginput/data folder without needing to use the editable mode
 
+## v1.1.5f
+
+**`mlo_smo_prep` version 1.1.1**
+
+This version is a small bugfix to allow `mlo_smo_prep` to handle updating the SMO monthly average
+file when there is no SMO data. Previous versions would crash because the function that checked
+that all the necessary GEOS files were present did not handle an empty dataframe of NOAA data
+and could not calculate the min and max datetimes required.
+
 ## v1.1.5e
 
 During testing with GEOS IT files, we found that cases in which 3 EqL interpolators needed passed
