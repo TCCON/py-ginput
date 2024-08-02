@@ -1,7 +1,8 @@
+from collections import OrderedDict
 import datetime as dt
 import os
+from pathlib import Path
 import re
-from collections import OrderedDict
 
 import netCDF4 as ncdf
 import numpy as np
@@ -12,7 +13,7 @@ from .mod_utils import ModelError
 from .versioning import GeosVersion, GeosSource
 from .ggg_logging import logger
 
-from typing import Dict
+from typing import Dict, Union
 
 def read_out_file(out_file, as_dataframes=False):
     n_header_lines = mod_utils.get_num_header_lines(out_file)
@@ -396,3 +397,15 @@ def read_runlog(runlog_file, as_dataframes=False, remove_commented_lines=True):
             return df
         else:
             return df.to_dict()
+
+
+def read_tabular_file_with_header(file_path: Union[str, Path], comment_str: str = '#') -> pd.DataFrame:
+    with open(file_path) as f:
+        for line in f:
+            if not line.startswith(comment_str):
+                break
+
+        columns = line.strip().split()
+        df = pd.read_csv(f, header=None, delim_whitespace=True)
+        df.columns = columns
+        return df

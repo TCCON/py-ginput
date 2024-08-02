@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 import argparse
 
-from ginput.priors import acos_interface as aci, tccon_priors, map_maker, automation
+from ginput.priors import acos_interface as aci, tccon_priors, map_maker, fo2_prep, automation
 from ginput.mod_maker import mod_maker
 from ginput.download import get_GEOS5, get_fo2_data
 
@@ -14,6 +14,9 @@ def parse_args():
     aci.parse_args(oco_parser, oco_or_gosat='oco')
     gosat_parser = subparsers.add_parser('acos', help='Generate .h5 file for input into the GOSAT algorithm')
     aci.parse_args(gosat_parser, oco_or_gosat='gosat')
+    
+    o2_parser = subparsers.add_parser('update_fo2', help='Update or create the O2 mole fraction file')
+    fo2_prep.parse_args(o2_parser)
 
     mm_parser = subparsers.add_parser('mod', help='Generate .mod (model) files for GGG')
     mod_maker.parse_args(mm_parser)
