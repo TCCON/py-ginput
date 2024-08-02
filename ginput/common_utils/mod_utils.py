@@ -10,8 +10,8 @@ from __future__ import print_function, division
 import datetime as dt
 from datetime import timedelta
 from glob import glob
+from hashlib import md5
 
-import numpy
 import xarray as xr
 from dateutil.relativedelta import relativedelta
 import netCDF4 as ncdf
@@ -2408,3 +2408,45 @@ def make_geos_date_ranges(dates):
 def get_runlog_geos_date_ranges(rldf):
     rl_dates = ydh_to_date(rldf['Year'], rldf['Day'], rldf['Hour'])
     return make_geos_date_ranges(rl_dates)
+
+
+def compute_file_checksum(file_path):
+    """Compute an MD5 checksum on the given file
+
+    Parameters
+    ----------
+    file_path : str or Path
+        Path to the file
+
+    Returns
+    -------
+    str
+        The hexadecimal representation of the checksum
+    """
+    checksum = md5()
+    with open(file_path, 'rb') as f:
+        while True:
+            block = f.read(1000000)
+            if len(block) == 0:
+                break
+            checksum.update(block)
+    return checksum.hexdigest()
+
+
+def compute_bytes_checksum(bytes):
+    """Compute an MD5 checksum on the given bytes
+
+    Parameters
+    ----------
+    bytes
+        A byte string. To compute the checksum of a string,
+        use `.encode()` to convert it to bytes.
+
+    Returns
+    -------
+    str
+        The hexadecimal representation of the checksum
+    """
+    checksum = md5()
+    checksum.update(bytes)
+    return checksum.hexdigest()

@@ -102,7 +102,8 @@ import warnings
 
 from ..common_utils import mod_utils, run_utils
 from ..common_utils.mod_utils import gravity, check_site_lat_lon_alt
-from ..common_utils.mod_constants import ratio_molec_mass as rmm, p_ussa, t_ussa, z_ussa, mass_dry_air, GeosVersion
+from ..common_utils.mod_constants import ratio_molec_mass as rmm, p_ussa, t_ussa, z_ussa, mass_dry_air
+from ..common_utils.versioning import GeosVersion
 from ..common_utils.ggg_logging import logger
 from .slantify import * # code to make slant paths
 from .tccon_sites import site_dict, tccon_site_info, tccon_site_info_for_date
