@@ -12,7 +12,7 @@ import time
 from ..common_utils import mod_utils, writers
 from ..common_utils.ggg_logging import logger
 from ..mod_maker import mod_maker
-from . import tccon_priors
+from . import tccon_priors, fo2_prep
 
 class MKLThreads(object):
     """
@@ -282,6 +282,10 @@ def job_driver(json_file, simulate_with_delay=None):
 
     
 def lut_regen_driver():
+    # Update the O2 dry mole fraction table first - the LUTs shouldn't depend on this,
+    # but it's quick, so may as well do it first.
+    fo2_prep.fo2_update_driver()
+
     # Have each trace gas record use its internal logic to decide if it needs
     # regenerated
     for record in tccon_priors.gas_records.values():

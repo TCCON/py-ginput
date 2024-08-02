@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 import argparse
 
-from ginput.priors import acos_interface as aci, tccon_priors, map_maker, mlo_smo_prep, automation
+from ginput.priors import acos_interface as aci, tccon_priors, map_maker, mlo_smo_prep, fo2_prep, automation
 from ginput.mod_maker import mod_maker
 from ginput.download import get_GEOS5, get_NOAA_flask_data, get_fo2_data
 
@@ -19,7 +19,9 @@ def parse_args():
 
     noaa_parser = subparsers.add_parser('update_hourly', help='Update monthly input CO2 files with new NOAA hourly data')
     mlo_smo_prep.parse_args(noaa_parser)
-    
+
+    o2_parser = subparsers.add_parser('update_fo2', help='Update or create the O2 mole fraction file')
+    fo2_prep.parse_args(o2_parser)
 
     mm_parser = subparsers.add_parser('mod', help='Generate .mod (model) files for GGG')
     mod_maker.parse_args(mm_parser)

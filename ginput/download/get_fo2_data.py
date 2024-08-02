@@ -36,8 +36,11 @@ def parse_args(parser: Optional[ArgumentParser] = None):
         parser.set_defaults(driver_fxn=download_fo2_inputs)
 
 
-def download_fo2_inputs(out_dir: Union[str, Path] = const.data_dir, make_subdir: bool = True, only_if_new: bool = False) -> (Path, bool):
-    """Download the required inputs (NOAA global mean CO2 and Scripps O2/N2 data) to calculate f(O2)
+def download_fo2_inputs(out_dir: Union[str, Path] = DEFAULT_OUT_DIR, make_subdir: bool = True, only_if_new: bool = False) -> (Path, bool):
+    """Download the required inputs (NOAA global mean CO2 and Scripps O2/N2 data) to calculate f(O2).
+
+    Scripps data are available at https://scrippso2.ucsd.edu/data.html.
+    NOAA data are available at https://gml.noaa.gov/ccgg/trends/gl_data.html.
 
     Parameters
     ----------
