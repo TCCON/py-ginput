@@ -9,7 +9,7 @@ import pandas as pd
 
 from . import mod_utils
 from .mod_utils import ModelError
-from .mod_constants import GeosVersion, GeosSource
+from .versioning import GeosVersion, GeosSource
 from .ggg_logging import logger
 
 from typing import Dict

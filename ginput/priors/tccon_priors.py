@@ -75,6 +75,7 @@ import xarray as xr
 
 from ..mod_maker import tccon_sites
 from ..common_utils import mod_utils, ioutils, readers, writers, run_utils, mod_constants as const
+from ..common_utils.versioning import GeosSource
 from ..common_utils.ggg_logging import logger
 
 GGGPathError = mod_utils.GGGPathError
@@ -1857,7 +1858,7 @@ class CORecord(TraceGasRecord):
     _gas_seas_cyc_coeff = 0.2
 
     @classmethod
-    def compute_co_scale(cls, prof_pres, prof_theta, trop_pres, trop_theta, co_source: const.GeosSource):
+    def compute_co_scale(cls, prof_pres, prof_theta, trop_pres, trop_theta, co_source: GeosSource):
         """
         Compute a level-dependent scaling factor for the GEOS CO profile
 
@@ -1900,10 +1901,10 @@ class CORecord(TraceGasRecord):
         # GEOS IT vs. HIPPO was not exactly 1, but it was close enough that I didn't feel the need to scale. (Also the GEOS FP-IT
         # vs. HIPPO comparison was similar enough to the comparison with ATom that I felt that using HIPPO was a reasonable
         # comparison.)
-        if co_source in {const.GeosSource.FPIT, const.GeosSource.FP}:
+        if co_source in {GeosSource.FPIT, GeosSource.FP}:
             logger.debug('Using GEOS FP/FP-IT CO scaling')
             atom_scale_fac = 1.23
-        elif co_source == const.GeosSource.IT:
+        elif co_source == GeosSource.IT:
             logger.debug('Using GEOS IT CO scaling')
             atom_scale_fac = 1.0
         else:
@@ -1927,7 +1928,7 @@ class CORecord(TraceGasRecord):
 
         return scale
 
-    def add_trop_prior(self, prof_gas, obs_date, obs_lat, mod_data, co_source: const.GeosSource, **kwargs):
+    def add_trop_prior(self, prof_gas, obs_date, obs_lat, mod_data, co_source: GeosSource, **kwargs):
         """
         Add tropospheric CO prior.
 
@@ -2804,7 +2805,7 @@ def generate_single_tccon_prior(mod_file_data, utc_offset, concentration_record,
     file_date = mod_file_data['file']['datetime']
     file_lat = mod_file_data['file']['lat']
     file_lon = mod_file_data['file']['lon']
-    co_source = mod_file_data['constants'].get('co_source', const.GeosSource.UNKNOWN)
+    co_source = mod_file_data['constants'].get('co_source', GeosSource.UNKNOWN)
 
     # Make the UTC date a datetime object that is rounded to a date (hour/minute/etc = 0)
     obs_utc_date = dt.datetime.combine((file_date - utc_offset).date(), dt.time())

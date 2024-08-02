@@ -3,7 +3,7 @@ import argparse
 
 from ginput.priors import acos_interface as aci, tccon_priors, map_maker, mlo_smo_prep, automation
 from ginput.mod_maker import mod_maker
-from ginput.download import get_GEOS5, get_NOAA_flask_data
+from ginput.download import get_GEOS5, get_NOAA_flask_data, get_fo2_data
 
 
 def parse_args():
@@ -48,8 +48,11 @@ def parse_args():
     get_rlg5_parser = subparsers.add_parser('get-rl-g5', help='Download GEOS5 FP or FP-IT data for spectra in a runlog')
     get_GEOS5.parse_runlog_args(get_rlg5_parser)
 
-    get_noaa_parser = subparsers.add_parser("getnoaa",help="Download NOAA flask data")
+    get_noaa_parser = subparsers.add_parser('getnoaa', help='Download NOAA flask data')
     get_NOAA_flask_data.parse_args(get_noaa_parser)
+
+    get_fo2_parser = subparsers.add_parser('getfo2', help='Download input data required to calculate f(O2)')
+    get_fo2_data.parse_args(get_fo2_parser)
 
     map_parser = subparsers.add_parser('map', help='Generate .map (a priori) files.')
     map_maker.parse_cl_args(map_parser)
@@ -57,7 +60,11 @@ def parse_args():
     auto_parser = subparsers.add_parser('auto', help='Entry point for running ginput in an automation environment')
     automation.parse_cl_args(auto_parser)
 
-    return vars(parser.parse_args())
+    clargs = vars(parser.parse_args())
+    if 'driver_fxn' not in clargs:
+        parser.print_usage()
+    else:
+        return clargs
 
 
 def main():
