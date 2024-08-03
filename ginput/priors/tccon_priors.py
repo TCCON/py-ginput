@@ -58,6 +58,7 @@ import argparse
 from collections import OrderedDict
 from copy import deepcopy
 import datetime as dt
+from pathlib import Path
 
 from dateutil.relativedelta import relativedelta
 from glob import glob
@@ -74,6 +75,9 @@ from ..mod_maker import tccon_sites
 from ..common_utils import mod_utils, ioutils, readers, writers, run_utils, mod_constants as const
 from ..common_utils.versioning import GeosSource
 from ..common_utils.ggg_logging import logger
+from . import fo2_prep
+
+from typing import Optional, Union
 
 GGGPathError = mod_utils.GGGPathError
 
@@ -170,6 +174,119 @@ def _init_prof(profs, n_lev, n_profs=0, fill_val=np.nan):
                 target_shape, profs.shape
             ))
         return profs
+
+
+class O2MeanMoleFractionRecord(object):
+    """A record of the global mean O2 dry mole fraction.
+
+    This class does not inherit from :class:`TraceGasRecord` because it does not provide
+    a profile; it provides a global mean value for a given date.
+
+    Initialization arguments:
+
+    :param o2_mole_fraction_file: path to the file containing a timeseries of O2 mole fractions,
+     created by the :mod:`fo2_prep` module (accessed via the "update_fo2" subcommand of run_ginput.py).
+
+    :param delay_years: number of years before the target year to exclude from the f(O2) data. This is
+     to support reproducible files, see discussion below.
+
+    :param max_extrap_years: number of years after the final year (following truncation) of the f(O2)
+     data to extrapolate.
+
+    :param extrap_basis_years: number of years at the end of the f(O2) data (following truncation) to fit
+     for the extrapolation.
+
+    .. note:: What are ``delay_years`` and ``max_extrap_years`` all about?
+       The issue is that there is some latency in the NOAA and Scripps data, and we need to make sure that
+       we can reproduce the same output whenever we run ginput. The NOAA data tends to set the latency, since
+       it is a yearly average. For example, it is Aug 2024 as I write this, and the NOAA global data extends
+       to 2023. It will probably be a few months into 2025 before the 2024 data is available, so if I try to
+       generate priors for 1 Jan 2025 on 2 Jan 2025, the 2024 NOAA data certainly won't be available, but if
+       I generate those priors on 1 May 2025, the 2024 NOAA data will probably be available. This makes the
+       O2 DMFs dependent on when we run, which isn't ideal.
+
+       The solution is similar to what we do for OCO-2/3 and will eventually do for the primary gases for TCCON:
+       only use up to a certain number of years before our priors' date no matter if later data is available or
+       not. In the example of making priors for 1 Jan 2025, our default is to withhold two years (``delay_years=2``),
+       so we only use up to 2023 data, which should definitely be available by then. We then extrapolate 3 years
+       by default (``max_extrap_years=3``), bringing us to 2026. Since we treat the O2 data as being at the
+       midpoint of each year, i.e. 1 July, that ensures that we will always have a data point after any date in
+       2025.
+
+       This does, of course, introduce error into the f(O2) estimation, though at least as of 2024, f(O2) is changing
+       pretty linearly, so the error is small. If that starts to change, then we will revisit this approach.
+       The error is a reasonable price to pay in exchange for reproducible runs.
+    """
+    def __init__(self,
+                 o2_mole_fraction_file: Union[str, Path] = fo2_prep.DEFAULT_FO2_FILE,
+                 delay_years: int = 2,
+                 max_extrap_years: int = 3,
+                 extrap_basis_years: int = 5):
+        if max_extrap_years <= delay_years:
+            raise ValueError('max_extrap_years must be greater than delay_years')
+        if not os.path.exists(o2_mole_fraction_file):
+            raise IOError(f'O2 mole fraction file does not exist at {o2_mole_fraction_file}. Make sure the path is correct and you have run the '
+                          '"update_fo2" subcommand of run_ginput.py at least once.')
+        self._o2_df = readers.read_tabular_file_with_header(o2_mole_fraction_file).set_index('year')
+        self._delay_years = delay_years
+        self._max_extrap_years = max_extrap_years
+        self._extrap_basis_years = extrap_basis_years
+
+    def get_o2_mole_fraction(self, target_date: pd.Timestamp):
+        """Calculate the O2 mole fraction for a given date.
+
+        The date must be within the bounds of the O2 data availble plus however
+        long we are allowed to extrapolate for, or a :class:`RuntimeError` will be
+        raised.
+        """
+        extrapolated_o2_df = self.truncate_and_extrapolate(target_date.year)
+
+        # The O2 data contains yearly averages, so we'll treat those as being the value
+        # at the midpoint of the year (around July 1)
+        o2_dates = pd.to_datetime({'year': extrapolated_o2_df.index, 'month': 7, 'day': 1})
+        o2_julian_dates = pd.DatetimeIndex(o2_dates).to_julian_date()
+        o2_values = extrapolated_o2_df['fo2'].to_numpy()
+        target_julian_date = target_date.to_julian_date()
+
+        if target_julian_date < np.min(o2_julian_dates) or target_julian_date > np.max(o2_julian_dates):
+            raise RuntimeError(f'Target date {target_date} is outside the range of dates available from f(O2) input data')
+        
+        target_o2_value = np.interp([target_julian_date], o2_julian_dates, o2_values).item()
+        return target_o2_value
+
+    def truncate_and_extrapolate(self, target_year: int):
+        """Return a copy of the O2 dataframe truncated by ``self._delay_years`` and extrapolated.
+
+        This implements the logic to ensure consistent O2 mole fractions as new NOAA and Scripps
+        data become available, see the note on the class documentation.
+
+        :param target_year: the year of the date we want an O2 mole fraction for.
+        """
+        last_year_to_keep = target_year - self._delay_years
+        if self._o2_df.index.max() < last_year_to_keep:
+            last_year_in_df = self._o2_df.index.max()
+            raise RuntimeError(f'O2 mole fraction data does not extend far enough; needed up to {last_year_to_keep}, only have up to {last_year_in_df}')
+        if target_year >= last_year_to_keep + self._max_extrap_years:
+            raise RuntimeError(f'{self._max_extrap_years} is not sufficient, must extrapolate from {last_year_to_keep} to one year past {target_year}')
+        
+        tt = self._o2_df.index <= last_year_to_keep
+        df = self._o2_df.loc[tt, :].copy()
+        df['extrap_flag'] = 0
+
+        first_basis_year = last_year_to_keep - self._extrap_basis_years + 1
+        bb = df.index >= first_basis_year
+        years = df.index[bb].to_numpy().astype(float)
+        fo2_values = df.loc[bb, 'fo2'].to_numpy()
+        fit = np.polynomial.polynomial.Polynomial.fit(years, fo2_values, deg=1)
+        extrap_years = np.arange(last_year_to_keep+1, last_year_to_keep+self._max_extrap_years+1, dtype=float)
+        extrap_fo2_values = fit(extrap_years)
+
+        # The O2 mole fraction seems to follow a pretty linear decrease, so a
+        # linear fit over the last few years should do a reasonable job of
+        # capturing its trend.
+        extrap_rows = pd.DataFrame({'fo2': extrap_fo2_values, 'extrap_flag': 1}, index=extrap_years.astype(int))
+        return pd.concat([df, extrap_rows])
+
 
 
 class TraceGasRecord(object):
@@ -2738,6 +2855,10 @@ def generate_single_tccon_prior(mod_file_data, utc_offset, concentration_record,
     if co_source == GeosSource.IT:
         raise NotImplementedError('ginput v1.0.6 does not handle GEOS IT files')
 
+    # We only need the datetime to get the O2 mole fraction
+    o2_record = O2MeanMoleFractionRecord()
+    o2_dmf = o2_record.get_o2_mole_fraction(pd.Timestamp(file_date))
+
     # Make the UTC date a datetime object that is rounded to a date (hour/minute/etc = 0)
     obs_utc_date = dt.datetime.combine((file_date - utc_offset).date(), dt.time())
 
@@ -2822,7 +2943,9 @@ def generate_single_tccon_prior(mod_file_data, utc_offset, concentration_record,
                      'prof_ref_lat': trop_ref_lat,
                      'surface_alt': mod_file_data['scalar']['Height'],
                      'tropopause_alt': z_trop_met,
-                     'strat_used_eqlat': use_eqlat_strat}
+                     'strat_used_eqlat': use_eqlat_strat,
+                     'global_o2_dry_mole_fraction': o2_dmf,
+                     'co_source': co_source}
 
     return map_dict, units_dict, map_constants
 
@@ -3042,10 +3165,18 @@ def generate_tccon_priors_driver(mod_data, utc_offsets, species, site_abbrevs='x
                 generate_single_tccon_prior(mod_data[iprofile], utc_offsets[iprofile],
                                             specie_record, **prior_kwargs)
 
-            if ispecie == 0 or np.isnan(map_constants['tropopause_alt']):
+            # Not all species return tropopause_alt and the other extra data we want, so
+            # we take the first set of constants to give ourselves a dictionary for that,
+            # but then replace it when a later (more complete) set of constants is returned.
+            if ispecie == 0 or np.isnan(map_constants['tropopause_alt']):  # noqa: F821
+                map_constants = specie_constants
+
+            # For the other dictionaries, we just want the first set of profiles and units
+            # to initialize our dictionary, then we add the gas profiles to the output after
+            # that.
+            if ispecie == 0:
                 profile_dict = specie_profile
                 units_dict = specie_units
-                map_constants = specie_constants
             else:
                 for ancvar in ancillary_variables:
                     if not np.allclose(specie_profile[ancvar], profile_dict[ancvar], equal_nan=True):
@@ -3068,7 +3199,7 @@ def generate_tccon_priors_driver(mod_data, utc_offsets, species, site_abbrevs='x
                 # If model data was passed in directly, we have to figure out the file name from
                 # the coordinates given in that data.
                 vmr_name = mod_utils.vmr_file_name(obs_date=site_date, lon=site_lon, lat=site_lat,
-                                                keep_latlon_prec=keep_latlon_prec)
+                                                   keep_latlon_prec=keep_latlon_prec)
             else:
                 # If we got the path to the model file, then it's safer to just reuse the parts of the
                 # name that should match. This avoids the bug described in issue #5 with slightly negative
@@ -3082,12 +3213,17 @@ def generate_tccon_priors_driver(mod_data, utc_offsets, species, site_abbrevs='x
                 if not os.path.exists(this_vmr_dir):
                     os.makedirs(this_vmr_dir)
                 vmr_name = os.path.join(this_vmr_dir, vmr_name)
+            extra_header_info = {
+                'EFF_LAT_TROP': map_constants['trop_eqlat'],
+                'MIDTROP_THETA': '{:.2f}'.format(map_constants['midtrop_theta']),
+                'GLOBAL_O2_DRY_MOLE_FRACTION': '{:.8f}'.format(map_constants['global_o2_dry_mole_fraction']),
+                'CO_SOURCE': map_constants['co_source'].value
+            }
             writers.write_vmr_file(vmr_name, tropopause_alt=map_constants['tropopause_alt'],
                                    profile_date=site_date, profile_lat=site_lat,
                                    profile_alt=profile_dict['Height'], profile_gases=vmr_gases,
                                    gas_name_order=gas_name_order,
-                                   extra_header_info={'EFF_LAT_TROP': map_constants['trop_eqlat'],
-                                                      'MIDTROP_THETA': '{:.2f}'.format(map_constants['midtrop_theta'])})
+                                   extra_header_info=extra_header_info)
 
 
 def _add_common_cl_args(parser):
