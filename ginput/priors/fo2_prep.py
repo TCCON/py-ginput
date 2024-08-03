@@ -84,6 +84,11 @@ def create_or_update_fo2_file(fo2_input_data_dir: Union[str, Path], fo2_dest_fil
         The number of backup copies of ``fo2_dest_file`` to keep; if the current number of backups is greater than or equal to
         this number, the oldest one(s) will be removed. Set this to ``None`` to keep all backups.
     """
+
+    # Although our Scripps reader uses the "CO2 filled" column, which contains O2/N2 values 
+    # to the end of the current year filled in by a fit, those data should not get included
+    # because the NOAA data will almost certainly be released after the Scripps values are
+    # updated with real measurements.
     source_files = _fo2_files_from_dir(fo2_input_data_dir)
     new_fo2_df = fo2_from_scripps_o2n2_and_noaa_co2(**source_files).dropna()
     new_fo2_df.index.name = 'year'
@@ -195,7 +200,8 @@ def fo2_from_scripps_o2n2_and_noaa_co2(co2gl_file: Union[str, Path], alt_o2n2_fi
     -------
     DataFrame
         A dataframe containing the dry mole fraction of O2 (as the column "fo2") along with the inputs needed to
-        calculate it.
+        calculate it. Note that this will contain NAs for years with some data (e.g. Scripps but not NOAA) so
+        be sure to call ``.dropna()`` on it if you only want complete years.
     """
     co2gl = _read_co2gl_file(co2gl_file)['mean']
     d_co2gl = co2gl - co2gl[base_year]
