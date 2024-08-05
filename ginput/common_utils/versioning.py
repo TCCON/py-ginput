@@ -26,7 +26,7 @@ class GeosSource(Enum):
             return cls.UNKNOWN
 
 class GeosVersion:
-    def __init__(self, version_str: str, source: str | GeosSource, file_name: str, md5_checksum: str):
+    def __init__(self, version_str: str, source: Union[str, GeosSource], file_name: str, md5_checksum: str):
         self.version_str = version_str
         self.file_name = file_name
         self.md5_checksum = md5_checksum
