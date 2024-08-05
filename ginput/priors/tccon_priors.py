@@ -248,7 +248,7 @@ class O2MeanMoleFractionRecord(object):
         o2_values = extrapolated_o2_df['fo2'].to_numpy()
         target_julian_date = target_date.to_julian_date()
 
-        if target_julian_date < np.min(o2_julian_dates) or target_julian_date > np.max(o2_julian_dates):
+        if target_julian_date < o2_julian_dates.min() or target_julian_date > o2_julian_dates.max():
             raise RuntimeError(f'Target date {target_date} is outside the range of dates available from f(O2) input data')
         
         target_o2_value = np.interp([target_julian_date], o2_julian_dates, o2_values).item()
@@ -285,7 +285,7 @@ class O2MeanMoleFractionRecord(object):
         # linear fit over the last few years should do a reasonable job of
         # capturing its trend.
         extrap_rows = pd.DataFrame({'fo2': extrap_fo2_values, 'extrap_flag': 1}, index=extrap_years.astype(int))
-        return pd.concat([df, extrap_rows])
+        return pd.concat([df, extrap_rows], sort=True)
 
 
 
