@@ -724,7 +724,7 @@ def extract_mod_site_abbrevs(mod_files, default='xx'):
         fileparts = modf.split(os.sep)
         if len(fileparts) < 3:
             return default
-        elif not re.match(r'[a-zA-Z]{2}', fileparts[-3]):
+        elif not re.match(r'[a-zA-Z0-9]{2}', fileparts[-3]):
             return default
         else:
             return fileparts[-3]
