@@ -8,7 +8,7 @@ setup(
     description='Python code that creates the .mod and .vmr files used in GGG',
     author='Joshua Laughner, Sebastien Roche, Matthaeus Kiel',
     author_email='jlaugh@caltech.edu',
-    version='1.2.1',  # make sure stays in sync with the version in ginput/__init__.py
+    version='1.3.0',  # make sure stays in sync with the version in ginput/__init__.py
     url='',
     install_requires=[
         'astropy>=3.1.2',

@@ -1,6 +1,6 @@
 # Ginput: GGG meteorology and a priori VMR preprocessor
 
-[![DOI](https://data.caltech.edu/badge/534420806.svg)](https://data.caltech.edu/badge/latestdoi/534420806)
+|DOI| |docs|
 
 ## Copyright notice
 
@@ -18,8 +18,8 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 
 ## Quickstart
 
-* Make sure you have Anaconda Python (https://www.anaconda.com/products/individual) 
-  installed on your system
+* Make sure you have a Python installation with the `conda` package manager
+  on your system. We currently recommend [miniforge](https://github.com/conda-forge/miniforge).
 * Run `make install`
 * Run `./run_ginput.py --help` to see available subcommands
 * For more detailed help, try `man ginput` after running `make install`. 
@@ -98,3 +98,13 @@ setup.
 ## Contact
 
 For assistance with `ginput`, contact [Josh Laughner](https://science.jpl.nasa.gov/people/joshua-laughner/).
+
+.. |DOI| image:: https://data.caltech.edu/badge/534420806.svg
+    :alt: Persistent repository
+    :scale: 100%
+    :target: https://data.caltech.edu/badge/latestdoi/534420806
+
+.. |docs| image:: https://readthedocs.org/projects/ginput/badge/?version=latest
+    :alt: Documentation Status
+    :scale: 100%
+    :target: https://ginput.readthedocs.io/en/latest/?badge=latest

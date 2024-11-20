@@ -33,7 +33,8 @@ envname="$1"
 conda -h >& /dev/null
 if [[ $? != 0 ]]; then
     echo "Cannot create a conda environment for ginput because 'conda' is not on your PATH."
-    echo "Install Anaconda (https://www.anaconda.com/distribution/) or ensure that 'conda' is on your PATH."
+    echo "Install Miniforge (https://github.com/conda-forge/miniforge), or another package that provides 'conda', "
+    echo "or ensure that conda is properly initialized in your shell."
     exit 1
 fi
 
