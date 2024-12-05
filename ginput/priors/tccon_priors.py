@@ -240,20 +240,39 @@ class O2MeanMoleFractionRecord(object):
         long we are allowed to extrapolate for, or a :class:`RuntimeError` will be
         raised.
         """
-        extrapolated_o2_df = self.truncate_and_extrapolate(target_date.year)
+        dtindex = pd.to_datetime([target_date])
+        o2_dmf_arr = self.get_many_o2_mole_fractions(dtindex)
+        return o2_dmf_arr.item()
 
-        # The O2 data contains yearly averages, so we'll treat those as being the value
-        # at the midpoint of the year (around July 1)
-        o2_dates = pd.to_datetime({'year': extrapolated_o2_df.index, 'month': 7, 'day': 1})
-        o2_julian_dates = pd.DatetimeIndex(o2_dates).to_julian_date()
-        o2_values = extrapolated_o2_df['fo2'].to_numpy()
-        target_julian_date = target_date.to_julian_date()
+    def get_many_o2_mole_fractions(self, target_dates: pd.DatetimeIndex):
+        """Calculate the O2 mole fractions for a sequence of dates.
 
-        if target_julian_date < np.min(o2_julian_dates) or target_julian_date > np.max(o2_julian_dates):
-            raise RuntimeError(f'Target date {target_date} is outside the range of dates available from f(O2) input data')
+        The date must be within the bounds of the O2 data availble plus however
+        long we are allowed to extrapolate for, or a :class:`RuntimeError` will be
+        raised.
+        """
+
+        o2_dmfs = np.full(target_dates.size, np.nan)
+        # We have to truncate the input data for each unique year, so we'll
+        # group the calculations by year to speed things up (compared to doing
+        # one date at a time).
+        unique_years = np.unique(target_dates.year)
+        for year in unique_years:
+            extrapolated_o2_df = self.truncate_and_extrapolate(year)
         
-        target_o2_value = np.interp([target_julian_date], o2_julian_dates, o2_values).item()
-        return target_o2_value
+            # The O2 data contains yearly averages, so we'll treat those as being the value
+            # at the midpoint of the year (around July 1)
+            o2_dates = pd.to_datetime({'year': extrapolated_o2_df.index, 'month': 7, 'day': 1})
+            o2_julian_dates = pd.DatetimeIndex(o2_dates).to_julian_date()
+            o2_values = extrapolated_o2_df['fo2'].to_numpy()
+        
+            tt = target_dates.year == year
+            target_julian_dates = target_dates[tt].to_julian_date()
+            if np.any(target_julian_dates < np.min(o2_julian_dates)) or np.any(target_julian_dates > np.max(o2_julian_dates)):
+                raise RuntimeError('At least one target date is outside the range of dates available from f(O2) input data')
+        
+            o2_dmfs[tt] = np.interp(target_julian_dates, o2_julian_dates, o2_values)
+        return o2_dmfs
 
     def truncate_and_extrapolate(self, target_year: int):
         """Return a copy of the O2 dataframe truncated by ``self._delay_years`` and extrapolated.
