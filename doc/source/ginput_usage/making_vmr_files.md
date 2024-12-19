@@ -8,14 +8,6 @@ However, please note that GEOS FP is _not_ the standard met source for TCCON and
 ## Creating .vmr files for dates
 
 As with the previous steps, we will use the `run_ginput.py` script to call ginput.
-Before we can generate our `.vmr` files, we need to download one other set of input data, needed to calculate the global mean O2 mole fraction.
-To do this, simply run `./run_ginput.py update_fo2`; this will download the necessary data and write a file containing the mean O2 mole fractions calculated at `ginput/data/o2_mean_dmf.dat`.
-This command only needs run about once per year to update the data, but since it's pretty quick, running it more ofter (once a month or once a week even) is not a problem.
-
-```{note}
-The `update_fo2` subcommand was added in ginput v1.3.
-If you are using an older version of ginput, you will not have that subcommand, and ginput will not add the O2 mole fractions to the `.vmr` file headers.
-```
 
 To generate the actual `.vmr` files, we use the `vmr` subcommand.
 We'll assume that we are going to generate the `.vmr` files corresponding to the `.mod` files we made in {ref}`usage-mod`, so:
@@ -36,8 +28,16 @@ $ ./run_ginput.py vmr \
     --base-vmr-file ginput/testing/test_input_data/summer_35N.vmr \
     --integral-file ginput/testing/test_input_data/ap_51_level_0_to_70km.gnd \
     --save-path VMR_FILE_DIR \
+    --auto-update-fo2-file \
     20180101 \
     MOD_FILE_DIR/fp/xx/vertical
+```
+
+```{note}
+ginput v1.3 added a requirement for O2 mole fraction data when generating the `.vmr` files.
+For v1.3, you would have to execute the command `./run_ginput update_fo2` once before creating any `.vmr` files.
+From v1.3.1 on, you can use the `--auto-update-fo2-file` flag for the `vmr` subcommand as shown below.
+If you are using a version of ginput before 1.3, you will not have the `update_fo2` subcommand nor the `--auto-update-fo2-file` flag, and ginput will not add the O2 mole fractions to the `.vmr` file headers.
 ```
 
 This part of ginput requires several look up tables to be pre-calculated.
@@ -84,6 +84,7 @@ $ ./run_ginput.py rlvmr \
     --product fpit \
     --mod-root-dir MOD_FILE_DIR \
     --save-path VMR_FILE_DIR \
+    --auto-update-fo2-file \
     $gggpath/runlogs/gnd/pa_ggg_benchmark.grl
 ```
 

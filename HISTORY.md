@@ -1,5 +1,12 @@
 # Ginput Version History
 
+## 1.3.1
+
+This release improves the ergonomics of including the time-varying O2 mole fraction
+by providing an option to the `O2MeanMoleFractionRecord` and a command line flag for
+the `vmr` and `rlvmr` subcommands to automatically download the necessary data and
+create/update the O2 mole fraction data file when creating `.vmr` files.
+
 ## 1.3.0
 
 This release primarily adds the ability to calculate a time-varying O2 mole fraction,
