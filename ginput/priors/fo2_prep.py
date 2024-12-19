@@ -1,4 +1,5 @@
 from argparse import ArgumentParser
+from datetime import datetime, timedelta, timezone
 import pandas as pd
 from pathlib import Path
 from ..common_utils import versioning, readers, mod_constants
@@ -40,7 +41,7 @@ def parse_args(parser: Optional[ArgumentParser]):
                         help='O2 mole fraction file to create or update. Default is %(default)s.')
     parser.add_argument('--max-num-backups', type=int, default=5,
                         help=' Maximum number of backups of the O2 mole fraction file to keep. Default is %(default)d.')
-    
+
     if am_i_main:
         return vars(parser.parse_args())
     else:
@@ -48,7 +49,7 @@ def parse_args(parser: Optional[ArgumentParser]):
 
 
 
-def fo2_update_driver(fo2_dest_file: Union[str, Path] = DEFAULT_FO2_FILE, max_num_backups: int = 5):
+def fo2_update_driver(fo2_dest_file: Union[str, Path] = DEFAULT_FO2_FILE, max_num_backups: int = 5, time_since_mod: Optional[timedelta] = None):
     """Checks for new versions of the input files needed for f(O2) and updates the f(O2) table file if needed
 
     Parameters
@@ -59,13 +60,33 @@ def fo2_update_driver(fo2_dest_file: Union[str, Path] = DEFAULT_FO2_FILE, max_nu
     max_num_backups
         Maximum number of backups of the f(O2) file to keep.
 
+    time_since_mod
+        If given a timedelta, then this function will return without trying to update if the f(O2) file
+        has a modification time more recent than (now - time_since_mod).
+
     See also
     --------
     - :func:``create_or_update_fo2_file`` if you want to update an f(O2) data file without downloading
       new input data.
     """
+    fo2_dest_file = Path(fo2_dest_file)
+    if time_since_mod is not None and fo2_dest_file.exists():
+        if _check_time_since_modification(fo2_dest_file, time_since_mod):
+            logger.info('Will check if fO2 file needs updated')
+        else:
+            logger.info('Skipping fO2 file update (modified recently enough)')
+            return
+
     dl_dir, _ = get_fo2_data.download_fo2_inputs(only_if_new=True)
     create_or_update_fo2_file(dl_dir, fo2_dest_file, max_num_backups=max_num_backups)
+
+
+def _check_time_since_modification(fo2_dest_file: Path, time_since_mod: timedelta) -> bool:
+    mtime = fo2_dest_file.stat().st_mtime
+    mtime = datetime.fromtimestamp(mtime, tz=timezone.utc)
+    logger.info(f'fO2 file last updated on {mtime:%Y-%m-%d %H:%M}')
+    now = datetime.now(timezone.utc)
+    return (now - mtime) > time_since_mod
 
 
 def create_or_update_fo2_file(fo2_input_data_dir: Union[str, Path], fo2_dest_file: Union[str, Path], max_num_backups: int = 5):
@@ -109,7 +130,9 @@ def create_or_update_fo2_file(fo2_input_data_dir: Union[str, Path], fo2_dest_fil
         fo2_df = readers.read_tabular_file_with_header(fo2_dest_file).set_index('year')
         tt = new_fo2_df.index > fo2_df.index.max()
         if tt.sum() == 0:
-            # No new data, nothing to do
+            # No new data, nothing to do except to touch the file to ensure future checks
+            # based on its modification time recognize that we tried to update it.
+            fo2_dest_file.touch()
             logger.info(f'No new f(O2) data (last year in current file = {fo2_df.index.max()}, in new data = {new_fo2_df.index.max()}), not updating the file')
             return
 
@@ -129,7 +152,7 @@ def create_or_update_fo2_file(fo2_input_data_dir: Union[str, Path], fo2_dest_fil
         source_files=source_files,
         insert_line_index=2,  # want this after the first blank line in the header
     )
-    
+
     with open(fo2_dest_file, 'w') as f:
         f.writelines(new_header)
         fo2_df.reset_index().to_string(f, index=False)
@@ -189,7 +212,7 @@ def fo2_from_scripps_o2n2_and_noaa_co2(co2gl_file: Union[str, Path], alt_o2n2_fi
 
     ljo_o2n2_file
         Path to the Scripps O2/N2 ratio file for La Jolla Pier, California, USA.
-    
+
     base_year
         The year for which ``x_o2_ref`` is defined.
 
@@ -205,19 +228,19 @@ def fo2_from_scripps_o2n2_and_noaa_co2(co2gl_file: Union[str, Path], alt_o2n2_fi
     """
     co2gl = _read_co2gl_file(co2gl_file)['mean']
     d_co2gl = co2gl - co2gl[base_year]
-    
+
     # The "CO2 filled column" is the actual O2/N2 measurements (yes, confusing that it is called "CO2", I think it's supposed
     # to be like "C(O2)" not "carbon dioxide") but with missing values filled in by a fit. Using that simplifies the calculation
     # because we don't need to deal with fill values, and should not introduce a significant error, especially since the NOAA
     # data will usually be the latency-limited one
     o2_n2 = _read_global_mean_o2n2(alt_o2n2_file=alt_o2n2_file, cgo_o2n2_file=cgo_o2n2_file, ljo_o2n2_file=ljo_o2n2_file,
-                                     yearly_avg=True, keep_datetime_index=False, column='CO2 filled')
+                                   yearly_avg=True, keep_datetime_index=False, column='CO2 filled')
     d_o2_n2 = o2_n2 - o2_n2[base_year]
-    
+
     d_xo2 = _delta_xo2_explicit_xco2(d_o2_n2, d_co2=d_co2gl, x_co2=co2gl)
     fo2_df = d_xo2 + x_o2_ref
     return pd.DataFrame({'fo2': fo2_df, 'o2_n2': o2_n2, 'd_o2_n2': d_o2_n2, 'co2': co2gl, 'd_co2': d_co2gl})
-    
+
 
 def _delta_xo2_explicit_xco2(d_o2_n2, d_co2, x_co2, x_o2_ref=DEFAULT_X_O2_REF):
     """Calculate the change in the O2 mole fraction relative to a reference value.
@@ -257,7 +280,7 @@ def _read_co2gl_file(co2_file, datetime_index=False):
             line = f.readline()
             if line.startswith('# year'):
                 break
-                
+
         columns = line[1:].split()
         df = pd.read_csv(f, sep=r'\s+')
         df.columns = columns
@@ -266,7 +289,7 @@ def _read_co2gl_file(co2_file, datetime_index=False):
         else:
             df.index = df['year']
         return df
-    
+
 
 def _read_global_mean_o2n2(alt_o2n2_file, cgo_o2n2_file, ljo_o2n2_file, yearly_avg=False, keep_datetime_index=False, column='CO2'):
     """Read the three Scripps O2/N2 files and average them to produce a global estimate O2/N2 ratio.
@@ -287,7 +310,7 @@ def _read_global_mean_o2n2(alt_o2n2_file, cgo_o2n2_file, ljo_o2n2_file, yearly_a
         return global_mean.groupby(lambda i: i.year).mean()
     else:
         return global_mean
-    
+
 
 def _read_o2n2_file(o2n2_file):
     """Read one of the Scripps O2/N2 files.
@@ -296,16 +319,16 @@ def _read_o2n2_file(o2n2_file):
         line = f.readline()
         while line.startswith('"'):
             line = f.readline()
-        
+
         # The header *should* be the first line that doesn't start with a quote mark
         columns = [x.strip() for x in line.split(',')]
         # The next line continues the header for some columns
         line = f.readline()
         columns = [f'{c} {x.strip()}'.strip() for c, x in zip(columns, line.split(','))]
-        
+
         df = pd.read_csv(f, header=None, na_values='-99.99')
         df.columns = columns
-        
+
     # Make a proper datetime index
     df.index = pd.to_datetime({'year': df['Yr'], 'month': df['Mn'], 'day': 1})
     return df
