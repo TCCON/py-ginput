@@ -13,6 +13,15 @@ Ginput provides the ability to download these files from 3 different streams:
 2. GEOS FP: this is a freely available simulation product from Goddard. It is available at higher spatial resolution than FP-IT but does not go as far back in time.
 3. GEOS IT: this is the new instrument teams product, released by Goddard in 2023. It also requires a data subscription. GGG2020 will switch to this when FP-IT is discontinued.
 
+```{note}
+The examples in the rest of this page will show downloading GEOS FP data, since that is the only one of these three that does not require a data subscription.
+However, if you are using ginput to generate priors for TCCON or COCCON retrievals, it is required that you use priors generated with GEOS FP-IT or GEOS IT, as those are the standard met types used by both networks.
+For information on how to obtain these priors, see:
+
+- [General information](https://tccon-wiki.caltech.edu/Main/ObtainingGinputData)
+- [For PROFFAST users](https://tccon-wiki.caltech.edu/Main/EM27ProffastSupport)
+```
+
 Downloading is done with the `getg5` and `get-rl-g5` subcommands to `run_ginput.py`. As with all subcommands, passing the `--help` flag will print out the most up-to-date command line argument information. 
 
 ## Expected file structure
@@ -54,17 +63,17 @@ It accepts a date or date range as its positional argument.
 The `--path` argument indicates where to download the data to.
 (GEOS data volume adds up quickly, so make sure this is right!)
 The `--mode`, `--filetypes` (short: `-t`), and `--levels` (short: `-l`) options set which data stream (FP, FP-IT, or IT), which kind of data (meteorology or chemistry) and which set of vertical levels (3D hybrid or 2D) to download files for.
-If you wanted to download all the files needed to generate standard GGG2020 priors for 1 Jan 2018, you would run this command three times as follows:
+If you wanted to download all the files needed to generate (nonstandard) GGG2020 priors from GEOS FP data, for 1 Jan 2018, you would run this command three times as follows:
 
 ```
-$ ./run_ginput.py getg5 --mode FPIT --filetypes met --levels eta --path GEOS_MET_DIR 20180101
-$ ./run_ginput.py getg5 --mode FPIT --filetypes met --levels surf --path GEOS_MET_DIR 20180101
-$ ./run_ginput.py getg5 --mode FPIT --filetypes chm --levels eta --path GEOS_CHEM_DIR 20180101
+$ ./run_ginput.py getg5 --mode FP --filetypes met --levels eta --path GEOS_MET_DIR 20180101
+$ ./run_ginput.py getg5 --mode FP --filetypes met --levels surf --path GEOS_MET_DIR 20180101
+$ ./run_ginput.py getg5 --mode FP --filetypes chm --levels eta --path GEOS_CHEM_DIR 20180101
 ```
 
 `GEOS_MET_DIR` and `GEOS_CHEM_DIR` can be whatever path you wish. 
 Note that in the third command, the argument to `--filetypes` is "chm" (no "e").
-If you wished to download the openly available GEOS FP data, you would change the "FPIT" argument of `--mode` to "FP".
+If you wished to download the GEOS FP-IT data used for the standard priors, you would change the "FP" argument of `--mode` to "FPIT" (note that this would require a data subscription from NASA Goddard).
 If you wished to download data for all of January 2018, you would make the positional argument "20180101-20180201". 
 Note that in this case, the second date in the range is *exclusive*, that is, this command would download up to and including 31 Jan 2018 but not 1 Feb 2018.
 
@@ -84,12 +93,12 @@ Likewise, if you are someone who needs to do standard GGG2020 processing of TCCO
 
 If you want to download GEOS data necessary to generate the `.mod` and `.vmr` files to process spectra defined in a runlog, the `get-rl-g5` subcommand will automatically download the GEOS files for the dates included in a runlog.
 Suppose you have a runlog, `$GGGPATH/runlogs/gnd/xx20200101_20200201.grl`. 
-To download the GEOS files needed to make `.mod` and `.vmr` files for this runlog, you would again need three commands:
+To download the GEOS files needed to make nonstandard `.mod` and `.vmr` files for this runlog, you would again need three commands:
 
 ```
-$ ./run_ginput get-rl-g5 --mode FPIT --filetypes met --levels eta --path GEOS_MET_DIR $GGGPATH/runlogs/gnd/xx20200101_20200201.grl
-$ ./run_ginput get-rl-g5 --mode FPIT --filetypes met --levels surf --path GEOS_MET_DIR $GGGPATH/runlogs/gnd/xx20200101_20200201.grl
-$ ./run_ginput get-rl-g5 --mode FPIT --filetypes chm --levels eta --path GEOS_MET_DIR $GGGPATH/runlogs/gnd/xx20200101_20200201.grl
+$ ./run_ginput get-rl-g5 --mode FP --filetypes met --levels eta --path GEOS_MET_DIR $GGGPATH/runlogs/gnd/xx20200101_20200201.grl
+$ ./run_ginput get-rl-g5 --mode FP --filetypes met --levels surf --path GEOS_MET_DIR $GGGPATH/runlogs/gnd/xx20200101_20200201.grl
+$ ./run_ginput get-rl-g5 --mode FP --filetypes chm --levels eta --path GEOS_MET_DIR $GGGPATH/runlogs/gnd/xx20200101_20200201.grl
 ```
 
 By default, this will download the met data required for the entire runlog. 

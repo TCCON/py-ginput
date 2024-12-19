@@ -1003,7 +1003,7 @@ def equivalent_latitude_functions(ncdf_path,mode,start=None,end=None,muted=False
 
 def _add_common_args(parser):
     def english_join(conj, seq):
-        seq = ['"{}"' for el in seq]
+        seq = [f'"{el}"' for el in seq]
         if len(seq) == 1:
             return seq[0]
 
