@@ -70,4 +70,22 @@ If you put your GEOS meteorology and chemistry files in the same directory, such
 
 ## Producing model files for a runlog
 
-If you are a GGG user and have a runlog for which you need the 
+If you are a GGG user and have a runlog for which you need the `.mod` files for, ginput provides a command to create only the `.mod` files needed by that runlog.
+(If you don't know what a runlog is, then just skip this section.)
+This still requires you have the GEOS files downloaded; {ref}`usage-dl-met` includes a section on how to download files needed for a runlog.
+
+The following example shows how you would generate the `.mod` files for the Park Falls benchmark runlog that is included with GGG.
+Since that runlog has spectra from 2004, we cannot use GEOS FP data for it, so this example shows the use of GEOS FP-IT:
+
+```
+$ ./run_ginput.py rlmod \
+    --include-chem \
+    --chem-path GEOS_CHEM_DIR \
+    --mode fpit-eta \
+    --save-path MOD_FILE_DIR \
+    $GGGPATH/runlogs/gnd/pa_ggg_benchmark.grl \
+    GEOS_MET_DIR
+```
+
+Note that we do not specify latitude, longitude, altitude, site IDs, or dates.
+All of that information is automatically inferred from the runlog.

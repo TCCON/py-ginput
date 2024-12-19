@@ -25,3 +25,6 @@ $ ./run_ginput.py map \
 If you want netCDF `.map` files instead, change `--map-fmt txt` to `--map-fmt nc`.
 
 As with the other sections, if you are generating `.map` files for different locations or dates, make sure to pass the correct `--lat`, `--lon` and date range values.
+
+Unlike `.mod` and `.vmr` files, there is no option to generate `.map` files for a runlog.
+This is because GGG does not require `.map` files as input (but it does need `.mod` and `.vmr` files), so there is little use for generating the `.map` files corresponding to the `.mod` and `.vmr` files required by a runlog.

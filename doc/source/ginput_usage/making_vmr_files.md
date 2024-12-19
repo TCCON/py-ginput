@@ -69,3 +69,38 @@ VMR_FILE_DIR
 ```
 
 See {ref}`usage-mod` for an explanation of the meaning of each level.
+
+## Producing .vmr files for a runlog
+
+As with the `.mod` files, ginput can generate the specific `.vmr` files needed for a GGG runlog.
+(If you don't know what a runlog is, you can skip this section.)
+The following example shows how to create the `.vmr` files for the Park Falls benchmark runlog included with GGG.
+Like with the `.mod` files, this example uses GEOS FP-IT data, because GEOS FP does not cover the year needed by this runlog.
+
+```
+$ ./run_ginput.py rlvmr \
+    --base-vmr-file ginput/testing/test_input_data/summer_35N.vmr \
+    --integral-file ginput/testing/test_input_data/ap_51_level_0_to_70km.gnd \
+    --product fpit \
+    --mod-root-dir MOD_FILE_DIR \
+    --save-path VMR_FILE_DIR \
+    $gggpath/runlogs/gnd/pa_ggg_benchmark.grl
+```
+
+Most of the options are the same as the example above where we specific the dates to generate.
+However, notice that instead of giving the full path to the `.mod` files as the second positional argument, we use the `--mod-root-dir` option and point it to the top directory that the `.mod` files were output to.
+This directory must have the structure `met/site/vertical`.
+For our example, it would be:
+
+```
+MOD_FILE_DIR
+└── fpit
+    └── pa
+        └── vertical
+            ├── FPIT_2004072121Z_46N_090W.mod
+            ├── FPIT_2004072200Z_46N_090W.mod
+            └── FPIT_2004122215Z_46N_090W.mod
+```
+
+The reason we recommend using `--mod-root-dir` in this case is that, if your runlog contains multiple sites, this allows ginput to automatically select the correct subdirectory, assuming that your `.mod` files are organized in the above structure.
+On the other hand, if all of your `.mod` files are in one directory (even from different sites), then passing the path to that directory as the second positional argument and omitting the `--mod-root-dir` option instead will handle that organization.
