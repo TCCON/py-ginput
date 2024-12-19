@@ -197,6 +197,15 @@ class O2MeanMoleFractionRecord(object):
     :param extrap_basis_years: number of years at the end of the f(O2) data (following truncation) to fit
      for the extrapolation.
 
+    :param auto_update_fo2_file: set to ``True`` to try automatically updating the f(O2) data file. This
+     is ``False`` by default because is does require downloading data from Scripps and NOAA, and our philosophy
+     is that any action taken over the internet should require you to opt-in to that.
+
+    :param auto_update_td: the timedelta defining how long ago the f(O2) data file must have been updated
+     to try updating it again if ``auto_update_fo2_file`` is ``True``. Setting to ``None`` will always try
+     to update the file. If the file does not exist and ``auto_update_fo2_file = True``, then it will always
+     be created.
+
     .. note:: What are ``delay_years`` and ``max_extrap_years`` all about?
        The issue is that there is some latency in the NOAA and Scripps data, and we need to make sure that
        we can reproduce the same output whenever we run ginput. The NOAA data tends to set the latency, since
@@ -222,12 +231,17 @@ class O2MeanMoleFractionRecord(object):
                  o2_mole_fraction_file: Union[str, Path] = fo2_prep.DEFAULT_FO2_FILE,
                  delay_years: int = 2,
                  max_extrap_years: int = 3,
-                 extrap_basis_years: int = 5):
+                 extrap_basis_years: int = 5,
+                 auto_update_fo2_file: bool = False,
+                 auto_update_td: dt.timedelta = dt.timedelta(days=7)):
         if max_extrap_years <= delay_years:
             raise ValueError('max_extrap_years must be greater than delay_years')
+        
+        if auto_update_fo2_file:
+            fo2_prep.fo2_update_driver(o2_mole_fraction_file, time_since_mod=auto_update_td)
         if not os.path.exists(o2_mole_fraction_file):
             raise IOError(f'O2 mole fraction file does not exist at {o2_mole_fraction_file}. Make sure the path is correct and you have run the '
-                          '"update_fo2" subcommand of run_ginput.py at least once.')
+                          '"update_fo2" subcommand of run_ginput.py at least once OR set auto_update_fo2_file = True when instantiating this class.')
         self._o2_df = readers.read_tabular_file_with_header(o2_mole_fraction_file).set_index('year')
         self._delay_years = delay_years
         self._max_extrap_years = max_extrap_years
@@ -2886,7 +2900,8 @@ def calculate_meso_co(alt_profile, eqlat_profile, pres_profile, temp_profile, pr
 
 
 def generate_single_tccon_prior(mod_file_data, utc_offset, concentration_record, zgrid=None,
-                                use_eqlat_trop=True, use_eqlat_strat=True, use_adjusted_zgrid=True):
+                                use_eqlat_trop=True, use_eqlat_strat=True, use_adjusted_zgrid=True,
+                                auto_update_fo2_file=False):
     """
     Driver function to generate the TCCON prior profiles for a single observation.
 
@@ -2926,6 +2941,10 @@ def generate_single_tccon_prior(mod_file_data, utc_offset, concentration_record,
      is used as-is. 
     :type use_adjusted_zgrid: bool
 
+    :param auto_update_fo2_file: if ``True``, automatically update the f(O2) data file if it is missing or it has been
+     more than 7 days since it was last updated.
+    :type auto_update_fo2_file: bool
+
     :return: a dictionary containing all the profiles (including many for debugging) and a dictionary containing the
      units of the values in each profile.
     :rtype: dict, dict
@@ -2942,7 +2961,7 @@ def generate_single_tccon_prior(mod_file_data, utc_offset, concentration_record,
     co_source = mod_file_data['constants'].get('co_source', GeosSource.UNKNOWN)
 
     # We only need the datetime to get the O2 mole fraction
-    o2_record = O2MeanMoleFractionRecord()
+    o2_record = O2MeanMoleFractionRecord(auto_update_fo2_file=auto_update_fo2_file)
     o2_dmf = o2_record.get_o2_mole_fraction(pd.Timestamp(file_date))
 
     # Make the UTC date a datetime object that is rounded to a date (hour/minute/etc = 0)
@@ -3161,7 +3180,7 @@ def generate_full_tccon_vmr_file(mod_data, utc_offsets, save_dir, product='fpit'
 
 def generate_tccon_priors_driver(mod_data, utc_offsets, species, site_abbrevs='xx', write_vmrs=False,
                                  gas_name_order=None, keep_latlon_prec=False, flat_outdir=True, product='fpit',
-                                 special_header_info: Optional[dict] = None, **prior_kwargs):
+                                 special_header_info: Optional[dict] = None, auto_update_fo2_file=False, **prior_kwargs):
     """
     Generate multiple TCCON priors or a file containing multiple gas concentrations
 
@@ -3258,6 +3277,11 @@ def generate_tccon_priors_driver(mod_data, utc_offsets, species, site_abbrevs='x
 
     # if given species names, convert to the actual records.
     species = [gas_records[s]() if isinstance(s, str) else s for s in species]
+
+    # if told to update the f(O2) file, do that once here and keep the False default for the
+    # single priors function to avoid spamming the log with messages from the f(O2) class
+    if auto_update_fo2_file:
+        O2MeanMoleFractionRecord(auto_update_fo2_file=True)
 
     vmrs_dir, write_vmrs = parse_boollike_input(write_vmrs)
 
@@ -3376,6 +3400,9 @@ def _add_common_cl_args(parser):
                         help='A JSON file that configures which files to read MLO/SMO data from. The top level must be a '
                              'dictionary with lowercase gas names as keys. The values must be dictionaries with "mlo_file" '
                              'and "smo_file" as keys, with their values being paths to the files to read.')
+    parser.add_argument('--auto-update-fo2-file', action='store_true',
+                        help='Give this flag to create the required f(O2) file if missing or update it if it was last modified '
+                             'more than 7 days ago')
 
 
 def parse_args(parser=None):
@@ -3490,7 +3517,7 @@ def cl_driver(date_range, mod_dir=None, mod_root_dir=None, save_dir=None, produc
         msg += '  * ' + '\n  * '.join(missing_files)
         msg += '\nEither correct the mod path or generate these files'
         raise IOError(msg)
-    else:
+    elif len(missing_files) > 0:
         logger.warning(f'{len(missing_files)} .mod files missing from this date range, will not generate the corresponding .vmr files')
 
     # GO!

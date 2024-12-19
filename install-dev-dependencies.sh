@@ -13,4 +13,10 @@ if [[ $? != 0 ]]; then
   echo "Warning: dot is not installed or not on your path. Some graphs in the documentation will not build. Please install graphviz with your package manager."
 fi
 
-conda install -c conda-forge sphinx sphinx_rtd_theme myst-parser linkify-it-py
+if [[ $GGG_USE_MICROMAMBA == "1" ]]; then
+  CMD=micromamba
+else
+  CMD=conda
+fi
+
+${CMD} install -c conda-forge sphinx sphinx_rtd_theme myst-parser linkify-it-py

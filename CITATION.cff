@@ -1,0 +1,10 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+authors:
+- family-names: "Total Carbon Column Observing Network"
+  given-names: ""
+title: "TCCON/py-ginput – ginput v1.2.0 release"
+version: 1.2.0
+doi: 10.22002/s5xsr-y8x98
+date-released: 2024-05-19
+url: "https://github.com/TCCON/py-ginput"

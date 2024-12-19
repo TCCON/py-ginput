@@ -1,5 +1,31 @@
 # Ginput Version History
 
+## 1.3.1
+
+This release improves the ergonomics of including the time-varying O2 mole fraction
+by providing an option to the `O2MeanMoleFractionRecord` and a command line flag for
+the `vmr` and `rlvmr` subcommands to automatically download the necessary data and
+create/update the O2 mole fraction data file when creating `.vmr` files.
+
+## 1.3.0
+
+This release primarily adds the ability to calculate a time-varying O2 mole fraction,
+which gets added to the `.vmr` file header. To support this, it includes a new program
+that downloads Scripps O2/N2 data and NOAA global average CO2 data and calculates the
+yearly O2 mole fraction from them. This file is not included with `ginput`, but can be
+obtained by running the `update_fo2` subcommand of `run_ginput.py`. 
+
+Other changes:
+
+- `GeosSource` and `GeosVersion` classes moved from the `mod_constants` module to the
+  new `versioning` module (under `common_utils`).
+- Some type hints in `get_NOAA_flask_data` updated to be backwards compatible to at least
+  Python 3.7.
+- Small update to `mod_maker` to handle taking chemistry variables from a different version
+  of the GEOS files than the met variables. This will support possible TCCON reprocessing
+  with GEOS FP-IT met and GEOS IT CO.
+- GEOS file information now includes checksums
+
 ## 1.2.1
 
 Specific changes:

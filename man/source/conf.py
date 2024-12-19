@@ -22,7 +22,7 @@ copyright = '2021, Joshua Laughner, Sebastien Roche, and Matthaeus Kiel'
 author = 'Joshua Laughner, Sebastien Roche, and Matthaeus Kiel'
 
 # The full version, including alpha/beta/rc tags
-release = '1.2.1'
+release = '1.3.1'
 
 
 # -- General configuration ---------------------------------------------------
@@ -68,4 +68,3 @@ man_pages = [
      [author], 1), 
     ('upnoaaman', 'ginput.upnoaa', 'Ginput: Update MLO/SMO monthly files', [author], 1)
 ]
-
