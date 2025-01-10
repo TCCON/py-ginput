@@ -304,6 +304,8 @@ class O2MeanMoleFractionRecord(object):
             raise RuntimeError(f'{self._max_extrap_years} is not sufficient, must extrapolate from {last_year_to_keep} to one year past {target_year}')
         
         tt = self._o2_df.index <= last_year_to_keep
+        if tt.sum() < 2:
+            raise RuntimeError(f'Insufficient O2 data to start from year {target_year}: 2 years before required, {tt.sum()} available.')
         df = self._o2_df.loc[tt, :].copy()
         df['extrap_flag'] = 0
 

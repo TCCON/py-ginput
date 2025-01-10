@@ -20,6 +20,7 @@ from itertools import repeat, product
 import logging
 from multiprocessing import Pool
 import numpy as np
+import pandas as pd
 from pathlib import Path
 import pickle
 import os
@@ -30,7 +31,7 @@ from ..common_utils import mod_utils, mod_constants
 from ..common_utils.sat_utils import time_weight, datetime2datenum
 from ..common_utils.ggg_logging import logger, setup_logger
 from ..mod_maker import mod_maker
-from ..priors import tccon_priors
+from . import tccon_priors, fo2_prep
 from .. import __version__
 
 __acos_int_version__ = '1.2.3'
@@ -131,6 +132,7 @@ _def_errh = ErrorHandler(suppress_error=False)
 
 def acos_interface_main(instrument, met_resampled_file, geos_files, output_file, mlo_co2_file=None, smo_co2_file=None,
                         use_trop_eqlat=False, cache_strat_lut=False, truncate_mlo_smo_by=0, nprocs=0, interp_pickle_dir='.',
+                        fo2_file=fo2_prep.DEFAULT_FO2_FILE, auto_update_fo2_file=False,
                         error_handler=_def_errh):
     """
     The primary interface to create CO2 priors for the ACOS algorithm
@@ -164,6 +166,17 @@ def acos_interface_main(instrument, met_resampled_file, geos_files, output_file,
      truncate the MLO/SMO data to (and extrapolate beyond). The default is 2, e.g. if the latest date in the met file
      is in Aug 2021, the MLO/SMO data will only be used up to June 2021 - but they *must* include data up to that
      month, or an error is raised.
+
+    :param fo2_file: Path to a file containing a timeseries of O2 DMFs. This is typically produced by the "fo2_prep"
+     subcommand of ginput, or it can be created automatically by setting ``auto_update_fo2_file = True``.
+    :type fo2_file: os.PathLike
+
+    :param auto_update_fo2_file: set to ``True`` to enable this function to automatically create or update the O2
+     DMF input file at the path specified by ``fo2_file``. This will by default do nothing if the ``fo2_file`` has
+     been updated within the last 7 days. Otherwise it will download the latest Scripps and NOAA data needed to create
+     the file and check if there is new data in them that requires an update to the ``fo2_file``. If ``fo2_file`` does
+     not exist, the outputs are downloaded and created. Note that outputs will always be downloaded to the default directory.
+     using this option. If you want more control, please use the "update_fo2" subcommand of ``run_ginput.py``.
 
     :return: None, writes results to the HDF5 ``output_file``.
     """
@@ -248,6 +261,7 @@ def acos_interface_main(instrument, met_resampled_file, geos_files, output_file,
 
     met_data['el'] = eqlat_array.reshape(orig_shape)
     prior_flags = prior_flags.reshape(flags_orig_shape)
+    o2_dmfs = _make_o2_dmf_array(met_data['dates'], fo2_file=fo2_file, auto_update_fo2_file=auto_update_fo2_file)
 
     # Create the priors
     if cache_strat_lut:
@@ -333,6 +347,7 @@ def acos_interface_main(instrument, met_resampled_file, geos_files, output_file,
                 logger.debug('GOSAT array "{}" squeezed from {} to {}'.format(key, value.shape, profiles[key].shape))
 
         # Write the priors to the file requested.
+        write_o2_h5(output_file, o2_dmfs)
         write_prior_h5(output_file, profiles, units, prior_group=prior_group.format(gas))
         if gas != 'co':
             insitu_record_to_h5_group(output_file, gas_record.conc_seasonal, gas, record_group=record_group.format(gas))
@@ -427,6 +442,20 @@ def _prior_helper(i_sounding, i_foot, qflag, mod_data, gas_record, var_mapping, 
         units[h5_var] = priors_units[tccon_var]
 
     return profiles, units, prior_flags[i_sounding, i_foot]
+
+
+def _make_o2_dmf_array(datetimes: np.array, fo2_file: os.PathLike = fo2_prep.DEFAULT_FO2_FILE, auto_update_fo2_file: bool = False) -> np.ndarray:
+    output_shape = datetimes.shape
+    datetimes = pd.to_datetime(datetimes.ravel())
+    o2_rec = tccon_priors.O2MeanMoleFractionRecord(
+        o2_mole_fraction_file=fo2_file,
+        auto_update_fo2_file=auto_update_fo2_file,
+    )
+    # Timestamp fill values seem to be in 1992 (-999999 from 1 Jan 1993 in seconds probably)
+    tt = datetimes > pd.Timestamp(1993,1,1)
+    o2_dmfs = np.full(datetimes.size, np.nan)
+    o2_dmfs[tt] = o2_rec.get_many_o2_mole_fractions(datetimes[tt])
+    return o2_dmfs.reshape(output_shape)
 
 
 def _make_output_profiles_dict(orig_shape, var_mapping, var_type_info):
@@ -1073,6 +1102,15 @@ def write_prior_h5(output_file, profile_variables, units, prior_group='priors'):
             dset.attrs['units'] = var_unit
 
 
+def write_o2_h5(output_file, o2_dmfs, h5_group='o2_record'):
+    with h5py.File(output_file, 'a') as h5obj:
+        grp = h5obj.create_group(h5_group)
+        dset = grp.create_dataset('o2_global_dmf', data=o2_dmfs, compression='gzip', compression_opts=9, shuffle=True)
+        dset.attrs['description'] = 'Global mean O2 dry mole fraction calculated from Scripps O2/N2 data and NOAA global mean CO2 data'
+        dset.attrs['units'] = 'mol mol^-1'
+        dset.attrs['note'] = 'Only pixels with a fill value for their time (a time before 1 Jan 1993) will have a NaN, all other receive a value.'
+
+
 def insitu_record_to_h5_group(output_file, df, gas, record_group='mlo_smo_record'):
     def get_unit(col):
         if col == 'dmf_mean':
@@ -1326,6 +1364,15 @@ def parse_args(parser=None, instrument=None):
                              'including the month that they will be truncated at. Default is %(default)d.')
     parser.add_argument('--no-truncate-mlo-smo', action='store_const', const=None, dest='truncate_mlo_smo_by',
                         help='Override the default to truncate MLO/SMO data.')
+    parser.add_argument('--fo2-file', default=str(fo2_prep.DEFAULT_FO2_FILE),
+                        help='Path to the file containing the O2 global mean DMF trend created by "update_fo2". '
+                             'Default is %(default)s.')
+    parser.add_argument('--auto-update-fo2-file', action='store_true',
+                        help='Including this flag will activate logic to automatically check if the file pointed to by '
+                             '--fo2-file needs created or updated. If it does not exist or has not been updated recently, '
+                             'this will download Scripps and NOAA data to the "data" subdirectory within the ginput package '
+                             'and create or update the O2 file if needed. If you need more control over where the data is '
+                             'downloaded, you will need to use the "update_fo2" subcommand of run_ginput.py')
     parser.add_argument('-v', '--verbose', dest='log_level', default=0, action='count',
                         help='Increase logging verbosity')
     parser.add_argument('-q', '--quiet', dest='log_level', const=-1, action='store_const',
