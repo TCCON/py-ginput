@@ -41,7 +41,10 @@ def parse_args(parser: Optional[ArgumentParser]):
                         help='O2 mole fraction file to create or update. Default is %(default)s.')
     parser.add_argument('--download-dir', default=str(get_fo2_data.DEFAULT_OUT_DIR),
                         help='Where to download the necessary inputs. Must be an existing directory. '
-                             'A subdirectory by date will be created to hold the inputs.')
+                             'By default, a subdirectory by date will be created to hold the inputs.')
+    parser.add_argument('--no-download-subdir', action='store_true',
+                        help='If specified, the input files will be downloaded directly into '
+                             '--download-dir, with no subdirectory created.')
     parser.add_argument('--max-num-backups', type=int, default=5,
                         help=' Maximum number of backups of the O2 mole fraction file to keep. Default is %(default)d.')
 
@@ -53,7 +56,7 @@ def parse_args(parser: Optional[ArgumentParser]):
 
 
 def fo2_update_driver(fo2_dest_file: Union[str, Path] = DEFAULT_FO2_FILE, download_dir: Union[str, Path] = get_fo2_data.DEFAULT_OUT_DIR,
-                      max_num_backups: int = 5, time_since_mod: Optional[timedelta] = None):
+                      no_download_subdir: bool = False, max_num_backups: int = 5, time_since_mod: Optional[timedelta] = None):
     """Checks for new versions of the input files needed for f(O2) and updates the f(O2) table file if needed
 
     Parameters
@@ -81,7 +84,7 @@ def fo2_update_driver(fo2_dest_file: Union[str, Path] = DEFAULT_FO2_FILE, downlo
             logger.info('Skipping fO2 file update (modified recently enough)')
             return
 
-    dl_dir, _ = get_fo2_data.download_fo2_inputs(out_dir=download_dir, only_if_new=True)
+    dl_dir, _ = get_fo2_data.download_fo2_inputs(out_dir=download_dir, make_subdir=not no_download_subdir, only_if_new=True)
     create_or_update_fo2_file(dl_dir, fo2_dest_file, max_num_backups=max_num_backups)
 
 
