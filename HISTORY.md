@@ -1,5 +1,36 @@
 # Ginput Version History
 
+**A note on versioning:** because of the nature of this code, `ginput` follows
+a different set of criteria for major/minor/patch versions:
+
+- The major version number will be incremented when the output from `ginput`
+  changes so much that retrievals using the new priors are likely to produce
+  different results than those using the previous version's priors.
+- The minor version number will be incremented when a new feature is added
+  or the API (Python internal or command line) changes. Thus, users should
+  expect that upgrading from, e.g., v1.3.x to v1.4.0 may require updates to
+  how they call `ginput`.
+- The patch version will be incremented when changes do not break the API
+  or alter existing output variables are made.
+
+We recognize that this is non-standard, and that breaking API changes should
+result in a major version increase. However, our experience has been that small
+improvements to improve the scientific capabilities of this code sometimes require
+an update to the API because the new best default behavior requires additional
+user input.
+
+## 1.4.0
+
+This release adds mean O2 dry air mole fractions into the satellite .h5 files.
+There will be one value per sounding in the "o2_record/o2_global_dmf" variable.
+This means that running the satellite priors module requires that the input data
+for the O2 DMF calculation be available or it be allowed to automatically download
+and prepare those inputs. Because this is a change to the command line API, we have
+incremented the minor version number.
+
+The `update_fo2` subcommand also now has more options to control where the various
+data files are written, if needed.
+
 ## 1.3.1
 
 This release improves the ergonomics of including the time-varying O2 mole fraction
