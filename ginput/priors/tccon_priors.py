@@ -1059,53 +1059,53 @@ class MloSmoTraceGasRecord(TraceGasRecord):
             old_shape = -1  # will be initialized properly the first time through the loop
 
             for ispec in range(spectra.shape[0]):
+                # The first step is to put the trace gas record on the same time resolution as the age spectra. This
+                # is necessary for the convolution to work. Note that the age spectra aren't assigned to any
+                # specific date, we just need the adjacent points in the age spectra and gas record to have the same
+                # spacing in time.
+                # To handle the reindexing properly, we need to keep the original rows in until we handle the
+                # interpolation to the new values. For this part we need to use the decimal years as the index
+                # and (as of 2022-08-30, pandas 1.4.3), remove columns that we don't need to allow the index
+                # interpolation method to work
+                tmp_index = np.unique(np.concatenate([df_lagged['dec_year'], new_index]))
+                df_asi = df_lagged.set_index('dec_year', drop=False)[['dmf_mean']].reindex(tmp_index).interpolate(method='index').reindex(new_index)
+
+                # Now we can do the convolution. Note: in Arlyn's original R code, she had to flip the age spectrum
+                # to act as the convolution kernel, but testing showed that in order to get the same answer using
+                # numpy's convolution function we had to leave the spectrum unflipped.
+                #
+                # This is because the numpy convolution operation acts to flip the kernel internally. It is defined
+                # as
+                #
+                # (a * v)[n] = \sum_{m=-\infty}^{\infty} a[m]v[n-m]
+                #
+                # Note that v is indexed with n-m. This has the effect of reversing the kernel; for n=10, a[11] gets
+                # multiplied by v[9], a[12] by v[8] and so on. R's convolve function uses a different indexing
+                # pattern that does not reverse the kernel.
+                #
+                # We want the kernel reversed because the trace gas records are defined from old to new, while the
+                # age spectra are from new to old. Therefore, we need to reverse the spectra before convolving to
+                # actually put both in the same direction.
+                conv_result = np.convolve(df_asi['dmf_mean'].values.squeeze(), spectra.iloc[ispec, :].values,
+                                          mode='valid')
+                if conv_dates is None:
+                    conv_dates = new_index[(spectra.shape[1] - 1):]
+                    # The call to dec_year_to_dtindex was ~80% of the time for this function when it was being
+                    # called in every loop. There should be no reason to recalculate on every loop; the spectra
+                    # should not be changing size and should therefore always give results on the same dates
+                    conv_dates = cls._dec_year_to_dtindex(conv_dates, force_first_of_month=False)
+                    old_shape = spectra.shape[1]
+                elif spectra.shape[1] != old_shape:
+                    raise NotImplementedError('Different spectra have different lengths; this is not allowed as '
+                                              'currently implemented')
+
+                # Finally we put the age-convolved gas concentration back onto the dates of the input dataframe,
+                # unless alternate dates were specified.
+                conv_df = pd.DataFrame(conv_result, index=conv_dates)
+                tmp_index = np.unique(np.concatenate([out_dates, conv_dates]))
+                this_out_df = conv_df.reindex(tmp_index).interpolate(method='index').reindex(out_dates)
+
                 for itheta in range(n_theta):
-                    # The first step is to put the trace gas record on the same time resolution as the age spectra. This
-                    # is necessary for the convolution to work. Note that the age spectra aren't assigned to any
-                    # specific date, we just need the adjacent points in the age spectra and gas record to have the same
-                    # spacing in time.
-                    # To handle the reindexing properly, we need to keep the original rows in until we handle the
-                    # interpolation to the new values. For this part we need to use the decimal years as the index
-                    # and (as of 2022-08-30, pandas 1.4.3), remove columns that we don't need to allow the index
-                    # interpolation method to work
-                    tmp_index = np.unique(np.concatenate([df_lagged['dec_year'], new_index]))
-                    df_asi = df_lagged.set_index('dec_year', drop=False)[['dmf_mean']].reindex(tmp_index).interpolate(method='index').reindex(new_index)
-
-                    # Now we can do the convolution. Note: in Arlyn's original R code, she had to flip the age spectrum
-                    # to act as the convolution kernel, but testing showed that in order to get the same answer using
-                    # numpy's convolution function we had to leave the spectrum unflipped.
-                    #
-                    # This is because the numpy convolution operation acts to flip the kernel internally. It is defined
-                    # as
-                    #
-                    # (a * v)[n] = \sum_{m=-\infty}^{\infty} a[m]v[n-m]
-                    #
-                    # Note that v is indexed with n-m. This has the effect of reversing the kernel; for n=10, a[11] gets
-                    # multiplied by v[9], a[12] by v[8] and so on. R's convolve function uses a different indexing
-                    # pattern that does not reverse the kernel.
-                    #
-                    # We want the kernel reversed because the trace gas records are defined from old to new, while the
-                    # age spectra are from new to old. Therefore, we need to reverse the spectra before convolving to
-                    # actually put both in the same direction.
-                    conv_result = np.convolve(df_asi['dmf_mean'].values.squeeze(), spectra.iloc[ispec, :].values,
-                                              mode='valid')
-                    if conv_dates is None:
-                        conv_dates = new_index[(spectra.shape[1] - 1):]
-                        # The call to dec_year_to_dtindex was ~80% of the time for this function when it was being
-                        # called in every loop. There should be no reason to recalculate on every loop; the spectra
-                        # should not be changing size and should therefore always give results on the same dates
-                        conv_dates = cls._dec_year_to_dtindex(conv_dates, force_first_of_month=False)
-                        old_shape = spectra.shape[1]
-                    elif spectra.shape[1] != old_shape:
-                        raise NotImplementedError('Different spectra have different lengths; this is not allowed as '
-                                                  'currently implemented')
-
-                    # Finally we put the age-convolved gas concentration back onto the dates of the input dataframe,
-                    # unless alternate dates were specified.
-                    conv_df = pd.DataFrame(conv_result, index=conv_dates)
-                    tmp_index = np.unique(np.concatenate([out_dates, conv_dates]))
-                    this_out_df = conv_df.reindex(tmp_index).interpolate(method='index').reindex(out_dates)
-
                     # And store this result in the output data frame, remembering that we added an extra row at the
                     # beginning for zero age air, and again using broadcasting.
                     #
