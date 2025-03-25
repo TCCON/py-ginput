@@ -5,7 +5,7 @@ Usual GGG users will not need to concern themselves with this file. GGG develope
 is still able to generate equivalent latitudes and CO2 priors from the TCCON prior and mod_maker code.
 
 If you wish to call this code from within other python code, the function :func:`acos_interface_main` is the entry
-point. A command line interface is also provided
+point. A command line interface is also provided.
 """
 
 from __future__ import print_function, division
@@ -238,7 +238,7 @@ def acos_interface_main(instrument, met_resampled_file, geos_files, output_file,
     # Also fix the end date of the MLO/SMO record relative to the data date, rather than
     # the execution date. Requested by SDOS on 14 Oct 2021.
     record_end_date = mod_utils.start_of_month(max_date) + relativedelta(years=2, months=1)
-    
+
     if truncate_mlo_smo_by is not None:
         check_date = dt.datetime.today() + dt.timedelta(days=30)
         if max_date > check_date:
@@ -251,7 +251,7 @@ def acos_interface_main(instrument, met_resampled_file, geos_files, output_file,
         truncate_mlo_smo_date = dt.datetime(truncate_mlo_smo_date.year, truncate_mlo_smo_date.month, truncate_mlo_smo_date.day)
     else:
         truncate_mlo_smo_date = None
-        
+
 
     eqlat_array = compute_sounding_equivalent_latitudes(sounding_pv=pv_array, sounding_theta=theta_array,
                                                         sounding_datenums=datenum_array, sounding_qflags=qflag_array,
@@ -351,7 +351,7 @@ def acos_interface_main(instrument, met_resampled_file, geos_files, output_file,
         write_prior_h5(output_file, profiles, units, prior_group=prior_group.format(gas))
         if gas != 'co':
             insitu_record_to_h5_group(output_file, gas_record.conc_seasonal, gas, record_group=record_group.format(gas))
-        
+
 
 
 def _prior_helper(i_sounding, i_foot, qflag, mod_data, gas_record, var_mapping, var_type_info, use_trop_eqlat=False,
@@ -696,7 +696,7 @@ def _eqlat_helper(idx, pv_vec, theta_vec, datenum, quality_flag, eqlat_fxns, geo
     elif prior_flags is not None and prior_flags[idx] != 0:
         logger.info('Sounding {}: prior flag != 0. Skipping eq. lat. calculation.'.format(idx))
         return default_return, prior_flags[idx]
-    
+
     # Because of a limit on the size of objects that can be sent between threads in Python 3.6,
     # we need a workaround for big interpolators. If we got strings/paths, then we had to write
     # those interpolators to files and pass the paths to those files instead. This block can
@@ -836,11 +836,11 @@ def _eqlat_pickle_manager(eqlat_fxns, pickle_dir='.'):
         logger.info("Running under Python 3.10 or greater, assuming support for large inter-thread objects. Not writing pickle files for eqlat interpolators.")
         yield eqlat_fxns
         return 
-    
+
     logger.info("Running under Python 3.9 or less, not assuming there is support for large inter-thread objects. Writing pickle files for eqlat interpolators.")
     mypid = os.getpid()
     eqlat_pickle_files = []
-    
+
     for i, fxn in enumerate(eqlat_fxns):
         pickle_file = os.path.join(pickle_dir, f'ginput_eqlat_interpolator_pickle.{mypid}-{i}.pkl')
         if os.path.exists(pickle_file):
@@ -850,7 +850,7 @@ def _eqlat_pickle_manager(eqlat_fxns, pickle_dir='.'):
             pickle.dump(fxn, f)
     file_basenames = ', '.join(os.path.basename(fname) for fname in eqlat_pickle_files)
     logger.info(f'Created {len(eqlat_pickle_files)} pickle files in {os.path.abspath(pickle_dir)}: {file_basenames}')
-    
+
     try:
         yield eqlat_pickle_files
     finally:
@@ -1106,9 +1106,15 @@ def write_o2_h5(output_file, o2_dmfs, h5_group='o2_record'):
     with h5py.File(output_file, 'a') as h5obj:
         grp = h5obj.create_group(h5_group)
         dset = grp.create_dataset('o2_global_dmf', data=o2_dmfs, compression='gzip', compression_opts=9, shuffle=True)
-        dset.attrs['description'] = 'Global mean O2 dry mole fraction calculated from Scripps O2/N2 data and NOAA global mean CO2 data'
+        dset.attrs['description'] = ('Per-sounding global mean O2 dry mole fraction calculated from Scripps O2/N2 data and NOAA global mean CO2 data. '
+                                     'This will vary slightly over the granule from the interpolation to different times for each sounding. '
+                                     'No seasonal cycle is included, only the year-over-year change.')
         dset.attrs['units'] = 'mol mol^-1'
         dset.attrs['note'] = 'Only pixels with a fill value for their time (a time before 1 Jan 1993) will have a NaN, all other receive a value.'
+
+        dset = grp.create_dataset('granule_mean_o2_global_dmf', data=np.nanmean(o2_dmfs))
+        dset.attrs['description'] = 'Mean of non-fill values from "o2_global_dmf" for applications that prefer a single value per granule.'
+        dset.attrs['units'] = 'mol mol^-1'
 
 
 def insitu_record_to_h5_group(output_file, df, gas, record_group='mlo_smo_record'):
@@ -1119,7 +1125,7 @@ def insitu_record_to_h5_group(output_file, df, gas, record_group='mlo_smo_record
             return '0 = not interpolated/extrapolated; 1 = interpolated; 2 = extrapolated.'
         if col == 'latency':
             return 'years'
-        
+
         return ''
 
     with h5py.File(output_file, 'a') as h5obj:
@@ -1127,8 +1133,8 @@ def insitu_record_to_h5_group(output_file, df, gas, record_group='mlo_smo_record
         dates = _convert_to_acos_time_strings(df.index.to_pydatetime())
         dset = grp.create_dataset('date', data=dates, fillvalue=_string_fill)
         dset.attrs['description'] = 'Date associated with the MLO/SMO record'
-        
-        
+
+
         for colname, column in df.iteritems():
             column = column.to_numpy().copy()
             column[np.isnan(column)] = _fill_val

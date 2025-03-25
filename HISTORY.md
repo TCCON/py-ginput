@@ -22,14 +22,22 @@ user input.
 ## 1.4.0
 
 This release adds mean O2 dry air mole fractions into the satellite .h5 files.
-There will be one value per sounding in the "o2_record/o2_global_dmf" variable.
-This means that running the satellite priors module requires that the input data
-for the O2 DMF calculation be available or it be allowed to automatically download
-and prepare those inputs. Because this is a change to the command line API, we have
-incremented the minor version number.
+There will be one value per sounding in the "o2_record/o2_global_dmf" variable
+and a granule mean in the "o2_record/granule_mean_o2_global_dmf" variable.
+Note that the latter is a scalar; if reading with the `h5py` Python package,
+you will need to slice it with an empty tuple rather than a colon to get the 
+value. This change means that running the satellite priors module requires that the
+input data for the O2 DMF calculation be available or it be allowed to automatically
+download and prepare those inputs. Because this is a change to the command line API,
+we have incremented the minor version number.
 
 The `update_fo2` subcommand also now has more options to control where the various
 data files are written, if needed.
+
+Additionally, the time needed to calculate the stratospheric lookup tables for N2O
+and CH4 has been reduced by a factor of 3, with no change to the output values. This
+was accomplished by minimizing duplicate calculations in the inner-most loop for those
+LUTs.
 
 ## 1.3.1
 
