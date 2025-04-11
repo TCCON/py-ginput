@@ -1,17 +1,16 @@
 from abc import ABC, abstractmethod, abstractclassmethod
 from argparse import ArgumentParser
 from enum import Enum
-from logging import warning
 from dateutil.relativedelta import relativedelta
 import numpy as np
 import os
 import pandas as pd
+from pathlib import Path
 import re
 import xarray as xr
 
-from ..common_utils import mod_utils
 from ..common_utils.ioutils import make_dependent_file_hash
-from ..common_utils.ggg_logging import logger, setup_logger
+from ..common_utils.ggg_logging import logger
 
 from typing import Tuple, Optional, Sequence
 
@@ -98,38 +97,116 @@ def make_geos_2d_file_list(path_pattern: str, start_date, end_date, geos_version
         files.append(t.strftime(path_pattern))
     return files
 
-def read_surface_file(surface_file: str, datetime_index: Optional[Tuple[str, str]]=('year', 'month')) -> pd.DataFrame:
+
+def read_surface_file(surface_file: str, datetime_index: Optional[Tuple[str, str]]=('year', 'month'),
+                      match_v1_columns: bool = True, drop_fills: bool = False, v3_known_site_codes = ('mlo', 'smo')) -> pd.DataFrame:
     """Read a text file with NOAA surface data, either a monthly average or hourly file
 
     Parameters
     ----------
     surface_file
-        Path to the surface file to read
+      Path to the surface file to read
 
     datetime_index
-        If not `None`, then must be a tuple giving the names of the year and month columns
-        in the file, to be converted to a monthly datetime index. (Only supported for monthly
-        files.)
+      If not `None`, then must be a tuple giving the names of the year and month columns
+      in the file, to be converted to a monthly datetime index. (Only supported for monthly
+      files.)
 
     Returns
     -------
     pd.DataFrame
-        The data from the surface file as a dataframe. If `datetime_index` was not `None`, the
-        index will be a :class:`pandas.DatetimeIndex`.
+      The data from the surface file as a dataframe. If `datetime_index` was not `None`, the
+      index will be a :class:`pandas.DatetimeIndex`.
     """
-    with open(surface_file) as f:
-        line1 = f.readline()
-        nhead = int(line1.split(':')[1])
-        for _ in range(nhead-1):
-            line = f.readline()
-        columns = line.split(':')[1].split()
+    nhead, columns, file_version = _parse_noaa_header(surface_file)
 
     df = pd.read_csv(surface_file, sep=r'\s+', skiprows=nhead, header=None)
     df.columns = columns
     if datetime_index is not None:
         yf, mf = datetime_index
         df.index = pd.DatetimeIndex([pd.Timestamp(int(r[yf]), int(r[mf]), 1) for _, r in df.iterrows()])
+
+    if file_version == 3:
+        # These are the Scripps-style file (i.e., with the deseasonalized value)
+        # that don't include a site code. The best we can do is assume that the
+        # site code is in the file stem as the last part when split on underscores,
+        # and check that it is a known site ID.
+        site_id = Path(surface_file).stem.split('_')[-1]
+        if site_id not in v3_known_site_codes:
+            raise InsituProcessingError(
+                f'Unknown/unexpected site code derived from file name: "{site_id}". '
+                'If this is the expected site code, pass it as one of the ``v3_known_site_codes``.'
+            )
+        df['site'] = site_id.upper()
+
+    if file_version > 1 and match_v1_columns:
+        # The newer file versions have additional/renamed columns, so prune things as needed to make the
+        # returned dataframe match what the rest of the code expects.
+        if file_version == 2:
+            df.rename(columns={'site_code': 'site'}, inplace=True)
+        v1_columns = {'site', 'year', 'month', 'value'}
+        to_drop = [c for c in df.columns if c not in v1_columns]
+        df.drop(columns=to_drop, inplace=True)
+        assert set(df.columns) == v1_columns, 'NOAA file dataframe did not have the expected columns, is this a new file version?'
+
+    if drop_fills:
+        not_fill = df.value > -990
+        df = df.loc[not_fill, :]
     return df
+
+
+def _parse_noaa_header(surface_file):
+    """Read the header of a NOAA file and return the number of header lines, column names, and file version
+
+    Note that the version number given to the file types is not an official NOAA version;
+    it simply represents the order in which the different formats appeared as a simple
+    way to distinguish file types.
+    """
+    with open(surface_file) as f:
+        line1 = f.readline()
+        # v1 will look something like "# number_of_header_lines: 70" while
+        # v2 will look something like # header_lines : 159"
+        # v3 doesn't give the number of header lines, so we have to count them ourselves
+        if 'header_lines' in line1:
+            nhead = int(line1.split(':')[1])
+            header_lines = [f.readline() for _ in range(nhead-1)]
+        else:
+            header_lines = [line1]
+            for line in f:
+                if line.startswith('#'):
+                    header_lines.append(line)
+                else:
+                    break
+            nhead = len(header_lines)
+
+        if header_lines[-1].startswith('# data_fields'):
+            # These files have a last header line like "# data_fields: site year month value"
+            # so we do need to split on the colon first, then spaces
+            columns = header_lines[-1].split(':')[1].split()
+            version = 1
+        elif not header_lines[-1].startswith('#'):
+            # Assume that if the last line does not start with a comment symbol that it is a
+            # v2 file and the column names are just a space-separated list
+            columns = header_lines[-1].strip().split()
+            version = 2
+        elif _is_noaa_v3_header(header_lines):
+            columns = ['year', 'month', 'decimal_date', 'value', 'deseasonalized_value', 'num_days', 'std_dev_of_days', 'uncertainty']
+            version = 3
+        else:
+            raise NotImplementedError('Could not infer NOAA file format from the header')
+
+        return nhead, columns, version
+
+
+def _is_noaa_v3_header(header_lines):
+    # The v3 files end with lines
+    #   "#            decimal       monthly    de-season  #days  st.dev  unc. of"
+    #   "#             date         average     alized          of days  mon mean"
+    # which is really awkward to parse, so we're just going to check if the lines are what
+    # we expect, and specify our own column names in the main reader function.
+    if header_lines[-2].split() != ['#', 'decimal', 'monthly', 'de-season', '#days', 'st.dev', 'unc.', 'of']:
+        return False
+    return header_lines[-1].split() == ['#', 'date', 'average', 'alized', 'of', 'days', 'mon', 'mean']
 
 
 def read_hourly_insitu(hourly_file: str) -> pd.DataFrame:
@@ -810,7 +887,7 @@ class InsituMonthlyAverager(ABC):
 
     @classmethod
     def write_monthly_insitu(cls, output_file: str, monthly_df: pd.DataFrame, previous_monthly_file: str, new_hourly_file: str, 
-                             new_months: pd.DatetimeIndex, clobber: bool = False) -> None:
+                             new_months: pd.DatetimeIndex, is_seed_file: bool = False, clobber: bool = False) -> None:
         """Write a new monthly average file
 
         Parameters
@@ -830,6 +907,11 @@ class InsituMonthlyAverager(ABC):
         new_months
             A sequence of datetimes giving the first of each month added
 
+        is_seed_file
+            Whether this is the first monthly average file built from a NOAA monthly average file,
+            rather than a previous ginput-managed monthly average file. (This controls how the header
+            is constructed.)
+
         clobber
             Whether to allow overwriting the output file if it already exists.
         """
@@ -838,7 +920,10 @@ class InsituMonthlyAverager(ABC):
         if not clobber and os.path.exists(output_file):
             raise IOError('Output file already exists')
 
-        new_header = cls._make_monthly_header(previous_monthly_file=previous_monthly_file, new_hourly_file=new_hourly_file, new_months=new_months)
+        if is_seed_file:
+            new_header = cls._make_seed_file_monthly_header(previous_monthly_file=previous_monthly_file, new_hourly_file=new_hourly_file, new_months=new_months, columns=monthly_df.columns)
+        else:
+            new_header = cls._make_monthly_header(previous_monthly_file=previous_monthly_file, new_hourly_file=new_hourly_file, new_months=new_months)
         with open(output_file, 'w') as outf:
             outf.write('\n'.join(new_header) + '\n')
             monthly_df.to_string(outf, index=False, header=False)
@@ -889,6 +974,29 @@ class InsituMonthlyAverager(ABC):
         return header
 
     @staticmethod
+    def _make_seed_file_monthly_header(previous_monthly_file: str, new_hourly_file: str, new_months: pd.DatetimeIndex, columns: Sequence[str]):
+        first_hourly_month = min(new_months)
+        last_hourly_month = max(new_months)
+        monthly_sha1 = make_dependent_file_hash(previous_monthly_file)
+        hourly_sha1 = make_dependent_file_hash(new_hourly_file)
+        columns = ' '.join(columns)
+        header = [
+            '#',
+            '# HISTORY:',
+            '#    Initial creation:',
+            f'#        - Data before {first_hourly_month:%b %Y} are taken directly from the NOAA monthly average file',
+            f'#          {previous_monthly_file} (SHA1 sum = {monthly_sha1})',
+            f'#        - Data from {first_hourly_month:%b %Y} to {last_hourly_month:%b %Y} were averaged from the hourly file',
+            f'#          {new_hourly_file} (SHA1 sum = {hourly_sha1})',
+            '# END HISTORY',
+            '#',
+            f'# data_fields: {columns}'
+        ]
+        nhead = len(header) + 1
+        header.insert(0, f'# header_lines: {nhead}')
+        return header
+
+    @staticmethod
     def _check_output_clobber(output_file, previous_file, clobber):
         """Check whether it is okay to write the output file
         """
@@ -933,7 +1041,7 @@ class InsituMonthlyAverager(ABC):
         return hourly_sites.item()
 
 
-    def convert(self, noaa_hourly_file: str, previous_monthly_file: str, output_monthly_file: str, allow_alt_sites: bool = False, site_id_override: Optional[str] = None) -> None:
+    def convert(self, noaa_hourly_file: str, previous_monthly_file: str, output_monthly_file: str, allow_alt_sites: bool = False, site_id_override: Optional[str] = None, is_seed_file: bool = False) -> None:
         """Convert a NOAA hourly file to monthly averages and append to the end of an existing file.
 
         Parameters
@@ -964,6 +1072,11 @@ class InsituMonthlyAverager(ABC):
             .. note::
                Passing a string with more than 3 characters for ``site_id_override`` *should* work, but 
                is not officially tested/supported.
+
+        is_seed_file
+            Whether this is the first monthly average file built from a NOAA monthly average file,
+            rather than a previous ginput-managed monthly average file. (This controls how the header
+            is constructed.)
 
         Returns
         -------
@@ -1052,6 +1165,7 @@ class InsituMonthlyAverager(ABC):
                 previous_monthly_file=previous_monthly_file,
                 new_hourly_file=noaa_hourly_file, 
                 new_months=(first_new_date, last_new_date),
+                is_seed_file=is_seed_file,
                 clobber=self._clobber
             )
             logger.info('New monthly averages written to {}'.format(output_monthly_file))
@@ -1094,7 +1208,7 @@ class SmoMonthlyAverager(InsituMonthlyAverager):
 
 def driver(site, previous_monthly_file, hourly_insitu_file, output_monthly_file, last_month=DEFAULT_LAST_MONTH, geos_2d_file_list=None, 
            allow_missing_geos_files=False, allow_missing_hourly_times=False, allow_missing_creation_date=False, limit_by_avail_data=True,
-           clobber=False, save_missing_geos_to=None, allow_alt_sites=False, site_id_override=None):
+           clobber=False, save_missing_geos_to=None, allow_alt_sites=False, site_id_override=None, is_seed_file=False):
     run_settings = RunSettings(
         save_missing_geos_to=save_missing_geos_to, 
         last_month=last_month, 
@@ -1113,7 +1227,7 @@ def driver(site, previous_monthly_file, hourly_insitu_file, output_monthly_file,
         raise InsituProcessingError('When processing with site == "smo", geos_2d_file_list must be provided')
 
     converter = conversion_classes[site]
-    converter.convert(hourly_insitu_file, previous_monthly_file, output_monthly_file, allow_alt_sites=allow_alt_sites, site_id_override=site_id_override)
+    converter.convert(hourly_insitu_file, previous_monthly_file, output_monthly_file, allow_alt_sites=allow_alt_sites, site_id_override=site_id_override, is_seed_file=is_seed_file)
 
 
 
@@ -1179,6 +1293,8 @@ def parse_args(p: ArgumentParser):
                                                          'output file. This permits ingesting hourly files with mixed site IDs. If you only '
                                                          'need to allow ingesting an hourly file for a site with a different ID than given '
                                                          'by the SITE argument, prefer --allow-alt-noaa-site over this option.')
+    p.add_argument('--is-seed-file', action='store_true', help='Passing this flag indicates that this is being constructed from a NOAA monthly '
+                                                               'file extended with hourly data, which will alter how the header is written.')
     p.add_argument('-c', '--clobber', action='store_true', help='By default, the output file will not overwrite any existing '
                                                                 'file at that path. Setting this flag will cause it to overwrite '
                                                                 'existing files UNLESS that file is the previous monthly file. '
