@@ -1,5 +1,6 @@
 from argparse import ArgumentParser
 from datetime import datetime, timedelta, timezone
+import json
 import pandas as pd
 from pathlib import Path
 from ..common_utils import versioning, readers, mod_constants
@@ -43,7 +44,9 @@ def parse_args(parser: Optional[ArgumentParser]):
                         help='Where to download the necessary inputs. Must be an existing directory. '
                              'If --no-download if not specified, then by default, a subdirectory by '
                              'date will be created to hold the inputs. If --no-download is specified, '
-                             'then this directory must already contain the needed inputs.')
+                             'then this directory must already contain the needed inputs. Alternatively, '
+                             'when --no-download is specified, this can point to a JSON file that provides '
+                             'the paths to each of the input files. See the epilog for details.')
     parser.add_argument('--no-download', action='store_true',
                         help='Disables download of the necessary input file. Instead, the required files '
                              '(co2_annmean_gl.txt, monthly_o2_alt.csv, monthly_o2_cgo.csv and monthly_o2_ljo.csv) '
@@ -53,6 +56,12 @@ def parse_args(parser: Optional[ArgumentParser]):
                              '--download-dir, with no subdirectory created.')
     parser.add_argument('--max-num-backups', type=int, default=5,
                         help=' Maximum number of backups of the O2 mole fraction file to keep. Default is %(default)d.')
+    parser.epilog = ('If specifying a JSON file as the argument to --download-dir, it must have four top level keys: '
+                     '"co2gl_file" must be a path to the NOAA annual global CO2 and "alt_o2n2_file", "cgo_o2n2_file", '
+                     'and "ljo_o2n2_file" must be paths to the monthly Scripps O2/N2 ratio files for Alert (Canada), '
+                     'Cape Grim (Australia), and La Jolla Pier (CA, USA), respectively. If the paths given are relative, '
+                     'they will be interpreted as relative to the directory containing the JSON file, not the current '
+                     'working directory.')
 
     if am_i_main:
         return vars(parser.parse_args())
@@ -210,16 +219,37 @@ def fo2_from_scripps_noaa_dir(fo2_data_dir: Union[str, Path], **kwargs) -> pd.Da
     )
 
 
-def _fo2_files_from_dir(fo2_data_dir, check_if_exists: bool = True):
+def _fo2_files_from_dir(fo2_data_in, check_if_exists: bool = True):
     """Returns a dictionary mapping keywords for :func:`fo2_from_scripps_o2n2_and_noaa_co2` to the corresponding files under ``fo2_data_dir``.
     """
-    fo2_data_dir = Path(fo2_data_dir)
-    files = {
-        'co2gl_file': fo2_data_dir / 'co2_annmean_gl.txt',
-        'alt_o2n2_file': fo2_data_dir / 'monthly_o2_alt.csv',
-        'cgo_o2n2_file': fo2_data_dir / 'monthly_o2_cgo.csv',
-        'ljo_o2n2_file': fo2_data_dir / 'monthly_o2_ljo.csv',
-    }
+    fo2_data_in = Path(fo2_data_in)
+    if fo2_data_in.is_dir():
+        logger.info('f(O2) data input is a directory, assuming standard file names')
+        files = {
+            'co2gl_file': fo2_data_in / 'co2_annmean_gl.txt',
+            'alt_o2n2_file': fo2_data_in / 'monthly_o2_alt.csv',
+            'cgo_o2n2_file': fo2_data_in / 'monthly_o2_cgo.csv',
+            'ljo_o2n2_file': fo2_data_in / 'monthly_o2_ljo.csv',
+        }
+    else:
+        logger.info('f(O2) data input is a file, assuming a JSON file containing paths to the input files')
+        with open(fo2_data_in) as f:
+            files_from_json = json.load(f)
+        # Make any relative paths relative to the directory with the JSON file
+        # A Path object is smart enough that if the second part in a path join
+        # is absolute, the leading path is discarded
+        json_dir = fo2_data_in.parent
+        files = {k: json_dir / v for k, v in files_from_json.items()}
+
+        required_keys = ('co2gl_file', 'alt_o2n2_file', 'cgo_o2n2_file', 'ljo_o2n2_file')
+        missing_keys = [k for k in required_keys if k not in files]
+        if len(missing_keys) > 0:
+            nmissing = len(missing_keys)
+            nexpected = len(required_keys)
+            missing_keys = ', '.join(missing_keys)
+            raise IOError(f'JSON file {fo2_data_in} is missing {nmissing} of {nexpected} top level keys: {missing_keys}')
+
+
     if check_if_exists:
         missing_files = []
         for path in files.values():
@@ -229,7 +259,7 @@ def _fo2_files_from_dir(fo2_data_dir, check_if_exists: bool = True):
             nmissing = len(missing_files)
             nexpected = len(files)
             missing_files = ', '.join(missing_files)
-            raise FileNotFoundError(f'{nmissing} of {nexpected} files expected in {fo2_data_dir} not found: {missing_files}')
+            raise FileNotFoundError(f'{nmissing} of {nexpected} files expected in {fo2_data_in} not found: {missing_files}')
 
     return files
 
