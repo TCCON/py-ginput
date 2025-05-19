@@ -41,7 +41,13 @@ def parse_args(parser: Optional[ArgumentParser]):
                         help='O2 mole fraction file to create or update. Default is %(default)s.')
     parser.add_argument('--download-dir', default=str(get_fo2_data.DEFAULT_OUT_DIR),
                         help='Where to download the necessary inputs. Must be an existing directory. '
-                             'By default, a subdirectory by date will be created to hold the inputs.')
+                             'If --no-download if not specified, then by default, a subdirectory by '
+                             'date will be created to hold the inputs. If --no-download is specified, '
+                             'then this directory must already contain the needed inputs.')
+    parser.add_argument('--no-download', action='store_true',
+                        help='Disables download of the necessary input file. Instead, the required files '
+                             '(co2_annmean_gl.txt, monthly_o2_alt.csv, monthly_o2_cgo.csv and monthly_o2_ljo.csv) '
+                             'must be present in that directory.')
     parser.add_argument('--no-download-subdir', action='store_true',
                         help='If specified, the input files will be downloaded directly into '
                              '--download-dir, with no subdirectory created.')
@@ -56,13 +62,26 @@ def parse_args(parser: Optional[ArgumentParser]):
 
 
 def fo2_update_driver(fo2_dest_file: Union[str, Path] = DEFAULT_FO2_FILE, download_dir: Union[str, Path] = get_fo2_data.DEFAULT_OUT_DIR,
-                      no_download_subdir: bool = False, max_num_backups: int = 5, time_since_mod: Optional[timedelta] = None):
+                      no_download: bool = False, no_download_subdir: bool = False, max_num_backups: int = 5, time_since_mod: Optional[timedelta] = None):
     """Checks for new versions of the input files needed for f(O2) and updates the f(O2) table file if needed
 
     Parameters
     ----------
     fo2_dest_file
         Which file containing the calculated f(O2) data to write or update.
+
+    download_dir
+        Where to download the input files to or read them from, if ``no_download = True``
+
+    no_download
+        When ``True``, this function will not attempt to download the data. Instead, ``download_dir``
+        must already contain the 4 expected files (:file:`co2_annmean_gl.txt`, :file:`monthly_o2_alt.csv`,
+        :file:`monthly_o2_cgo.csv`, :file:`monthly_o2_ljo.csv`).
+
+    no_download_subdir
+        By default, a timestamped subdirectory is created inside :file:`download_dir` for the newly downloaded
+        files. Setting this to ``True`` will instead download directly into :file:`download_dir`. It has no
+        effect if ``no_download = True``.
 
     max_num_backups
         Maximum number of backups of the f(O2) file to keep.
@@ -84,7 +103,10 @@ def fo2_update_driver(fo2_dest_file: Union[str, Path] = DEFAULT_FO2_FILE, downlo
             logger.info('Skipping fO2 file update (modified recently enough)')
             return
 
-    dl_dir, _ = get_fo2_data.download_fo2_inputs(out_dir=download_dir, make_subdir=not no_download_subdir, only_if_new=True)
+    if no_download:
+        dl_dir = download_dir
+    else:
+        dl_dir, _ = get_fo2_data.download_fo2_inputs(out_dir=download_dir, make_subdir=not no_download_subdir, only_if_new=True)
     create_or_update_fo2_file(dl_dir, fo2_dest_file, max_num_backups=max_num_backups)
 
 
@@ -188,18 +210,28 @@ def fo2_from_scripps_noaa_dir(fo2_data_dir: Union[str, Path], **kwargs) -> pd.Da
     )
 
 
-def _fo2_files_from_dir(fo2_data_dir):
+def _fo2_files_from_dir(fo2_data_dir, check_if_exists: bool = True):
     """Returns a dictionary mapping keywords for :func:`fo2_from_scripps_o2n2_and_noaa_co2` to the corresponding files under ``fo2_data_dir``.
-
-    Note: does not check if the files exist.
     """
     fo2_data_dir = Path(fo2_data_dir)
-    return {
+    files = {
         'co2gl_file': fo2_data_dir / 'co2_annmean_gl.txt',
         'alt_o2n2_file': fo2_data_dir / 'monthly_o2_alt.csv',
         'cgo_o2n2_file': fo2_data_dir / 'monthly_o2_cgo.csv',
         'ljo_o2n2_file': fo2_data_dir / 'monthly_o2_ljo.csv',
     }
+    if check_if_exists:
+        missing_files = []
+        for path in files.values():
+            if not path.is_file():
+                missing_files.append(path.name)
+        if len(missing_files) > 0:
+            nmissing = len(missing_files)
+            nexpected = len(files)
+            missing_files = ', '.join(missing_files)
+            raise FileNotFoundError(f'{nmissing} of {nexpected} files expected in {fo2_data_dir} not found: {missing_files}')
+
+    return files
 
 
 def fo2_from_scripps_o2n2_and_noaa_co2(co2gl_file: Union[str, Path], alt_o2n2_file: Union[str, Path], cgo_o2n2_file: Union[str, Path],
