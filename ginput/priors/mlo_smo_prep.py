@@ -1,7 +1,8 @@
 from abc import ABC, abstractmethod, abstractclassmethod
 from argparse import ArgumentParser
-from enum import Enum
+from datetime import datetime
 from dateutil.relativedelta import relativedelta
+from enum import Enum
 import numpy as np
 import os
 import pandas as pd
@@ -980,10 +981,13 @@ class InsituMonthlyAverager(ABC):
         monthly_sha1 = make_dependent_file_hash(previous_monthly_file)
         hourly_sha1 = make_dependent_file_hash(new_hourly_file)
         columns = ' '.join(columns)
+        now = datetime.now().astimezone().strftime('%Y-%m-%d %H:%M %Z')
         header = [
             '#',
             '# HISTORY:',
             '#    Initial creation:',
+            f'#        - Initial creation occurred at {now} in working directory',
+            f'#          {os.getcwd()}',
             f'#        - Data before {first_hourly_month:%b %Y} are taken directly from the NOAA monthly average file',
             f'#          {previous_monthly_file} (SHA1 sum = {monthly_sha1})',
             f'#        - Data from {first_hourly_month:%b %Y} to {last_hourly_month:%b %Y} were averaged from the hourly file',
