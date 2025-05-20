@@ -29,8 +29,13 @@ For instance, to use micromamba to create an environment in the top directory of
 micromamba create --prefix ./.mambaenv --file environment-py310.yml
 ```
 
-Once this completes, activate the new environment and run the `install-runscript.sh` script.
-This will create the `run_ginput.py` script that you can use to run any part of `ginput`.
+Once this completes, activate the new environment and do the following:
+
+1. In the repo root, call `pip install -e .`.
+2. Then, run the `install-runscript.sh` script.
+
+This will install ginput as an editable package into the environment (so that future updates to the code do not
+require reinstalling it) and create the `run_ginput.py` script that you can use to run any part of `ginput`.
 It will insert a shebang at the top of that script that points to the Python executable for the
 environment active when you run `install-runscript.sh`, so that you _do not_ need to activate this
 environment to use ginput - simply calling `run_ginput.py` will ensure that environment is used.

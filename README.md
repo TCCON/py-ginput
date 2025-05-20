@@ -78,22 +78,16 @@ The full legal terms are contained in LICENSE.txt file. For a short summary, ple
 [here](https://choosealicense.com/licenses/apache-2.0/#). If you have any questions about
 use, please contact us (contact information is below).
 
-In addition to the Apache license, you should cite the ginput paper in any publications
-resulting from the use of ginput. (At time of release, the manuscript is still in preparation,
-so contact us for the citation.) Please also consider contacting us to let us know you are
-using ginput!
+In addition to the Apache license, you should cite the ginput paper listed in the `CITATION.cff` file
+in any publications resulting from the use of ginput. Please also consider contacting us to let us know
+you are using ginput!
 
 ## Python support
 
 Only Python 3 is supported. Python 2 reached end-of-life on 1 Jan 2020. 
-We also require that the `conda` package manager provided with the Anaconda
-Python distribution be installed, and so only officially support Anaconda or
-Miniconda Python. 
+We also use the `conda` package manager in the install script, which is provided
+by, e.g. miniforge.
 
-If you have Anaconda or Miniconda based on Python 2 installed, that should work,
-as ginput is configured to create a Python 3 environment for itself on install.
-This also ensures that it's dependencies do not conflict with your existing 
-setup.
 
 ## Contact
 
