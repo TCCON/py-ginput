@@ -2903,7 +2903,7 @@ def calculate_meso_co(alt_profile, eqlat_profile, pres_profile, temp_profile, pr
 
 def generate_single_tccon_prior(mod_file_data, utc_offset, concentration_record, zgrid=None,
                                 use_eqlat_trop=True, use_eqlat_strat=True, use_adjusted_zgrid=True,
-                                auto_update_fo2_file=False):
+                                o2_mole_fraction_file=fo2_prep.DEFAULT_FO2_FILE, auto_update_fo2_file=False):
     """
     Driver function to generate the TCCON prior profiles for a single observation.
 
@@ -2963,7 +2963,7 @@ def generate_single_tccon_prior(mod_file_data, utc_offset, concentration_record,
     co_source = mod_file_data['constants'].get('co_source', GeosSource.UNKNOWN)
 
     # We only need the datetime to get the O2 mole fraction
-    o2_record = O2MeanMoleFractionRecord(auto_update_fo2_file=auto_update_fo2_file)
+    o2_record = O2MeanMoleFractionRecord(o2_mole_fraction_file=o2_mole_fraction_file, auto_update_fo2_file=auto_update_fo2_file)
     o2_dmf = o2_record.get_o2_mole_fraction(pd.Timestamp(file_date))
 
     # Make the UTC date a datetime object that is rounded to a date (hour/minute/etc = 0)

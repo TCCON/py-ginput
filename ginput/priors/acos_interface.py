@@ -311,11 +311,11 @@ def acos_interface_main(instrument, met_resampled_file, geos_files, output_file,
         if nprocs == 0:
             profiles, units = _prior_serial(orig_shape=orig_shape, var_mapping=var_mapping, var_type_info=var_type_info,
                                             met_data=met_data, gas_record=gas_record, prior_flags=gas_prior_flags,
-                                            use_trop_eqlat=use_trop_eqlat, error_handler=error_handler)
+                                            use_trop_eqlat=use_trop_eqlat, fo2_file=fo2_file, error_handler=error_handler)
         else:
             profiles, units = _prior_parallel(orig_shape=orig_shape, var_mapping=var_mapping, var_type_info=var_type_info,
                                               met_data=met_data, gas_record=gas_record, prior_flags=gas_prior_flags, nprocs=nprocs,
-                                              use_trop_eqlat=use_trop_eqlat, error_handler=error_handler)
+                                              use_trop_eqlat=use_trop_eqlat, fo2_file=fo2_file, error_handler=error_handler)
 
         # Add latitude, longitude, and flags to the priors file
         profiles['sounding_longitude'] = met_data['longitude']
@@ -355,7 +355,7 @@ def acos_interface_main(instrument, met_resampled_file, geos_files, output_file,
 
 
 def _prior_helper(i_sounding, i_foot, qflag, mod_data, gas_record, var_mapping, var_type_info, use_trop_eqlat=False,
-                  prior_flags=None, error_handler=_def_errh):
+                  fo2_file=fo2_prep.DEFAULT_FO2_FILE, prior_flags=None, error_handler=_def_errh):
     """
     Underlying function that generates individual prior profiles in serial and parallel mode
 
@@ -428,7 +428,8 @@ def _prior_helper(i_sounding, i_foot, qflag, mod_data, gas_record, var_mapping, 
         # which significantly overestimated the seasonal drawdown. The simple fix for now is to turn off
         # that adjustment.
         priors_dict, priors_units, priors_constants = tccon_priors.generate_single_tccon_prior(
-            mod_data, dt.timedelta(hours=0), gas_record, use_eqlat_trop=use_trop_eqlat, use_adjusted_zgrid=False
+            mod_data, dt.timedelta(hours=0), gas_record, use_eqlat_trop=use_trop_eqlat, use_adjusted_zgrid=False,
+            o2_mole_fraction_file=fo2_file
         )
     except Exception as err:
         new_err = err.__class__(err.args[0] + ' Occurred at sounding = {}, footprint = {}'.format(i_sounding+1, i_foot+1))
@@ -506,7 +507,7 @@ def _make_output_profiles_dict(orig_shape, var_mapping, var_type_info):
 
 
 def _prior_serial(orig_shape, var_mapping, var_type_info, met_data, gas_record, prior_flags=None, use_trop_eqlat=False,
-                  error_handler=_def_errh):
+                  fo2_file=fo2_prep.DEFAULT_FO2_FILE, error_handler=_def_errh):
     """
     Generate the priors, running in serial mode.
 
@@ -531,7 +532,7 @@ def _prior_serial(orig_shape, var_mapping, var_type_info, met_data, gas_record, 
 
             this_profiles, this_units, _ = _prior_helper(i_sounding, i_foot, qflag, mod_data, gas_record,
                                                          var_mapping, var_type_info, prior_flags=prior_flags,
-                                                         use_trop_eqlat=use_trop_eqlat, error_handler=error_handler)
+                                                         use_trop_eqlat=use_trop_eqlat, fo2_file=fo2_file, error_handler=error_handler)
             for h5_var, h5_array in profiles.items():
                 h5_array[i_sounding, i_foot, :] = this_profiles[h5_var]
             if not units_set and this_units is not None:
@@ -542,7 +543,7 @@ def _prior_serial(orig_shape, var_mapping, var_type_info, met_data, gas_record, 
 
 
 def _prior_parallel(orig_shape, var_mapping, var_type_info, met_data, gas_record, nprocs, prior_flags=None,
-                    use_trop_eqlat=False, error_handler=_def_errh):
+                    fo2_file=fo2_prep.DEFAULT_FO2_FILE, use_trop_eqlat=False, error_handler=_def_errh):
     """
     Generate the priors, running in parallel mode.
 
@@ -571,7 +572,8 @@ def _prior_parallel(orig_shape, var_mapping, var_type_info, met_data, gas_record
     with Pool(processes=nprocs) as pool:
         result = pool.starmap(_prior_helper, zip(sounding_inds, footprint_inds, qflags, mod_dicts,
                                                  repeat(gas_record), repeat(var_mapping), repeat(var_type_info),
-                                                 repeat(use_trop_eqlat), repeat(prior_flags), repeat(error_handler)))
+                                                 repeat(use_trop_eqlat), repeat(fo2_file), repeat(prior_flags),
+                                                 repeat(error_handler)))
 
     # At this point, result will be a list of tuples of pairs of dicts, the first dict the profiles dict, the second
     # the units dict or None if the prior calculation did not run. We need to combine the profiles into one array per
