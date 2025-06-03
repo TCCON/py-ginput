@@ -40,20 +40,20 @@ class GeosVersion:
             return False
         else:
             return self.version_str == other.version_str and self.source == other.source
-            
+
     def __repr__(self):
         clsname = self.__class__.__name__
         return f'<{clsname}({self.source}, {self.version_str})>'
-            
+
     def __str__(self):
         return f'{self.source.value} (GEOS v{self.version_str}) : {self.file_name} : {self.md5_checksum}'
-    
+
     @classmethod
     def from_str(cls, s):
         parts = [x.strip() for x in s.split(':')]
         if len(parts) != 3:
             raise ValueError(f'"{s}" does not contain three substrings separated by colons')
-        
+
         version, file_name, checksum = parts
         m = re.match(r'(\w+) \(GEOS v(\d+\.\d+\.\d+)\)', version)
         if m is None:
@@ -62,7 +62,7 @@ class GeosVersion:
             vstr = m.group(2)
             src_str = m.group(1)
             return cls(vstr, src_str, file_name, checksum)
-        
+
     @classmethod
     def from_nc_file(cls, nc_file):
         file_name = os.path.basename(nc_file)
@@ -74,7 +74,7 @@ class GeosVersion:
             # where the "source" is the second component as divided by "."s.
             source_str = granule.split('.')[1]
             return cls(vstr, source_str, file_name, file_hash)
-        
+
 
 def update_versioned_file_header(prev_file: Union[str, Path, Sequence[str]], new_data_descr: str, program_descr: str, source_files: Dict[str, Union[str, Path]],
                                  header_comment_symbol: str = '#', insert_line_index: int = 0):
@@ -186,6 +186,8 @@ class RollingBackup(ABC):
         dest_file
             The path to the backup created.
         """
+        if max_num_backups == 0:
+            return None
         src_file = Path(src_file)
         prev_backups = self._existing_backups(src_file)
         self._shuffle_backups(prev_backups, max_num_backups)
@@ -209,7 +211,7 @@ class RollingBackup(ABC):
         """
         if max_num_backups is None or len(prev_backups) < (max_num_backups - 1):
             return
-        
+
         n_to_remove = len(prev_backups) - max_num_backups + 1
         for prev_backup in prev_backups[:n_to_remove]:
             os.remove(prev_backup)
@@ -244,7 +246,7 @@ class RollingBackupByDate(RollingBackup):
         date_str = datetime.now().strftime(self._date_fmt)
         new_name = f'{curr_name}.bak{date_str}'
         return src_file.with_name(new_name)
-    
+
     def _existing_backups(self, src_file: Path) -> Sequence[Path]:
         src_dir = src_file.parent
         pattern = f'{src_file.name}.bak*'

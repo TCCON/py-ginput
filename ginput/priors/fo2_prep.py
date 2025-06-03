@@ -7,7 +7,7 @@ from ..common_utils import versioning, readers, mod_constants
 from ..download import get_fo2_data
 from ..common_utils.ggg_logging import logger
 
-from typing import Union, Optional
+from typing import Union, Optional, Tuple
 
 __version__ = '1.0.0'
 PROGRAM = f'fo2_prep v.{__version__}'
@@ -38,8 +38,23 @@ def parse_args(parser: Optional[ArgumentParser]):
         parser.description = description
         am_i_main = False
 
-    parser.add_argument('fo2_dest_file', default=str(DEFAULT_FO2_FILE), nargs='?',
-                        help='O2 mole fraction file to create or update. Default is %(default)s.')
+    parser.add_argument('fo2_file', nargs='?',
+                        help='O2 mole fraction file to create, update, or read from. Default is %(default)s. '
+                             'If --dest-file is not given and this file does not exist, then an f(O2) file is '
+                             'created at this path with the input data. If --dest-file is not given and this file '
+                             'does exist, then it will be backed up (by default) and written with new data appended. '
+                             'When --dest-file is given, the new file is written to that path instead, and if this '
+                             'argument is given and exists, it is used as existing f(O2) data to append to.')
+    parser.add_argument('--dest-file', help='If given, then the output is written to this path instead of FO2_FILE. '
+                                            'This option can use Python curly brace formatting syntax to insert some '
+                                            'values in the name: END_YEAR will be replaced by the last year in the '
+                                            'output data, NOW_UTC with the current date & time in UTC, and NOW_LOCAL '
+                                            'with the current date & time in the local timezone. END_YEAR is an integer '
+                                            'and NOW_UTC/NOW_LOCAL are datetime objects and so can be formatted with '
+                                            'the appropriate format codes. For example, '
+                                            '"fo2_{END_YEAR:06d}_{{NOW_UTC:%%Y%%m%%dT%%H%%M%%Z}}" would ensure that END_YEAR '
+                                            'is padded to 6 digits with zeros and NOW_UTC is written as, e.g., '
+                                            '"20250602T2035UTC" if run at 20:35 UTC on 2 June 2025.')
     parser.add_argument('--download-dir', default=str(get_fo2_data.DEFAULT_OUT_DIR),
                         help='Where to download the necessary inputs. Must be an existing directory. '
                              'If --no-download if not specified, then by default, a subdirectory by '
@@ -70,13 +85,13 @@ def parse_args(parser: Optional[ArgumentParser]):
 
 
 
-def fo2_update_driver(fo2_dest_file: Union[str, Path] = DEFAULT_FO2_FILE, download_dir: Union[str, Path] = get_fo2_data.DEFAULT_OUT_DIR,
+def fo2_update_driver(fo2_file: Union[str, Path] = DEFAULT_FO2_FILE, dest_file: Union[str, Path, None] = None, download_dir: Union[str, Path] = get_fo2_data.DEFAULT_OUT_DIR,
                       no_download: bool = False, no_download_subdir: bool = False, max_num_backups: int = 5, time_since_mod: Optional[timedelta] = None):
     """Checks for new versions of the input files needed for f(O2) and updates the f(O2) table file if needed
 
     Parameters
     ----------
-    fo2_dest_file
+    fo2_file
         Which file containing the calculated f(O2) data to write or update.
 
     download_dir
@@ -104,9 +119,9 @@ def fo2_update_driver(fo2_dest_file: Union[str, Path] = DEFAULT_FO2_FILE, downlo
     - :func:``create_or_update_fo2_file`` if you want to update an f(O2) data file without downloading
       new input data.
     """
-    fo2_dest_file = Path(fo2_dest_file)
-    if time_since_mod is not None and fo2_dest_file.exists():
-        if _check_time_since_modification(fo2_dest_file, time_since_mod):
+    fo2_file, dest_file = _finalize_file_paths(fo2_file, dest_file)
+    if time_since_mod is not None and dest_file is not None and dest_file.exists():
+        if _check_time_since_modification(dest_file, time_since_mod):
             logger.info('Will check if fO2 file needs updated')
         else:
             logger.info('Skipping fO2 file update (modified recently enough)')
@@ -116,18 +131,45 @@ def fo2_update_driver(fo2_dest_file: Union[str, Path] = DEFAULT_FO2_FILE, downlo
         dl_dir = download_dir
     else:
         dl_dir, _ = get_fo2_data.download_fo2_inputs(out_dir=download_dir, make_subdir=not no_download_subdir, only_if_new=True)
-    create_or_update_fo2_file(dl_dir, fo2_dest_file, max_num_backups=max_num_backups)
+    create_or_update_fo2_file(dl_dir, fo2_file, dest_file=dest_file, max_num_backups=max_num_backups)
 
 
-def _check_time_since_modification(fo2_dest_file: Path, time_since_mod: timedelta) -> bool:
-    mtime = fo2_dest_file.stat().st_mtime
+
+def _finalize_file_paths(fo2_file: Union[str, Path, None], dest_file: Union[str, Path, None]) -> Tuple[Union[Path, None], Path]:
+    if fo2_file is None and dest_file is None:
+        # This is the v1.4.0 behavior with no positional argument - create or update the default file
+        fo2_file = Path(DEFAULT_FO2_FILE)
+        dest_file = fo2_file
+        if not fo2_file.exists():
+            fo2_file = None
+    elif fo2_file is not None and dest_file is None:
+        # This is the v1.4.0 behavior with a positional argument - create or update the given file
+        fo2_file = Path(fo2_file)
+        dest_file = fo2_file
+        if not fo2_file.exists():
+            fo2_file = None
+    elif fo2_file is None and dest_file is not None:
+        # This is new v1.4.1 behavior that ensures we are creating a new file
+        dest_file = Path(dest_file)
+    elif fo2_file is not None and dest_file is not None:
+        # This is new v1.4.1 behavior - we must update the output file, so the input file must exist
+        fo2_file = Path(fo2_file)
+        dest_file = Path(dest_file)
+
+    return fo2_file, dest_file
+
+
+
+def _check_time_since_modification(dest_file: Path, time_since_mod: timedelta) -> bool:
+    mtime = dest_file.stat().st_mtime
     mtime = datetime.fromtimestamp(mtime, tz=timezone.utc)
-    logger.info(f'fO2 file last updated on {mtime:%Y-%m-%d %H:%M}')
+    logger.info(f'fO2 output file last updated on {mtime:%Y-%m-%d %H:%M}')
     now = datetime.now(timezone.utc)
     return (now - mtime) > time_since_mod
 
 
-def create_or_update_fo2_file(fo2_input_data_dir: Union[str, Path], fo2_dest_file: Union[str, Path], max_num_backups: int = 5):
+def create_or_update_fo2_file(fo2_input_data_dir: Union[str, Path], fo2_file: Union[str, Path, None],
+                              dest_file: Union[str, Path], max_num_backups: int = 5):
     """Update the f(O2) data file or create a new copy.
 
     Parameters
@@ -135,14 +177,22 @@ def create_or_update_fo2_file(fo2_input_data_dir: Union[str, Path], fo2_dest_fil
     fo2_input_data_dir
         Path to a directory containing the input files (co2_annmean_gl.txt, monthly_o2_alt.csv, monthly_o2_cgo.csv, monthly_o2_ljo.csv).
 
-    fo2_dest_file
-        Path to the f(O2) file to write or update. If this points to an existing file, only years after then end of the
-        existing file will be added. The existing file will be backed up.
+    fo2_file
+        Path to a potentially extant f(O2) file. If it exists, then only data after the last year in this file will
+
+    dest_file
+        If
 
     max_num_backups
-        The number of backup copies of ``fo2_dest_file`` to keep; if the current number of backups is greater than or equal to
+        The number of backup copies of ``fo2_file`` to keep; if the current number of backups is greater than or equal to
         this number, the oldest one(s) will be removed. Set this to ``None`` to keep all backups.
     """
+    # This function has to support two main use cases. For TCCON, we really just want to easily
+    # update a file and leave it in the same place so that the private -> public pipeline can 
+    # rely on it being present. For OCO-2, SDOS wants to be able to output the file (with the
+    # end year in the name) to a new location, and not have it generate if there is no new data.
+    # The finicky logic around whether to create a new file or not is due to that.
+
 
     # Although our Scripps reader uses the "CO2 filled" column, which contains O2/N2 values 
     # to the end of the current year filled in by a fit, those data should not get included
@@ -152,11 +202,16 @@ def create_or_update_fo2_file(fo2_input_data_dir: Union[str, Path], fo2_dest_fil
     new_fo2_df = fo2_from_scripps_o2n2_and_noaa_co2(**source_files).dropna()
     new_fo2_df.index.name = 'year'
 
-    fo2_dest_file = Path(fo2_dest_file)
+    fo2_file = Path(fo2_file) if fo2_file is not None else None
+    dest_file = Path(dest_file)
+    if fo2_file is not None and not fo2_file.exists():
+        raise FileNotFoundError(f'{fo2_file} does not exist. If creating a new file, do not specify an fo2_file value.')
 
-    if not fo2_dest_file.exists():
+    if fo2_file is None:
         # Creating the file for the first time, use the default header
-        logger.info(f'f(O2) file {fo2_dest_file} does not exist, creating initial file')
+        # For the command line case where the input file must exist, that
+        # is checked earlier.
+        logger.info('Previous f(O2) file not specified or did not exist, creating initial file')
         prev_file = FO2_FILE_HEADER
         data_descr = f'{new_fo2_df.index.min()} to {new_fo2_df.index.max()}'
         fo2_df = new_fo2_df
@@ -164,24 +219,29 @@ def create_or_update_fo2_file(fo2_input_data_dir: Union[str, Path], fo2_dest_fil
     else:
         # File already existed, create a backup and point the header history
         # to that file.
-        logger.info(f'f(O2) file {fo2_dest_file} exists, checking if update required')
-        fo2_df = readers.read_tabular_file_with_header(fo2_dest_file).set_index('year')
+        logger.info(f'Source f(O2) file {fo2_file} specified, checking if update required')
+        fo2_df = readers.read_tabular_file_with_header(fo2_file).set_index('year')
         tt = new_fo2_df.index > fo2_df.index.max()
         if tt.sum() == 0:
-            # No new data, nothing to do except to touch the file to ensure future checks
-            # based on its modification time recognize that we tried to update it.
-            fo2_dest_file.touch()
+            # No new data.
+            if dest_file.exists():
+                # If modifying the input file, touch the file to ensure future checks
+                # based on its modification time recognize that we tried to update it.
+                fo2_file.touch()
             logger.info(f'No new f(O2) data (last year in current file = {fo2_df.index.max()}, in new data = {new_fo2_df.index.max()}), not updating the file')
             return
 
         new_years = new_fo2_df.index[tt]
         new_years_str = ', '.join(str(y) for y in new_years)
         data_descr = f'{new_years.min()} to {new_years.max()}' if len(new_years) > 1 else f'{new_years[0]}'
-        logger.info(f'Adding data for {new_years_str} to {fo2_dest_file}')
+        logger.info(f'Adding data for {new_years_str} to {fo2_file}')
         fo2_df = pd.concat([fo2_df, new_fo2_df.loc[tt,:]])
-        backup_method = versioning.RollingBackupByDate(date_fmt='%Y%m%dT%H%M')
-        prev_file = backup_method.make_rolling_backup(fo2_dest_file, max_num_backups=max_num_backups)
-        logger.info(f'Backed up current f(O2) file to {prev_file}')
+        if dest_file.exists() and max_num_backups > 0:
+            backup_method = versioning.RollingBackupByDate(date_fmt='%Y%m%dT%H%M')
+            prev_file = backup_method.make_rolling_backup(fo2_file, max_num_backups=max_num_backups)
+            logger.info(f'Backed up current f(O2) file to {prev_file}')
+        else:
+            prev_file = fo2_file
 
     new_header = versioning.update_versioned_file_header(
         prev_file=prev_file,
@@ -191,10 +251,16 @@ def create_or_update_fo2_file(fo2_input_data_dir: Union[str, Path], fo2_dest_fil
         insert_line_index=2,  # want this after the first blank line in the header
     )
 
-    with open(fo2_dest_file, 'w') as f:
+    end_year = fo2_df.index.max()
+    now_utc = datetime.now(timezone.utc)
+    now_local = now_utc.astimezone()
+    dest_file_str = str(dest_file).format(END_YEAR=end_year, NOW_UTC=now_utc, NOW_LOCAL=now_local)
+    dest_file = Path(dest_file_str)
+
+    with open(dest_file, 'w') as f:
         f.writelines(new_header)
         fo2_df.reset_index().to_string(f, index=False)
-    logger.info(f'Wrote updated {fo2_dest_file}')
+    logger.info(f'Wrote updated {dest_file}')
 
 
 def fo2_from_scripps_noaa_dir(fo2_data_dir: Union[str, Path], **kwargs) -> pd.DataFrame:
