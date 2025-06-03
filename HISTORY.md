@@ -19,6 +19,36 @@ improvements to improve the scientific capabilities of this code sometimes requi
 an update to the API because the new best default behavior requires additional
 user input.
 
+## 1.4.1
+
+This release fixes a bug when creating satellite prior files with a specific
+O2 dry mole fraction file as input and adds more flexibility to the creation
+of the O2 dry air mole fraction files:
+
+- When passing an O2 file to the `oco` or `acos` subcommands with the `--fo2-file`
+  option, it is now correctly passed down into the functions that calculate the
+  priors. Because these function instantiate an instance of the O2 record class,
+  `ginput` would crash if you specified `--fo2-file` without having the default
+  O2 file in the `ginput` data directory. This is now fixed.
+- The `update_fo2` subcommand now accepts a `--dest-file` argument to specify where
+  to write the new/updated O2 file, rather than assuming that it should overwrite
+  the existing O2 file.
+- The `update_fo2` subcommand now has a `--no-download` flag to disable automatic
+  download of the NOAA and Scripps input files required for the O2 DMF calculation.
+  In that case, the location of these files can be specified through the `--download-dir`
+  option, which can accept either a path to a directory containing the files
+  (which must have the expected names) or a JSON file specifying where to find
+  each of the 4 required files.
+- The `update_fo2` subcommand now has a `--extrap-to-year` option, which will
+  cause the output f(O2) file to be extrapolated to the given year. This allows
+  less dependence on the upstream data files being kept up-to-date.
+
+Other changes:
+
+- A new one time script is included to pad NOAA hourly data with fill values to the
+  end of the current year, in case the available hourly files stop early.
+- NOAA data through 2024 is included in the repo for future-proofing.
+
 ## 1.4.0
 
 This release adds mean O2 dry air mole fractions into the satellite .h5 files.
