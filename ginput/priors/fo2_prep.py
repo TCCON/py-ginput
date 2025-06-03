@@ -1,6 +1,7 @@
 from argparse import ArgumentParser
 from datetime import datetime, timedelta, timezone
 import json
+import numpy as np
 import pandas as pd
 from pathlib import Path
 from ..common_utils import versioning, readers, mod_constants
@@ -55,6 +56,10 @@ def parse_args(parser: Optional[ArgumentParser]):
                                             '"fo2_{END_YEAR:06d}_{{NOW_UTC:%%Y%%m%%dT%%H%%M%%Z}}" would ensure that END_YEAR '
                                             'is padded to 6 digits with zeros and NOW_UTC is written as, e.g., '
                                             '"20250602T2035UTC" if run at 20:35 UTC on 2 June 2025.')
+    parser.add_argument('--extrap-to-year', type=int, help='If given, then new f(O2) data will be extrapolated from the '
+                                                           'last several years of real data out to this year, if needed. '
+                                                           'If the real data covers this year, then no extrapolation is '
+                                                           'performed.')
     parser.add_argument('--download-dir', default=str(get_fo2_data.DEFAULT_OUT_DIR),
                         help='Where to download the necessary inputs. Must be an existing directory. '
                              'If --no-download if not specified, then by default, a subdirectory by '
@@ -85,8 +90,9 @@ def parse_args(parser: Optional[ArgumentParser]):
 
 
 
-def fo2_update_driver(fo2_file: Union[str, Path] = DEFAULT_FO2_FILE, dest_file: Union[str, Path, None] = None, download_dir: Union[str, Path] = get_fo2_data.DEFAULT_OUT_DIR,
-                      no_download: bool = False, no_download_subdir: bool = False, max_num_backups: int = 5, time_since_mod: Optional[timedelta] = None):
+def fo2_update_driver(fo2_file: Union[str, Path] = DEFAULT_FO2_FILE, dest_file: Union[str, Path, None] = None, extrap_to_year: Union[int, None] = None,
+                      download_dir: Union[str, Path] = get_fo2_data.DEFAULT_OUT_DIR, no_download: bool = False, no_download_subdir: bool = False,
+                      max_num_backups: int = 5, time_since_mod: Optional[timedelta] = None):
     """Checks for new versions of the input files needed for f(O2) and updates the f(O2) table file if needed
 
     Parameters
@@ -131,7 +137,7 @@ def fo2_update_driver(fo2_file: Union[str, Path] = DEFAULT_FO2_FILE, dest_file: 
         dl_dir = download_dir
     else:
         dl_dir, _ = get_fo2_data.download_fo2_inputs(out_dir=download_dir, make_subdir=not no_download_subdir, only_if_new=True)
-    create_or_update_fo2_file(dl_dir, fo2_file, dest_file=dest_file, max_num_backups=max_num_backups)
+    create_or_update_fo2_file(dl_dir, fo2_file, dest_file=dest_file, extrap_to_year=extrap_to_year, max_num_backups=max_num_backups)
 
 
 
@@ -169,7 +175,8 @@ def _check_time_since_modification(dest_file: Path, time_since_mod: timedelta) -
 
 
 def create_or_update_fo2_file(fo2_input_data_dir: Union[str, Path], fo2_file: Union[str, Path, None],
-                              dest_file: Union[str, Path], max_num_backups: int = 5):
+                              dest_file: Union[str, Path], extrap_to_year: Union[int, None] = None,
+                              max_num_backups: int = 5):
     """Update the f(O2) data file or create a new copy.
 
     Parameters
@@ -200,8 +207,15 @@ def create_or_update_fo2_file(fo2_input_data_dir: Union[str, Path], fo2_file: Un
     # updated with real measurements.
     source_files = _fo2_files_from_dir(fo2_input_data_dir)
     new_fo2_df = fo2_from_scripps_o2n2_and_noaa_co2(**source_files).dropna()
-    new_fo2_df.index.name = 'year'
 
+    if extrap_to_year is not None and extrap_to_year > new_fo2_df.index.max():
+        # Extrapolate the new data, that way we are extrapolating only from real data,
+        # but we don't change the data already in the existing file
+        extrap_years, extrap_fo2 = extrapolate_fo2(new_fo2_df, new_fo2_df.index.max() - 5, extrap_to_year)
+        new_rows = pd.DataFrame({'fo2': extrap_fo2, 'extrap_flag': 1}, index=extrap_years)
+        new_fo2_df = pd.concat([new_fo2_df, new_rows])
+
+    new_fo2_df.index.name = 'year'
     fo2_file = Path(fo2_file) if fo2_file is not None else None
     dest_file = Path(dest_file)
     if fo2_file is not None and not fo2_file.exists():
@@ -374,7 +388,7 @@ def fo2_from_scripps_o2n2_and_noaa_co2(co2gl_file: Union[str, Path], alt_o2n2_fi
 
     d_xo2 = _delta_xo2_explicit_xco2(d_o2_n2, d_co2=d_co2gl, x_co2=co2gl)
     fo2_df = d_xo2 + x_o2_ref
-    return pd.DataFrame({'fo2': fo2_df, 'o2_n2': o2_n2, 'd_o2_n2': d_o2_n2, 'co2': co2gl, 'd_co2': d_co2gl})
+    return pd.DataFrame({'fo2': fo2_df, 'o2_n2': o2_n2, 'd_o2_n2': d_o2_n2, 'co2': co2gl, 'd_co2': d_co2gl, 'extrap_flag': 0})
 
 
 def _delta_xo2_explicit_xco2(d_o2_n2, d_co2, x_co2, x_o2_ref=DEFAULT_X_O2_REF):
@@ -467,3 +481,13 @@ def _read_o2n2_file(o2n2_file):
     # Make a proper datetime index
     df.index = pd.to_datetime({'year': df['Yr'], 'month': df['Mn'], 'day': 1})
     return df
+
+
+def extrapolate_fo2(df: pd.DataFrame, first_basis_year: int, target_year: int):
+    bb = df.index >= first_basis_year
+    years = df.index[bb].to_numpy().astype(float)
+    fo2_values = df.loc[bb, 'fo2'].to_numpy()
+    extrap_years = np.arange(df.index.max()+1, target_year+1, dtype=float)
+    fit = np.polynomial.polynomial.Polynomial.fit(years, fo2_values, deg=1)
+    extrap_fo2_values = fit(extrap_years)
+    return extrap_years.astype(int), extrap_fo2_values

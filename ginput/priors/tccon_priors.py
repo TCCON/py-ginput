@@ -247,6 +247,7 @@ class O2MeanMoleFractionRecord(object):
         self._max_extrap_years = max_extrap_years
         self._extrap_basis_years = extrap_basis_years
 
+
     def get_o2_mole_fraction(self, target_date: pd.Timestamp):
         """Calculate the O2 mole fraction for a given date.
 
@@ -307,20 +308,20 @@ class O2MeanMoleFractionRecord(object):
         if tt.sum() < 2:
             raise RuntimeError(f'Insufficient O2 data to start from year {target_year}: 2 years before required, {tt.sum()} available.')
         df = self._o2_df.loc[tt, :].copy()
-        df['extrap_flag'] = 0
+
+        # This is in here because until v1.4.0 we didn't include this in the file.
+        # To ensure compatibility with older files, add this if needed
+        if 'extrap_flag' not in df.columns:
+            df['extrap_flag'] = 0
 
         first_basis_year = last_year_to_keep - self._extrap_basis_years + 1
-        bb = df.index >= first_basis_year
-        years = df.index[bb].to_numpy().astype(float)
-        fo2_values = df.loc[bb, 'fo2'].to_numpy()
-        fit = np.polynomial.polynomial.Polynomial.fit(years, fo2_values, deg=1)
-        extrap_years = np.arange(last_year_to_keep+1, last_year_to_keep+self._max_extrap_years+1, dtype=float)
-        extrap_fo2_values = fit(extrap_years)
+        target_year = last_year_to_keep+self._max_extrap_years+1
+        extrap_years, extrap_fo2_values = fo2_prep.extrapolate_fo2(df, first_basis_year, target_year)
 
         # The O2 mole fraction seems to follow a pretty linear decrease, so a
         # linear fit over the last few years should do a reasonable job of
         # capturing its trend.
-        extrap_rows = pd.DataFrame({'fo2': extrap_fo2_values, 'extrap_flag': 1}, index=extrap_years.astype(int))
+        extrap_rows = pd.DataFrame({'fo2': extrap_fo2_values, 'extrap_flag': 2}, index=extrap_years)
         return pd.concat([df, extrap_rows])
 
 
