@@ -100,7 +100,8 @@ def make_geos_2d_file_list(path_pattern: str, start_date, end_date, geos_version
 
 
 def read_surface_file(surface_file: str, datetime_index: Optional[Tuple[str, str]]=('year', 'month'),
-                      match_v1_columns: bool = True, drop_fills: bool = False, v3_known_site_codes = ('mlo', 'smo')) -> pd.DataFrame:
+                      match_v1_columns: bool = True, drop_fills: bool = False, fills_to_nan: bool = True,
+                      v3_known_site_codes = ('mlo', 'smo')) -> pd.DataFrame:
     """Read a text file with NOAA surface data, either a monthly average or hourly file
 
     Parameters
@@ -153,6 +154,9 @@ def read_surface_file(surface_file: str, datetime_index: Optional[Tuple[str, str
     if drop_fills:
         not_fill = df.value > -990
         df = df.loc[not_fill, :]
+    elif fills_to_nan:
+        is_fill = df.value <= -990
+        df.loc[is_fill, 'value'] = np.nan
     return df
 
 
