@@ -22,7 +22,7 @@ import pandas as pd
 import re
 
 from numpy.core._multiarray_umath import arctan, tan, sin, cos
-from scipy.interpolate import interp1d, interp2d
+from scipy.interpolate import interp1d, RectBivariateSpline
 import subprocess
 import sys
 from warnings import warn
@@ -908,7 +908,7 @@ def calculate_eq_lat_on_grid(EPV, PT, area):
 
     for itime in range(PT.shape[0]):
         interpolator = calculate_eq_lat(EPV[itime], PT[itime], area)
-        # This is probably going to be horrifically slow - but interp2d sometimes gives weird results when called with
+        # This is probably going to be horrifically slow - but RectBivariateSpline sometimes gives weird results when called with
         # vectors, so unfortunately we have to call this one element at a time
         pbar = ProgressBar(PT[itime].size, prefix='Calculating eq. lat for time {}/{}:'.format(itime, PT.shape[0]),
                            style='counter')
@@ -936,7 +936,7 @@ def calculate_eq_lat(EPV, PT, area):
     :type area: :class:`numpy.ndarray`
 
     :return: a 2D interpolator for equivalent latitude, requires potential vorticity and potential temperature as inputs
-    :rtype: :class:`scipy.interpolate.interp2d`
+    :rtype: :class:`scipy.interpolate.RectBivariateSpline`
 
     Note: when querying the interpolator for equivalent latitude, it is often best to call it with scalar values, even
     though that is slower than calling it with the full vector of PV and PT that you wish to get EL for. The problem is
@@ -1010,7 +1010,7 @@ def calculate_eq_lat(EPV, PT, area):
     for k in range(new_nlev):
         interp_EL[k] = np.interp(pv_grid,EPV_thresh[k],EL[k])
 
-    return interp2d(pv_grid, theta_grid, interp_EL)
+    return RectBivariateSpline(pv_grid, theta_grid, interp_EL)
 
 
 def get_eqlat_profile(interpolator, epv, theta):

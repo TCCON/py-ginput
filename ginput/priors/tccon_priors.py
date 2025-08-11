@@ -2320,7 +2320,7 @@ def get_clams_age(theta, eq_lat, day_of_year, as_timedelta=False, clams_dat=dict
     el_grid, th_grid = np.meshgrid(clams_dat['eqlat'], clams_dat['theta'])
     clams_points = np.array([[el, th] for el, th in zip(el_grid.flat, th_grid.flat)])
 
-    # interp2d does not behave well here; it interpolates to points outside the range of eqlat/theta and gives a much
+    # RectBivariateSpline does not behave well here; it interpolates to points outside the range of eqlat/theta and gives a much
     # noisier result.
     age_interp = LinearNDInterpolator(clams_points, clams_dat['age'][idoy, :, :].flatten())
     prof_ages = np.array([age_interp(el, th).item() for el, th in zip(eq_lat, theta)])

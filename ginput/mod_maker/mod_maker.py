@@ -90,7 +90,7 @@ import glob
 import os, sys
 import numpy.ma as ma
 import pandas as pd
-from scipy.interpolate import interp1d, interp2d
+from scipy.interpolate import interp1d, RectBivariateSpline
 import netCDF4 # netcdf I/O
 import re # used to parse strings
 import time
@@ -986,7 +986,7 @@ def equivalent_latitude_functions(ncdf_path,mode,start=None,end=None,muted=False
         for k in range(new_nlev):
             interp_EL[k] = np.interp(fixed_PV,EPV_thresh[k],EL[k])
 
-        func_dict[date[t]] = interp2d(fixed_PV,fixed_PT,interp_EL)
+        func_dict[date[t]] = RectBivariateSpline(fixed_PV,fixed_PT,interp_EL)
 
         end = time.time()
         nmin.append(int(end-start)/60.0)
@@ -1396,7 +1396,7 @@ def lat_lon_interp(data_old,lat_old,lon_old,lat_new,lon_new,IDs_list):
 
         data = ma.masked_where(np.isnan(data),data)
 
-        func = interp2d(lon,lat,data)
+        func = RectBivariateSpline(lon,lat,data)
 
         data_new.append(func(lon_new[count],lat_new[count]))
 
