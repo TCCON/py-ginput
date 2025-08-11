@@ -3484,7 +3484,7 @@ def cl_driver(date_range, mod_dir=None, mod_root_dir=None, save_dir=None, produc
 
     # Expand the date range to explicitly include every 3 hours
     orig_date_range = date_range
-    date_range = pd.date_range(date_range[0], date_range[1], freq='3H')
+    date_range = pd.date_range(date_range[0], date_range[1], freq='3h')
     if date_range[-1] == orig_date_range[-1]:
         # Make sure the end date is not included
         date_range = date_range[:-1]
