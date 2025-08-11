@@ -986,7 +986,7 @@ def equivalent_latitude_functions(ncdf_path,mode,start=None,end=None,muted=False
         for k in range(new_nlev):
             interp_EL[k] = np.interp(fixed_PV,EPV_thresh[k],EL[k])
 
-        func_dict[date[t]] = RectBivariateSpline(fixed_PV,fixed_PT,interp_EL)
+        func_dict[date[t]] = RectBivariateSpline(fixed_PV,fixed_PT,interp_EL.T)
 
         end = time.time()
         nmin.append(int(end-start)/60.0)
@@ -1396,7 +1396,7 @@ def lat_lon_interp(data_old,lat_old,lon_old,lat_new,lon_new,IDs_list):
 
         data = ma.masked_where(np.isnan(data),data)
 
-        func = RectBivariateSpline(lon,lat,data)
+        func = RectBivariateSpline(lon,lat,data.T,kx=1,ky=1) # linear
 
         data_new.append(func(lon_new[count],lat_new[count]))
 

@@ -1010,7 +1010,7 @@ def calculate_eq_lat(EPV, PT, area):
     for k in range(new_nlev):
         interp_EL[k] = np.interp(pv_grid,EPV_thresh[k],EL[k])
 
-    return RectBivariateSpline(pv_grid, theta_grid, interp_EL)
+    return RectBivariateSpline(pv_grid, theta_grid, interp_EL.T)
 
 
 def get_eqlat_profile(interpolator, epv, theta):
