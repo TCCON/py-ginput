@@ -877,7 +877,7 @@ class InsituMonthlyAverager(ABC):
         if hourly_df.shape[0] == 0:
             raise InsituProcessingError('No new hourly data to add given specified last month and/or creation date of the hourly file')
         hourly_df = _filter_rapid_df(hourly_df)
-        return hourly_df, pd.date_range(first_month, cutoff_date, freq='MS', closed='left')
+        return hourly_df, pd.date_range(first_month, cutoff_date, freq='MS', inclusive='left')
 
     @staticmethod
     def check_hourly_file_creation_date(hourly_file: str, last_expected_month: pd.Timestamp = DEFAULT_LAST_MONTH) -> None:

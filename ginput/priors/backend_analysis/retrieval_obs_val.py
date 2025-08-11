@@ -78,7 +78,7 @@ def make_mod_files(obspack_locations, save_dir, geos_dir, chm_dir=None, overwrit
         if not overwrite:
             if len(loc_lat) != len(loc_lon) or len(loc_lat) != len(loc_abbrev):
                 raise NotImplementedError('lon, lat, and abbrevs all assumed to be the same length')
-            dates = pd.date_range(date_range[0], date_range[1], closed='left', freq='3h')
+            dates = pd.date_range(date_range[0], date_range[1], inclusive='left', freq='3h')
             exists = []
             for d in dates:
                 for lon, lat, abbrev in zip(loc_lon, loc_lat, loc_abbrev):
