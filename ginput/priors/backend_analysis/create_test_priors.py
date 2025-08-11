@@ -355,7 +355,7 @@ def _list_mod_files_required(start_date, end_date, lon, lat):
     """
     mod_files = []
 
-    for date in date_range(start_date, end_date, freq='3h', closed='left'):
+    for date in date_range(start_date, end_date, freq='3h', inclusive='left'):
         modf = mod_utils.mod_file_name_for_priors(datetime=date, site_lat=lat, site_lon_180=lon, round_latlon=False, in_utc=True)
         mod_files.append(modf)
 
