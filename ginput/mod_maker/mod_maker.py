@@ -947,8 +947,8 @@ def equivalent_latitude_functions(ncdf_path,mode,start=None,end=None,muted=False
         PT[PT>1e4]=np.nan
         EPV[EPV>1e8]=np.nan
         for i in range(nlat):
-            pd.DataFrame(PT[:,i,:]).fillna(method='bfill',axis=0,inplace=True)
-            pd.DataFrame(EPV[:,i,:]).fillna(method='bfill',axis=0,inplace=True)
+            pd.DataFrame(PT[:,i,:]).bfill(axis=0,inplace=True)
+            pd.DataFrame(EPV[:,i,:]).bfill(axis=0,inplace=True)
 
         # Define a fixed potential temperature grid, with increasing spacing
         #fixed_PT = np.arange(np.min(PT),np.max(PT),20) # fixed potential temperature grid

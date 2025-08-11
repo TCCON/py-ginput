@@ -950,8 +950,8 @@ def calculate_eq_lat(EPV, PT, area):
     PT[PT > 1e4] = np.nan
     EPV[EPV > 1e8] = np.nan
     for i in range(nlat):
-        pd.DataFrame(PT[:, i, :]).fillna(method='bfill', axis=0, inplace=True)
-        pd.DataFrame(EPV[:, i, :]).fillna(method='bfill', axis=0, inplace=True)
+        pd.DataFrame(PT[:, i, :]).bfill(axis=0, inplace=True)
+        pd.DataFrame(EPV[:, i, :]).bfill(axis=0, inplace=True)
 
     # Define a fixed potential temperature grid, with increasing spacing
     # this is done arbitrarily to get sufficient levels for the interpolation to work well, and not too much for the
@@ -1051,8 +1051,8 @@ def calculate_eq_lat_field(EPV, PT, area):
     PT[PT > 1e4] = np.nan
     EPV[EPV > 1e8] = np.nan
     for i in range(nlat):
-        pd.DataFrame(PT[:, i, :]).fillna(method='bfill', axis=0, inplace=True)
-        pd.DataFrame(EPV[:, i, :]).fillna(method='bfill', axis=0, inplace=True)
+        pd.DataFrame(PT[:, i, :]).bfill(axis=0, inplace=True)
+        pd.DataFrame(EPV[:, i, :]).bfill(axis=0, inplace=True)
 
     # Define a fixed potential temperature grid, with increasing spacing
     # this is done arbitrarily to get sufficient levels for the interpolation to work well, and not too much for the
