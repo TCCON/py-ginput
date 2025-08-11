@@ -14,7 +14,7 @@ def _find_files_in_dirs(mod_dir, vmr_dir, date_range, site_lat, site_lon, produc
         raise IOError('Cannot find expected vmr file directory: {}'.format(vmr_dir))
 
     # Go through each expected mod and vmr file for the given date range.
-    dates = pd.date_range(date_range[0], date_range[1], freq='3H', closed='left')
+    dates = pd.date_range(date_range[0], date_range[1], freq='3H', inclusive='left')
     round_latlon = not keep_latlon_prec
     all_mod_files = []
     all_vmr_files = []
