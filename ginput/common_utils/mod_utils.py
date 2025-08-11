@@ -358,7 +358,7 @@ def format_lon(lon, prec=2, zero_pad=False):
 
 
 def find_lon_substring(string, to_float=False):
-    """
+    r"""
     Find a longitude substring in a string.
 
     A longitude substring will match \d+[EW] or \d+\.\d+[EW].
@@ -428,7 +428,7 @@ def format_lat(lat, prec=2, zero_pad=False):
 
 
 def find_lat_substring(string, to_float=False):
-    """
+    r"""
     Find a latitude substring in a string.
 
     A latitude substring will match \d+[NS] or \d+\.\d+[NS].
@@ -1570,8 +1570,8 @@ def mod_interpolation_new(z_grid, z_met, vals_met, interp_mode='linear'):
         raise ValueError(err_msg)
 
     interp_mode = interp_mode.lower()
-    do_log_x = re.match('^log-\w{3}', interp_mode)
-    do_log_y = re.match('\w{3}-log$', interp_mode)
+    do_log_x = re.match(r'^log-\w{3}', interp_mode)
+    do_log_y = re.match(r'\w{3}-log$', interp_mode)
 
     if do_log_x:
         z_grid = np.log(z_grid)
