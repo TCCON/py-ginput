@@ -212,6 +212,16 @@ def build_mod_fmt_strings(var_order):
     return header_names, header_units, var_name_mapping, data_fmt
 
 
+def safe_format(val):
+    """
+    If the object is an array of 1 value, just return the value
+    """
+    if hasattr(val, "__len__") and len(val) == 1:
+        return val[0]
+    else:
+        return val
+
+
 def write_mod(mod_path, version, site_lat, data=0, surf_data=0, func=None, muted=False, slant=False, chem_vars=False, geos_versions=None):
     """
     Creates a GGG-format .mod file
@@ -341,7 +351,7 @@ def write_mod(mod_path, version, site_lat, data=0, surf_data=0, func=None, muted
         mod_content.append(constants_fmt.format(*mod_constants))
         # surface variables
         mod_content.append('Pressure  Temperature     Height     MMW        H2O      RH         SLP        TROPPB        TROPPV      TROPPT       TROPT       SZA\n')
-        mod_content.append(surface_fmt.format(*[surf_data[key] for key in surf_var_order]))
+        mod_content.append(surface_fmt.format(*[safe_format(surf_data[key]) for key in surf_var_order]))
         # version info
         mod_content.append(version+'\n')
         for key, version in geos_versions.items():
@@ -407,6 +417,7 @@ def write_mod(mod_path, version, site_lat, data=0, surf_data=0, func=None, muted
                 line_dict['EL'] = func(line_dict['EPV']*1e6, line_dict['PT'])[0]
 
             for key in line_dict.keys():
+                line_dict[key] = safe_format(line_dict[key])
                 scale = mod_var_fmt_info[key]['scale']
                 line_dict[key] *= scale
 
