@@ -28,7 +28,7 @@ setup(
         'pydap>=3.2.2',
         'python-dateutil>=2.8.2',
         'requests>=2.14.2',
-        'scipy>=1.6.1',
+        'scipy>=1.16.1',
         'sgp4>=1.4',
         'skyfield>=1.10',
         'xarray>=0.12.1',
