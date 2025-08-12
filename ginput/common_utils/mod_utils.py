@@ -2053,7 +2053,7 @@ def frac_years_to_reldelta(frac_year, allow_nans=True):
         raise ValueError('NaNs not permitted in frac_year. Either remove them, or set `allow_nans=True`')
     age_years = np.floor(frac_year)
     age_fracs = np.mod(frac_year, 1)
-    rdels = [relativedelta(years=y, days=days_per_year * d) if not (np.isnan(y) or np.isnan(d)) else np.nan for y, d in zip(age_years, age_fracs)]
+    rdels = [relativedelta(years=y, days=days_per_year * d) if not (np.isnan(y) or np.isnan(d)) else pd.NaT for y, d in zip(age_years, age_fracs)]
     if return_scalar:
         rdels = rdels[0]
 

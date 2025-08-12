@@ -1247,7 +1247,7 @@ class MloSmoTraceGasRecord(TraceGasRecord):
         # We need to subtract the lag, because we're looking up against dates that have been already shifted forward
         # by that lag. That is, the age 0 air in the strat table for 1 Mar 2019 corresponds to the MLO/SMO record from
         # 1 Jan 2019.
-        ancillary_dict['gas_record_dates'] = np.array([pd.Timestamp(date - a - self.sbc_lag) for a in age_rdeltas])
+        ancillary_dict['gas_record_dates'] = np.array([pd.Timestamp(date - self.sbc_lag - a) for a in age_rdeltas])
         ancillary_dict['latency'] = self.get_latency_by_date(ancillary_dict['gas_record_dates'])
 
         if theta is None:
