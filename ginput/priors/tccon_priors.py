@@ -916,7 +916,7 @@ class MloSmoTraceGasRecord(TraceGasRecord):
 
         cls._check_extrap_fit(df, fit, extrap_julian_dates, direction)
 
-        df.loc[to_fill, 'dmf_mean'] = fit(extrap_julian_dates) + delta_dmf
+        df.loc[extrap_dates, 'dmf_mean'] = fit(extrap_julian_dates) + delta_dmf
 
     @classmethod
     def _fit_gas_trend(cls, x, y, fit_type=None):
@@ -1355,8 +1355,8 @@ class MloSmoTraceGasRecord(TraceGasRecord):
         monthly_idx = pd.date_range(start_date_subset, end_date_subset, freq='MS')
         monthly_df = pd.DataFrame(index=monthly_idx, columns=['dmf_mean', 'latency'], dtype=float)
         for timestamp in monthly_df.index:
-            monthly_df.dmf_mean[timestamp], info_dict = self.get_gas_by_month(timestamp.year, timestamp.month, deseasonalize=deseasonalize)
-            monthly_df.latency[timestamp] = info_dict['latency']
+            monthly_df.loc[timestamp, "dmf_mean"], info_dict = self.get_gas_by_month(timestamp.year, timestamp.month, deseasonalize=deseasonalize)
+            monthly_df.loc[timestamp, "latency"] = info_dict['latency']
 
         # Now we resample to the dates requested, making sure to keep the values at the start of each month on either
         # end of the record to ensure interpolation is successful
