@@ -472,6 +472,6 @@ def read_tabular_file_with_header(file_path: Union[str, Path], comment_str: str 
                 break
 
         columns = line.strip().split()
-        df = pd.read_csv(f, header=None, delim_whitespace=True)
+        df = pd.read_csv(f, header=None, sep=r"\s+")
         df.columns = columns
         return df
