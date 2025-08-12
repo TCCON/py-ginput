@@ -1724,7 +1724,7 @@ class HFTropicsRecord(MloSmoTraceGasRecord):
         all_months = pd.date_range(first_date, last_date, freq='MS')
         n_months = all_months.size
 
-        df_combined = pd.DataFrame(index=all_months, columns=['dmf_mean']).fillna(0.0)
+        df_combined = pd.DataFrame(index=all_months, columns=['dmf_mean'], dtype=float).fillna(0.0)
         df_combined = df_combined.assign(interp_flag=np.zeros((n_months,), dtype=int),
                                          latency=np.zeros((n_months,), dtype=int))
 
