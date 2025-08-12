@@ -916,7 +916,7 @@ class MloSmoTraceGasRecord(TraceGasRecord):
 
         cls._check_extrap_fit(df, fit, extrap_julian_dates, direction)
 
-        df.loc[to_fill, 'dmf_mean'] = fit(extrap_julian_dates) + delta_dmf
+        df.loc[extrap_dates, 'dmf_mean'] = fit(extrap_julian_dates) + delta_dmf
 
     @classmethod
     def _fit_gas_trend(cls, x, y, fit_type=None):
@@ -1247,7 +1247,7 @@ class MloSmoTraceGasRecord(TraceGasRecord):
         # We need to subtract the lag, because we're looking up against dates that have been already shifted forward
         # by that lag. That is, the age 0 air in the strat table for 1 Mar 2019 corresponds to the MLO/SMO record from
         # 1 Jan 2019.
-        ancillary_dict['gas_record_dates'] = np.array([pd.Timestamp(date - a - self.sbc_lag) for a in age_rdeltas])
+        ancillary_dict['gas_record_dates'] = np.array([pd.Timestamp(date - self.sbc_lag - a) for a in age_rdeltas])
         ancillary_dict['latency'] = self.get_latency_by_date(ancillary_dict['gas_record_dates'])
 
         if theta is None:
@@ -1355,8 +1355,8 @@ class MloSmoTraceGasRecord(TraceGasRecord):
         monthly_idx = pd.date_range(start_date_subset, end_date_subset, freq='MS')
         monthly_df = pd.DataFrame(index=monthly_idx, columns=['dmf_mean', 'latency'], dtype=float)
         for timestamp in monthly_df.index:
-            monthly_df.dmf_mean[timestamp], info_dict = self.get_gas_by_month(timestamp.year, timestamp.month, deseasonalize=deseasonalize)
-            monthly_df.latency[timestamp] = info_dict['latency']
+            monthly_df.loc[timestamp, "dmf_mean"], info_dict = self.get_gas_by_month(timestamp.year, timestamp.month, deseasonalize=deseasonalize)
+            monthly_df.loc[timestamp, "latency"] = info_dict['latency']
 
         # Now we resample to the dates requested, making sure to keep the values at the start of each month on either
         # end of the record to ensure interpolation is successful
@@ -1724,7 +1724,7 @@ class HFTropicsRecord(MloSmoTraceGasRecord):
         all_months = pd.date_range(first_date, last_date, freq='MS')
         n_months = all_months.size
 
-        df_combined = pd.DataFrame(index=all_months, columns=['dmf_mean']).fillna(0.0)
+        df_combined = pd.DataFrame(index=all_months, columns=['dmf_mean'], dtype=float).fillna(0.0)
         df_combined = df_combined.assign(interp_flag=np.zeros((n_months,), dtype=int),
                                          latency=np.zeros((n_months,), dtype=int))
 
@@ -2320,7 +2320,7 @@ def get_clams_age(theta, eq_lat, day_of_year, as_timedelta=False, clams_dat=dict
     el_grid, th_grid = np.meshgrid(clams_dat['eqlat'], clams_dat['theta'])
     clams_points = np.array([[el, th] for el, th in zip(el_grid.flat, th_grid.flat)])
 
-    # interp2d does not behave well here; it interpolates to points outside the range of eqlat/theta and gives a much
+    # RectBivariateSpline does not behave well here; it interpolates to points outside the range of eqlat/theta and gives a much
     # noisier result.
     age_interp = LinearNDInterpolator(clams_points, clams_dat['age'][idoy, :, :].flatten())
     prof_ages = np.array([age_interp(el, th).item() for el, th in zip(eq_lat, theta)])
@@ -3484,7 +3484,7 @@ def cl_driver(date_range, mod_dir=None, mod_root_dir=None, save_dir=None, produc
 
     # Expand the date range to explicitly include every 3 hours
     orig_date_range = date_range
-    date_range = pd.date_range(date_range[0], date_range[1], freq='3H')
+    date_range = pd.date_range(date_range[0], date_range[1], freq='3h')
     if date_range[-1] == orig_date_range[-1]:
         # Make sure the end date is not included
         date_range = date_range[:-1]
