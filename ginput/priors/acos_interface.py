@@ -432,7 +432,7 @@ def _prior_helper(i_sounding, i_foot, qflag, mod_data, gas_record, var_mapping, 
             o2_mole_fraction_file=fo2_file
         )
     except Exception as err:
-        new_err = err.__class__(err.args[0] + ' Occurred at sounding = {}, footprint = {}'.format(i_sounding+1, i_foot+1))
+        new_err = err.__class__(str(err.args[0]) + ' Occurred at sounding = {}, footprint = {}'.format(i_sounding+1, i_foot+1))
         error_handler.handle_err(new_err, err_code_name='prior_failure', flags=prior_flags, inds=(i_sounding, i_foot))
         return profiles, None, prior_flags[i_sounding, i_foot]
 
