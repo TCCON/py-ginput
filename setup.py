@@ -13,7 +13,7 @@ setup(
     long_description_content_type='text/markdown',
     author='Joshua Laughner, Sebastien Roche, Matthaeus Kiel',
     author_email='jlaugh@caltech.edu',
-    version='1.4.2',  # make sure stays in sync with the version in ginput/__init__.py
+    version='1.4.3',  # make sure stays in sync with the version in ginput/__init__.py
     url='',
     install_requires=[
         'astropy>=3.1.2',
@@ -28,7 +28,7 @@ setup(
         'pydap>=3.2.2',
         'python-dateutil>=2.8.2',
         'requests>=2.14.2',
-        'scipy>=1.2.1,<2.0.0',
+        'scipy>=1.2.1,<1.14.0',
         'sgp4>=1.4',
         'skyfield>=1.10',
         'xarray>=0.12.1',

@@ -22,7 +22,7 @@ copyright = '2021, Joshua Laughner, Sebastien Roche, and Matthaeus Kiel'
 author = 'Joshua Laughner, Sebastien Roche, and Matthaeus Kiel'
 
 # The full version, including alpha/beta/rc tags
-release = '1.4.2'
+release = '1.4.3'
 
 
 # -- General configuration ---------------------------------------------------

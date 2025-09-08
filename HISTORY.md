@@ -19,6 +19,11 @@ improvements to improve the scientific capabilities of this code sometimes requi
 an update to the API because the new best default behavior requires additional
 user input.
 
+## 1.4.3
+
+This release just fixes the allowed scipy version, otherwise it is identical
+to 1.4.2.
+
 ## 1.4.2
 
 This release addresses two issues.
