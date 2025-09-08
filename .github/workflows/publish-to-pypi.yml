@@ -28,6 +28,18 @@ jobs:
       with:
         name: python-package-distributions
         path: dist/
+  publish-to-pypi:
+    name: >-
+      Publish Python distribution to PyPI
+    if: startsWith(github.ref, 'refs/tags/')  # only publish to PyPI on tag pushes
+    needs:
+    - build
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/ginput  # Replace <package-name> with your PyPI project name
+    permissions:
+      id-token: write  # IMPORTANT: mandatory for trusted publishing
   publish-to-testpypi:
     name: Publish Python distribution to TestPyPI
     needs:
