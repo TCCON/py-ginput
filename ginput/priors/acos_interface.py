@@ -326,7 +326,12 @@ def acos_interface_main(instrument, met_resampled_file, geos_files, output_file,
         units['prior_failure_flags'] = error_handler.get_error_descriptions()
 
         # Convert the from ppm/ppb to dry mole fraction
-        profiles[gas_field] *= unit_scales[units[gas_field]]
+        gas_unit = units[gas_field]
+        if len(gas_unit) > 0:
+            # If this is an empty string, it probably means that we didn't actually compute profiles for any sounding
+            # Since the values will be all NaNs in that case, I don't have to scale the DMFs anyway, so there's no
+            # need for an "else" block.
+            profiles[gas_field] *= unit_scales[units[gas_field]]
         units[gas_field] = 'dmf'
 
         # Also need to convert the entry dates into decimal years to write to HDF
