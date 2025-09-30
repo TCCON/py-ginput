@@ -19,6 +19,24 @@ improvements to improve the scientific capabilities of this code sometimes requi
 an update to the API because the new best default behavior requires additional
 user input.
 
+## 1.4.3
+
+This release just fixes the allowed scipy version, otherwise it is identical
+to 1.4.2.
+
+## 1.4.2
+
+This release addresses two issues.
+
+First, it now errors by default if input in situ data includes negative values,
+assuming that these are fill values which should have been replaced by NaNs.
+
+Second, it fixes a bug in error handling in the satellite priors code.
+Previously, `ginput` would crash if a sounding resulted in an error that
+did not have a string as its first argument; it will now properly convert
+that argument to a string.
+
+
 ## 1.4.1
 
 This release fixes a bug when creating satellite prior files with a specific

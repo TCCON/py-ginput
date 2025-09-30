@@ -1,0 +1,5 @@
+- Update HISTORY.md file
+- Update version number in setup.py, CITATION.cff, ginput/__init__.py, and man/source/conf.py
+- Tag the commit with the version as "vX.Y.Z"
+- Push to public github and create release
+- Confirm that the PyPI publishing action ran

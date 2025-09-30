@@ -326,7 +326,12 @@ def acos_interface_main(instrument, met_resampled_file, geos_files, output_file,
         units['prior_failure_flags'] = error_handler.get_error_descriptions()
 
         # Convert the from ppm/ppb to dry mole fraction
-        profiles[gas_field] *= unit_scales[units[gas_field]]
+        gas_unit = units[gas_field]
+        if len(gas_unit) > 0:
+            # If this is an empty string, it probably means that we didn't actually compute profiles for any sounding
+            # Since the values will be all NaNs in that case, I don't have to scale the DMFs anyway, so there's no
+            # need for an "else" block.
+            profiles[gas_field] *= unit_scales[units[gas_field]]
         units[gas_field] = 'dmf'
 
         # Also need to convert the entry dates into decimal years to write to HDF
@@ -432,7 +437,7 @@ def _prior_helper(i_sounding, i_foot, qflag, mod_data, gas_record, var_mapping, 
             o2_mole_fraction_file=fo2_file
         )
     except Exception as err:
-        new_err = err.__class__(err.args[0] + ' Occurred at sounding = {}, footprint = {}'.format(i_sounding+1, i_foot+1))
+        new_err = err.__class__(str(err.args[0]) + ' Occurred at sounding = {}, footprint = {}'.format(i_sounding+1, i_foot+1))
         error_handler.handle_err(new_err, err_code_name='prior_failure', flags=prior_flags, inds=(i_sounding, i_foot))
         return profiles, None, prior_flags[i_sounding, i_foot]
 

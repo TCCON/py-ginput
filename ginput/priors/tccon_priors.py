@@ -433,6 +433,11 @@ class MloSmoTraceGasRecord(TraceGasRecord):
      recalculated. Default is ``None``, which will save the LUT if recalculated unless it was recalculated to cover the
      time frame requested. This option has no effect if the stratospheric lookup table is read from the netCDF file.
     :type save_strat: bool or None
+
+    :param allow_negative_insitu_values: set to ``True`` to allow the in situ files to include negative DMF values.
+     Normally this is not allowed, as the DMFs for long-lived gases should be positive and negative values normally
+     indicate a fill value is present. Such fill values will lead to incorrect combined MLO+SMO values.
+    :type allow_negative_insitu_values: bool
     """
 
     # The lifetime is used to account for chemical loss between emission and the prior location. Setting to infinity
@@ -486,13 +491,14 @@ class MloSmoTraceGasRecord(TraceGasRecord):
         return self._last_record_date(self.conc_seasonal)
 
     def __init__(self, first_date=None, last_date=None, truncate_date=None, lag=None, mlo_file=None, smo_file=None,
-                 strat_age_scale=1.0, recalculate_strat_lut=None, save_strat=None, recalc_if_custom_dates=True):
+                 strat_age_scale=1.0, recalculate_strat_lut=None, save_strat=None, recalc_if_custom_dates=True,
+                 allow_negative_insitu_values=False):
         has_custom_dates = first_date is not None or last_date is not None or truncate_date is not None
         first_date, last_date, self.sbc_lag, mlo_file, smo_file = self._init_helper(first_date, last_date, lag, mlo_file, smo_file)
         self.mlo_file = mlo_file
         self.smo_file = smo_file
         self.strat_age_scale = strat_age_scale
-        self.conc_seasonal = self.get_mlo_smo_mean(mlo_file, smo_file, first_date, last_date, truncate_date)
+        self.conc_seasonal = self.get_mlo_smo_mean(mlo_file, smo_file, first_date, last_date, truncate_date, allow_negative_insitu_values=allow_negative_insitu_values) 
 
         # Deseasonalize the data by taking a 12 month rolling average. Only do that on the dmf_mean field,
         # leave the latency
@@ -697,7 +703,7 @@ class MloSmoTraceGasRecord(TraceGasRecord):
         return time, delt, age, spectra
 
     @classmethod
-    def read_insitu_gas(cls, full_file_path):
+    def read_insitu_gas(cls, full_file_path, allow_negative_values: bool = False):
         """
         Read a trace gas record file. Assumes that the file is of monthly average concentrations.
 
@@ -718,6 +724,12 @@ class MloSmoTraceGasRecord(TraceGasRecord):
         df = pd.read_csv(full_file_path, skiprows=int(hlines), skipinitialspace=True,
                          delimiter=' ', header=None, names=['site', 'year', 'month', cls._gas_name])
 
+        has_neg_values = (df.loc[:, cls._gas_name] < 0).any()
+        if not allow_negative_values and has_neg_values:
+            raise IOError(f'{full_file_path} has negative mole fraction values. Normally this indicates fill values are present in the data, which should be replaced with NaNs.')
+        elif has_neg_values:
+            logger.warning(f'{full_file_path} has negative mole fraction values. This may indicate fill values are present in the data that will be averaged incorrectly. Fill values should be replaced with NaNs.')
+
         # set datetime index in df (requires 'day' column)
         df['day'] = 1
         df.set_index(pd.to_datetime(df[['year', 'month', 'day']]), inplace=True)
@@ -725,7 +737,7 @@ class MloSmoTraceGasRecord(TraceGasRecord):
         return df
 
     @classmethod
-    def get_mlo_smo_mean(cls, mlo_file, smo_file, first_date, last_date, truncate_date):
+    def get_mlo_smo_mean(cls, mlo_file, smo_file, first_date, last_date, truncate_date, allow_negative_insitu_values=False):
         """
         Generate the Mauna Loa/Samoa mean trace gas record from the files stored in this repository.
 
@@ -752,6 +764,10 @@ class MloSmoTraceGasRecord(TraceGasRecord):
         :param truncate_date: the last date to use *real data* for in the record, after this date the MLO/SMO time
          series will be extrapolated. Note that this is inclusive.
 
+        :param allow_negative_insitu_values: set to ``True`` to allow the in situ files to include negative DMF values.
+         Normally this is not allowed, as the DMFs for long-lived gases should be positive and negative values normally
+         indicate a fill value is present. Such fill values will lead to incorrect combined MLO+SMO values.
+
         :return: the data frame containing the mean trace gas concentration ('dmf_mean'), a flag ('interp_flag') set
          to 1 for any months that had to be interpolated and 2 for months that had to be extrapolated, and the latency
          ('latency') in years that a concentration had to be extrapolated. Index by timestamp.
@@ -760,8 +776,8 @@ class MloSmoTraceGasRecord(TraceGasRecord):
          to 1 for any months that had to be interpolated. Index by timestamp.
         :rtype: :class:`pandas.DataFrame`
         """
-        df_mlo = cls.read_insitu_gas(mlo_file)
-        df_smo = cls.read_insitu_gas(smo_file)
+        df_mlo = cls.read_insitu_gas(mlo_file, allow_negative_values=allow_negative_insitu_values)
+        df_smo = cls.read_insitu_gas(smo_file, allow_negative_values=allow_negative_insitu_values)
         df_combined = pd.concat([df_mlo, df_smo], axis=1)
         if truncate_date is not None and df_combined.index.max() < truncate_date: 
             # Do this before dropping NaNs, as we need to allow for the possibility that there is not NOAA
