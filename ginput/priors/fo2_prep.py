@@ -10,7 +10,7 @@ from ..common_utils.ggg_logging import logger
 
 from typing import Union, Optional, Tuple
 
-__version__ = '1.0.0'
+__version__ = '1.0.1'
 PROGRAM = f'fo2_prep v.{__version__}'
 
 DEFAULT_FO2_FILE = Path(mod_constants.data_dir) / 'o2_mean_dmf.dat'
@@ -378,12 +378,11 @@ def fo2_from_scripps_o2n2_and_noaa_co2(co2gl_file: Union[str, Path], alt_o2n2_fi
     co2gl = _read_co2gl_file(co2gl_file)['mean']
     d_co2gl = co2gl - co2gl[base_year]
 
-    # The "CO2 filled column" is the actual O2/N2 measurements (yes, confusing that it is called "CO2", I think it's supposed
-    # to be like "C(O2)" not "carbon dioxide") but with missing values filled in by a fit. Using that simplifies the calculation
-    # because we don't need to deal with fill values, and should not introduce a significant error, especially since the NOAA
-    # data will usually be the latency-limited one
+    # The "O2 filled column" is the actual O2/N2 measurements but with missing values filled in by a fit. Using that simplifies the calculation
+    # because we don't need to deal with fill values, and should not introduce a significant error, especially since the NOAA data will usually
+    # be the latency-limited one
     o2_n2 = _read_global_mean_o2n2(alt_o2n2_file=alt_o2n2_file, cgo_o2n2_file=cgo_o2n2_file, ljo_o2n2_file=ljo_o2n2_file,
-                                   yearly_avg=True, keep_datetime_index=False, column='CO2 filled')
+                                   yearly_avg=True, keep_datetime_index=False, column='O2 filled')
     d_o2_n2 = o2_n2 - o2_n2[base_year]
 
     d_xo2 = _delta_xo2_explicit_xco2(d_o2_n2, d_co2=d_co2gl, x_co2=co2gl)
@@ -440,7 +439,7 @@ def _read_co2gl_file(co2_file, datetime_index=False):
         return df
 
 
-def _read_global_mean_o2n2(alt_o2n2_file, cgo_o2n2_file, ljo_o2n2_file, yearly_avg=False, keep_datetime_index=False, column='CO2'):
+def _read_global_mean_o2n2(alt_o2n2_file, cgo_o2n2_file, ljo_o2n2_file, yearly_avg=False, keep_datetime_index=False, column='O2'):
     """Read the three Scripps O2/N2 files and average them to produce a global estimate O2/N2 ratio.
 
     The use of Alert and La Jolla to represent the northern hemisphere and Cape Grim the southern
@@ -470,17 +469,55 @@ def _read_o2n2_file(o2n2_file):
             line = f.readline()
 
         # The header *should* be the first line that doesn't start with a quote mark
-        columns = [x.strip() for x in line.split(',')]
-        # The next line continues the header for some columns
-        line = f.readline()
-        columns = [f'{c} {x.strip()}'.strip() for c, x in zip(columns, line.split(','))]
+        header_line_1 = line
+        header_line_2 = f.readline()
+        try:
+            columns = _standardize_o2n2_columns(header_line_1, header_line_2)
+        except NotImplementedError:
+            raise NotImplementedError(f'Unexpected columns in Scripps {o2n2_file}')
 
         df = pd.read_csv(f, header=None, na_values='-99.99')
         df.columns = columns
 
+    # Ensure everything other than the integer date columns are floats - sometimes
+    # things stay strings for some annoying reason
+    for colname, colvals in df.items():
+        if colname in {'Yr', 'Mn', 'Date Excel'}:
+            df[colname] = colvals.astype(int)
+        else:
+            df[colname] = colvals.astype(float)
+
     # Make a proper datetime index
     df.index = pd.to_datetime({'year': df['Yr'], 'month': df['Mn'], 'day': 1})
     return df
+
+
+def _standardize_o2n2_columns(line1, line2):
+    columns1 = [x.strip() for x in line1.split(',')]
+    columns2 = [x.strip() for x in line2.split(',')]
+
+    n1 = len(columns1)
+    n2 = len(columns2)
+
+    if n1 == 10 and n2 == 10 and columns1[4] == 'CO2' and columns1[8] == 'CO2':
+        # This is a file from before they changed their code sometime in 2025.
+        # It has the right number of columns, but the gas name is wrong. Or it's
+        # supposed to be C(O2), i.e. concentration of O2.
+        columns1[4] = 'O2'
+        columns1[8] = 'O2'
+    elif n1 == 9 and n2 == 10 and columns1[4] == 'O2' and columns1[8] == 'O2 seasonally':
+        # This is a file produced by their 2025 code. It has the gas name right,
+        # but is missing a comma in the first line.
+        columns1[8] = 'O2'
+        columns1.append('seasonally')
+    elif n1 != 10 or n2 != 10:
+        # As long as it has the normal number of columns, assume that they've got their
+        # headers right. Otherwise, don't try to guess what else might have changed.
+        raise NotImplementedError('Unexpected number of columns in Scripps O2 file')
+
+    # The extra .strip() here removes the space between {c1} and {c2} if c2 is blank.
+    return [f'{c1} {c2}'.strip() for c1, c2 in zip(columns1, columns2)]
+
 
 
 def extrapolate_fo2(df: pd.DataFrame, first_basis_year: int, target_year: int):
