@@ -1699,7 +1699,7 @@ class HFTropicsRecord(MloSmoTraceGasRecord):
     ch4_hf_slopes_file = os.path.join(_data_dir, 'ch4_hf_slopes.nc')
 
     @classmethod
-    def get_mlo_smo_mean(cls, mlo_file, smo_file, first_date, last_date, truncate_date):
+    def get_mlo_smo_mean(cls, mlo_file, smo_file, first_date, last_date, truncate_date, allow_negative_insitu_values=False):
         """
         Generate the Mauna Loa/Samoa mean trace gas record.
 
@@ -1723,6 +1723,11 @@ class HFTropicsRecord(MloSmoTraceGasRecord):
         :type last_date: datetime-like
 
         :param truncate_date: unused, since HF has no MLO/SMO data.
+
+        :param allow_negative_insitu_values: set to ``True`` to allow the in situ files to include negative DMF values.
+         Normally this is not allowed, as the DMFs for long-lived gases should be positive and negative values normally
+         indicate a fill value is present. Such fill values will lead to incorrect combined MLO+SMO values.
+        :type allow_negative_insitu_values: bool
 
         :return: the data frame containing the mean trace gas concentration ('dmf_mean'), a flag ('interp_flag') set
          to 1 for any months that had to be interpolated and 2 for months that had to be extrapolated, and the latency
