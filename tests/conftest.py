@@ -4,7 +4,7 @@ import pytest
 
 
 _mydir = Path(__file__).parent.resolve()
-input_data_dir = _mydir / '..' / 'ginput' / 'testing' / 'test_input_data'
+input_data_dir = _mydir / 'test_input_data'
 fo2_dir = input_data_dir / 'fo2'
 
 
