@@ -1726,7 +1726,8 @@ class HFTropicsRecord(MloSmoTraceGasRecord):
 
         :param allow_negative_insitu_values: set to ``True`` to allow the in situ files to include negative DMF values.
          Normally this is not allowed, as the DMFs for long-lived gases should be positive and negative values normally
-         indicate a fill value is present. Such fill values will lead to incorrect combined MLO+SMO values.
+         indicate a fill value is present. Such fill values will lead to incorrect combined MLO+SMO values. Note, this
+         has no effect for :class:`HFTropicsRecord`, it is included only as part of the required interface.
         :type allow_negative_insitu_values: bool
 
         :return: the data frame containing the mean trace gas concentration ('dmf_mean'), a flag ('interp_flag') set
