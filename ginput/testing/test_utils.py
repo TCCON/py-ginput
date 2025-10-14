@@ -21,6 +21,12 @@ vmr_input_dir = os.path.join(input_data_dir, 'vmr_files', 'fpit')
 map_input_dir = os.path.join(input_data_dir, 'map_files', 'fpit')
 std_vmr_file = os.path.join(input_data_dir, 'summer_35N.vmr')
 
+fo2_dir = os.path.join(input_data_dir, 'fo2')
+fo2_pre2025_csv = os.path.join(fo2_dir, 'monthly_o2_ljo.pre2025.csv')
+fo2_v2025_csv = os.path.join(fo2_dir, 'monthly_o2_ljo.v2025.csv')
+fo2_pre2025_pkl = os.path.join(fo2_dir, 'monthly_o2_ljo.pre2025.pkl')
+fo2_v2025_pkl = os.path.join(fo2_dir, 'monthly_o2_ljo.v2025.pkl')
+
 output_data_dir = os.path.join(_mydir, 'test_output_data')
 mod_output_top_dir = os.path.join(output_data_dir, 'mod_files')
 mod_output_dir = os.path.join(mod_output_top_dir, 'fpit')

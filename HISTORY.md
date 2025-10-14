@@ -19,6 +19,11 @@ improvements to improve the scientific capabilities of this code sometimes requi
 an update to the API because the new best default behavior requires additional
 user input.
 
+## 1.4.4
+
+This release updates the `fo2_prep` program to v1.0.1, which handles a change
+to the Scripps O2/N2 data file format that occurred in 2025.
+
 ## 1.4.3
 
 This release just fixes the allowed scipy version, otherwise it is identical

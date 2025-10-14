@@ -16,13 +16,16 @@ run_ginput.py: .run_ginput_template.py
 
 test: test-profiles test-utils
 
-quicktest: test-utils
+quicktest: test-utils test-fo2
 
 test-profiles: 
 	python -m ginput.testing.mod_maker_tests
 	
 test-utils:
 	python -m ginput.testing.utility_tests
+
+test-fo2:
+	python -m ginput.testing.fo2_tests
 
 get-test-data:
 	python -m ginput.testing.test_utils get
