@@ -20,6 +20,7 @@ mod_input_dir = os.path.join(input_data_dir, 'mod_files', 'fpit')
 vmr_input_dir = os.path.join(input_data_dir, 'vmr_files', 'fpit')
 map_input_dir = os.path.join(input_data_dir, 'map_files', 'fpit')
 std_vmr_file = os.path.join(input_data_dir, 'summer_35N.vmr')
+lat_lon_file = os.path.join(input_data_dir, 'GEOS5124-lat-lon.nc4')
 
 fo2_dir = os.path.join(input_data_dir, 'fo2')
 fo2_pre2025_csv = os.path.join(fo2_dir, 'monthly_o2_ljo.pre2025.csv')
@@ -108,7 +109,8 @@ def download_test_geos_data(rebuild=False, rebuild_hash_only=False):
                   'Redownload now (~2 GB)? (y to download, anything else to abort)')
             user_ans = input('')
             if user_ans.lower().strip() != 'y':
-                raise UserCancelledDownloadError('User elected not to download GEOS FPIT data')
+                raise UserCancelledDownloadError(
+                    'User elected not to download GEOS FPIT data')
 
         else:
             return
@@ -137,10 +139,12 @@ def download_test_geos_data(rebuild=False, rebuild_hash_only=False):
 
 
 def iter_mod_file_pairs(base_dir, test_dir):
-    site_dirs = sorted([os.path.basename(p) for p in glob(os.path.join(base_dir, '*')) if os.path.isdir(p)])
+    site_dirs = sorted([os.path.basename(p) for p in glob(
+        os.path.join(base_dir, '*')) if os.path.isdir(p)])
     for sdir in site_dirs:
         base_site_dir = os.path.join(base_dir, sdir, 'vertical')
-        test_site_dir = os.path.join(test_dir, sdir, 'vertical') if test_dir is not None else None
+        test_site_dir = os.path.join(
+            test_dir, sdir, 'vertical') if test_dir is not None else None
 
         for fpair in _iter_file_pairs('*.mod', base_site_dir, test_site_dir):
             yield fpair
@@ -174,21 +178,24 @@ def _iter_file_pairs(pattern, base_dir, test_dir):
 
 def iter_file_pairs_by_time(pattern, base_dir, test_dir, test_pattern=None):
     def make_file_dict(file_dir, pat):
-        files =  sorted(glob(os.path.join(file_dir, pat)))
+        files = sorted(glob(os.path.join(file_dir, pat)))
         return {mod_utils.find_datetime_substring(os.path.basename(f), dt.datetime): f for f in files}
 
     base_site_files = make_file_dict(base_dir, pattern)
-    test_site_files = make_file_dict(test_dir, pattern if test_pattern is None else test_pattern)
+    test_site_files = make_file_dict(
+        test_dir, pattern if test_pattern is None else test_pattern)
 
     for base_date, base_file in base_site_files.items():
         if base_date not in test_site_files:
-            raise InputDataMismatchError('Could not find a test file in {} for time {}'.format(test_dir, base_date))
+            raise InputDataMismatchError(
+                'Could not find a test file in {} for time {}'.format(test_dir, base_date))
         else:
             yield base_file, test_site_files[base_date]
 
 
 def parse_args():
-    p = ArgumentParser(description='Download GEOS test data, check the hashes, or update the hashes')
+    p = ArgumentParser(
+        description='Download GEOS test data, check the hashes, or update the hashes')
     subp = p.add_subparsers()
 
     getp = subp.add_parser('get')
@@ -199,11 +206,13 @@ def parse_args():
 
     checkp = subp.add_parser('check')
     checkp.description = 'Check the hashes of the GEOS FPIT data against those stored'
-    checkp.set_defaults(driver_fxn=check_hash_list, hash_list_filename=geos_sha_file)
+    checkp.set_defaults(driver_fxn=check_hash_list,
+                        hash_list_filename=geos_sha_file)
 
     updatep = subp.add_parser('update', aliases=['up'])
     updatep.description = 'Update the list of SHA hashes for the necessary GEOS FPIT files'
-    updatep.set_defaults(driver_fxn=download_test_geos_data, rebuild_hash_only=True)
+    updatep.set_defaults(driver_fxn=download_test_geos_data,
+                         rebuild_hash_only=True)
 
     return vars(p.parse_args())
 
