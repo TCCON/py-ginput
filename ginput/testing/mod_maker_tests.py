@@ -159,7 +159,7 @@ class FileComparer(object):
             for variable_name, variable_data in category_data.items():
                 if variable_name not in variable_mapping[category_name]:
                     continue
-                elif variable_name == 'GINPUT_VERSION':
+                elif variable_name.lower() == 'ginput_version':
                     print('Ignoring GINPUT_VERSION in header for sake of testing')
                     continue
 

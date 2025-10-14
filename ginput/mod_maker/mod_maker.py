@@ -90,7 +90,7 @@ import glob
 import os, sys
 import numpy.ma as ma
 import pandas as pd
-from scipy.interpolate import interp1d, interp2d
+from scipy.interpolate import interp1d, RectBivariateSpline
 import netCDF4 # netcdf I/O
 import re # used to parse strings
 import time
@@ -210,6 +210,16 @@ def build_mod_fmt_strings(var_order):
     var_name_mapping = {v: k for k, v in var_names.items()}
     data_fmt += '\n'
     return header_names, header_units, var_name_mapping, data_fmt
+
+
+def safe_format(val):
+    """
+    If the object is an array of 1 value, just return the value
+    """
+    if hasattr(val, "__len__") and len(val) == 1:
+        return val[0]
+    else:
+        return val
 
 
 def write_mod(mod_path, version, site_lat, data=0, surf_data=0, func=None, muted=False, slant=False, chem_vars=False, geos_versions=None):
@@ -341,7 +351,7 @@ def write_mod(mod_path, version, site_lat, data=0, surf_data=0, func=None, muted
         mod_content.append(constants_fmt.format(*mod_constants))
         # surface variables
         mod_content.append('Pressure  Temperature     Height     MMW        H2O      RH         SLP        TROPPB        TROPPV      TROPPT       TROPT       SZA\n')
-        mod_content.append(surface_fmt.format(*[surf_data[key] for key in surf_var_order]))
+        mod_content.append(surface_fmt.format(*[safe_format(surf_data[key]) for key in surf_var_order]))
         # version info
         mod_content.append(version+'\n')
         for key, version in geos_versions.items():
@@ -407,6 +417,7 @@ def write_mod(mod_path, version, site_lat, data=0, surf_data=0, func=None, muted
                 line_dict['EL'] = func(line_dict['EPV']*1e6, line_dict['PT'])[0]
 
             for key in line_dict.keys():
+                line_dict[key] = safe_format(line_dict[key])
                 scale = mod_var_fmt_info[key]['scale']
                 line_dict[key] *= scale
 
@@ -947,8 +958,8 @@ def equivalent_latitude_functions(ncdf_path,mode,start=None,end=None,muted=False
         PT[PT>1e4]=np.nan
         EPV[EPV>1e8]=np.nan
         for i in range(nlat):
-            pd.DataFrame(PT[:,i,:]).fillna(method='bfill',axis=0,inplace=True)
-            pd.DataFrame(EPV[:,i,:]).fillna(method='bfill',axis=0,inplace=True)
+            pd.DataFrame(PT[:,i,:]).bfill(axis=0,inplace=True)
+            pd.DataFrame(EPV[:,i,:]).bfill(axis=0,inplace=True)
 
         # Define a fixed potential temperature grid, with increasing spacing
         #fixed_PT = np.arange(np.min(PT),np.max(PT),20) # fixed potential temperature grid
@@ -986,7 +997,7 @@ def equivalent_latitude_functions(ncdf_path,mode,start=None,end=None,muted=False
         for k in range(new_nlev):
             interp_EL[k] = np.interp(fixed_PV,EPV_thresh[k],EL[k])
 
-        func_dict[date[t]] = interp2d(fixed_PV,fixed_PT,interp_EL)
+        func_dict[date[t]] = RectBivariateSpline(fixed_PV,fixed_PT,interp_EL.T, kx=1, ky=1)  # linear interp
 
         end = time.time()
         nmin.append(int(end-start)/60.0)
@@ -1396,7 +1407,7 @@ def lat_lon_interp(data_old,lat_old,lon_old,lat_new,lon_new,IDs_list):
 
         data = ma.masked_where(np.isnan(data),data)
 
-        func = interp2d(lon,lat,data)
+        func = RectBivariateSpline(lon,lat,data.T,kx=1,ky=1) # linear
 
         data_new.append(func(lon_new[count],lat_new[count]))
 

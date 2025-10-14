@@ -94,7 +94,7 @@ def make_geos_2d_file_list(path_pattern: str, start_date, end_date, geos_version
         path_pattern += geos_version
 
     files = []
-    for t in pd.date_range(start_date, end_date, freq='3H'):
+    for t in pd.date_range(start_date, end_date, freq='3h'):
         files.append(t.strftime(path_pattern))
     return files
 
@@ -555,7 +555,7 @@ def _check_geos_times(data_times, geos_dataset, run_settings: RunSettings = RunS
     data_start = data_times.min().floor('D')
     data_end = data_times.max().ceil('D')
     geos_times = set(pd.DatetimeIndex(geos_dataset.time.data))
-    expected_times = set(pd.date_range(data_start, data_end, freq='3H'))
+    expected_times = set(pd.date_range(data_start, data_end, freq='3h'))
     missing_times = expected_times.difference(geos_times)
     n_missing = len(missing_times)
     if run_settings.save_missing_geos_to:
@@ -849,7 +849,7 @@ class InsituMonthlyAverager(ABC):
 
         while curr_month <= last_expected_month:
             next_month = curr_month + relativedelta(months=1)
-            expected_timestamps = set(pd.date_range(curr_month, next_month, freq='H', closed='left'))
+            expected_timestamps = set(pd.date_range(curr_month, next_month, freq='h', inclusive='left'))
 
             # Do we have all the time stamps for the current month?
             intersection = expected_timestamps.intersection(hourly_df_timestamps)
@@ -881,7 +881,7 @@ class InsituMonthlyAverager(ABC):
         if hourly_df.shape[0] == 0:
             raise InsituProcessingError('No new hourly data to add given specified last month and/or creation date of the hourly file')
         hourly_df = _filter_rapid_df(hourly_df)
-        return hourly_df, pd.date_range(first_month, cutoff_date, freq='MS', closed='left')
+        return hourly_df, pd.date_range(first_month, cutoff_date, freq='MS', inclusive='left')
 
     @staticmethod
     def check_hourly_file_creation_date(hourly_file: str, last_expected_month: pd.Timestamp = DEFAULT_LAST_MONTH) -> None:

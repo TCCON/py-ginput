@@ -879,7 +879,7 @@ def _bin_ace_to_geos_times(ace_dates):
 
     # Create the bins as floats so we can use numpy.digitize
     ace_datenums = np.array([sat_utils.datetime2datenum(d) for d in ace_dates])
-    bin_edges = pd.date_range(first_time, last_time, freq='3H')
+    bin_edges = pd.date_range(first_time, last_time, freq='3h')
     bin_edge_datenums = np.array([sat_utils.datetime2datenum(d) for d in bin_edges])
 
     inds = np.digitize(ace_datenums, bin_edge_datenums) - 1

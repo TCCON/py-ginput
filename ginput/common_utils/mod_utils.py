@@ -22,7 +22,7 @@ import pandas as pd
 import re
 
 from numpy.core._multiarray_umath import arctan, tan, sin, cos
-from scipy.interpolate import interp1d, interp2d
+from scipy.interpolate import interp1d, RectBivariateSpline
 import subprocess
 import sys
 from warnings import warn
@@ -358,7 +358,7 @@ def format_lon(lon, prec=2, zero_pad=False):
 
 
 def find_lon_substring(string, to_float=False):
-    """
+    r"""
     Find a longitude substring in a string.
 
     A longitude substring will match \d+[EW] or \d+\.\d+[EW].
@@ -428,7 +428,7 @@ def format_lat(lat, prec=2, zero_pad=False):
 
 
 def find_lat_substring(string, to_float=False):
-    """
+    r"""
     Find a latitude substring in a string.
 
     A latitude substring will match \d+[NS] or \d+\.\d+[NS].
@@ -908,7 +908,7 @@ def calculate_eq_lat_on_grid(EPV, PT, area):
 
     for itime in range(PT.shape[0]):
         interpolator = calculate_eq_lat(EPV[itime], PT[itime], area)
-        # This is probably going to be horrifically slow - but interp2d sometimes gives weird results when called with
+        # This is probably going to be horrifically slow - but RectBivariateSpline sometimes gives weird results when called with
         # vectors, so unfortunately we have to call this one element at a time
         pbar = ProgressBar(PT[itime].size, prefix='Calculating eq. lat for time {}/{}:'.format(itime, PT.shape[0]),
                            style='counter')
@@ -936,7 +936,7 @@ def calculate_eq_lat(EPV, PT, area):
     :type area: :class:`numpy.ndarray`
 
     :return: a 2D interpolator for equivalent latitude, requires potential vorticity and potential temperature as inputs
-    :rtype: :class:`scipy.interpolate.interp2d`
+    :rtype: :class:`scipy.interpolate.RectBivariateSpline`
 
     Note: when querying the interpolator for equivalent latitude, it is often best to call it with scalar values, even
     though that is slower than calling it with the full vector of PV and PT that you wish to get EL for. The problem is
@@ -950,8 +950,8 @@ def calculate_eq_lat(EPV, PT, area):
     PT[PT > 1e4] = np.nan
     EPV[EPV > 1e8] = np.nan
     for i in range(nlat):
-        pd.DataFrame(PT[:, i, :]).fillna(method='bfill', axis=0, inplace=True)
-        pd.DataFrame(EPV[:, i, :]).fillna(method='bfill', axis=0, inplace=True)
+        pd.DataFrame(PT[:, i, :]).bfill(axis=0, inplace=True)
+        pd.DataFrame(EPV[:, i, :]).bfill(axis=0, inplace=True)
 
     # Define a fixed potential temperature grid, with increasing spacing
     # this is done arbitrarily to get sufficient levels for the interpolation to work well, and not too much for the
@@ -1010,7 +1010,7 @@ def calculate_eq_lat(EPV, PT, area):
     for k in range(new_nlev):
         interp_EL[k] = np.interp(pv_grid,EPV_thresh[k],EL[k])
 
-    return interp2d(pv_grid, theta_grid, interp_EL)
+    return RectBivariateSpline(pv_grid, theta_grid, interp_EL.T, kx=1, ky=1)  # linear interp
 
 
 def get_eqlat_profile(interpolator, epv, theta):
@@ -1051,8 +1051,8 @@ def calculate_eq_lat_field(EPV, PT, area):
     PT[PT > 1e4] = np.nan
     EPV[EPV > 1e8] = np.nan
     for i in range(nlat):
-        pd.DataFrame(PT[:, i, :]).fillna(method='bfill', axis=0, inplace=True)
-        pd.DataFrame(EPV[:, i, :]).fillna(method='bfill', axis=0, inplace=True)
+        pd.DataFrame(PT[:, i, :]).bfill(axis=0, inplace=True)
+        pd.DataFrame(EPV[:, i, :]).bfill(axis=0, inplace=True)
 
     # Define a fixed potential temperature grid, with increasing spacing
     # this is done arbitrarily to get sufficient levels for the interpolation to work well, and not too much for the
@@ -1570,8 +1570,8 @@ def mod_interpolation_new(z_grid, z_met, vals_met, interp_mode='linear'):
         raise ValueError(err_msg)
 
     interp_mode = interp_mode.lower()
-    do_log_x = re.match('^log-\w{3}', interp_mode)
-    do_log_y = re.match('\w{3}-log$', interp_mode)
+    do_log_x = re.match(r'^log-\w{3}', interp_mode)
+    do_log_y = re.match(r'\w{3}-log$', interp_mode)
 
     if do_log_x:
         z_grid = np.log(z_grid)
@@ -2053,7 +2053,7 @@ def frac_years_to_reldelta(frac_year, allow_nans=True):
         raise ValueError('NaNs not permitted in frac_year. Either remove them, or set `allow_nans=True`')
     age_years = np.floor(frac_year)
     age_fracs = np.mod(frac_year, 1)
-    rdels = [relativedelta(years=y, days=days_per_year * d) if not (np.isnan(y) or np.isnan(d)) else np.nan for y, d in zip(age_years, age_fracs)]
+    rdels = [relativedelta(years=y, days=days_per_year * d) if not (np.isnan(y) or np.isnan(d)) else pd.NaT for y, d in zip(age_years, age_fracs)]
     if return_scalar:
         rdels = rdels[0]
 

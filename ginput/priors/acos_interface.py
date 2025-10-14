@@ -684,7 +684,7 @@ def _eqlat_helper(idx, pv_vec, theta_vec, datenum, quality_flag, eqlat_fxns, geo
 
     :param eqlat_fxns: the collection of equivalent latitude interpolators, must be in the same order as
      ``geos_datenums``.
-    :type eqlat_fxns: list(:class:`scipy.interpolate.interpolate.interp2d`)
+    :type eqlat_fxns: list(:class:`scipy.interpolate.interpolate.RectBivariateSpline`)
 
     :param geos_datenums: the date numbers (see ``datenum``) for the GEOS FP files that bracket this sounding. Should
      be >= 2 and must be ordered the same as ``eqlat_fxns``, so that ``eqlat_fxns[0]`` the the equivalent latitude
@@ -792,7 +792,7 @@ def _eqlat_serial(sounding_pv, sounding_theta, sounding_datenums, sounding_qflag
     :type geos_datenums: 1D :class:`numpy.ndarray` or equivalent.
 
     :param eqlat_fxns: a list of equivalent latitude interpolators for the date/times specified by ``geos_datenums``.
-    :type eqlat_fxns: list(:class:`scipy.interpolate.interpolate.interp2d`)
+    :type eqlat_fxns: list(:class:`scipy.interpolate.interpolate.RectBivariateSpline`)
 
     :return: an array of equivalent latitudes for the soundings (dimensions soundings-by-levels).
     :rtype: :class:`numpy.ndarray`
@@ -1254,7 +1254,7 @@ def _make_el_profile(pv, theta, interpolator):
 
     :param interpolator: one of the interpolators returned by :func:`mod_utils.equivalent_latitude_functions_from_geos_files`
      that interpolates equivalent latitude to given PV and theta.
-    :type interpolator: :class:`scipy.interpolate.interp2d`
+    :type interpolator: :class:`scipy.interpolate.RectBivariateSpline`
 
     :return: the equivalent latitude profile
     :rtype: 1D :class:`numpy.ndarray`
