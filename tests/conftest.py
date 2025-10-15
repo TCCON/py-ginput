@@ -5,6 +5,12 @@ from pathlib import Path
 import pytest
 
 
+def pytest_configure(config):
+    config.addinivalue_line(
+        "markers", "slow: mark test as slow/long-running (deselect with `-m 'not slow'`)"
+    )
+
+
 _mydir = Path(__file__).parent.resolve()
 input_data_dir = _mydir / 'test_input_data'
 output_data_dir = _mydir / 'test_output_data'
@@ -44,6 +50,7 @@ def mod_input_dir():
     return input_data_dir / 'mod_files' / 'fpit'
 
 
+@pytest.fixture(scope='session')
 def test_site_mod_input_dir(mod_input_dir, test_site):
     return mod_input_dir / test_site / 'vertical'
 

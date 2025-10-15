@@ -19,18 +19,21 @@ VMR_TO_MAP = {'profile': {'h2o': 'h2o', 'hdo': 'hdo', 'co2': 'co2', 'n2o': 'n2o'
 MAP_UNIT_SCALES = {'mol/mol': 1.0, 'parts': 1.0, 'ppm': 1e-6, 'ppb': 1e-9, 'ppt': 1e-12}
 
 
+@pytest.mark.slow
 def test_mod_files(subtests, mod_input_dir, mod_output_dir, test_plots_dir, generate_files):
     # generate_files is needed to ensure the output files are created - it's
     # a setup fixture.
     comparison_helper(subtests, iter_mod_file_pairs, mod_input_dir, mod_output_dir, plots_dir=test_plots_dir)
 
 
+@pytest.mark.slow
 def test_vmr_files(subtests, vmr_input_dir, vmr_output_dir, test_plots_dir, generate_files):
     # generate_files is needed to ensure the output files are created - it's
     # a setup fixture.
     comparison_helper(subtests, iter_vmr_file_pairs, vmr_input_dir, vmr_output_dir, plots_dir=test_plots_dir)
 
 
+@pytest.mark.slow
 def test_map_files(subtests, map_input_dir, map_output_dir, test_plots_dir, generate_files):
     # generate_files is needed to ensure the output files are created - it's
     # a setup fixture.
@@ -106,7 +109,7 @@ def test_txt_map_files_against_upstream(
             check_file=mod_file,
             new_file=map_file,
             plots_dir=test_plots_dir,
-            variable_mapping=MOD_TO_NCMAP
+            variable_mapping=MOD_TO_TXTMAP
         )
 
     vmr_iterator = iter_file_pairs_by_time(
@@ -188,7 +191,6 @@ def generate_files(
 
 @pytest.fixture(scope='session')
 def generate_dry_map_files(
-    subtests,
     test_site_mod_input_dir,
     vmr_input_dir,
     map_dry_output_dir,
@@ -241,17 +243,13 @@ def compare_two_files(check_file, new_file, plots_dir, variable_mapping=None, va
         `True` if the two files are the same, `False` otherwise
     """
 
-    # This function relies on the method resolution order in Python to perform as expected. The problem was I needed
-    # to be able to use the same comparison mechanics I'd written for the unit tests to compare any two arbitrary
-    # files, but the subtest and assertion mechanics were too interwoven to effectively encapsulate the test
-    # mechanism as its own function outside the unit test framework. So when this class is used on its own, then
-    # `self.subTest`, `self._plot_helper`, and `self.assertTrue` all resolve to those methods on *this* class which
-    # are set up for manual tests. However, when this is "mixed in" as the second parent class to the test case,
-    # these resolve to:
-    #   * subTest -> unittest.TestCase.subTest
-    #   * assertTrue -> unittest.TestCase.assertTrue
-    #   * _plot_helper -> __class__._plot_helper
-    # thus behaving as a unit test.
+    # Define absolute tolerances for some variables, keyed off of the check data variable names
+    atol_overrides = {
+        # A tenth of a degree in equivalent latitude should be trivial, and will avoid issues with
+        # small changes near the surface that don't matter anyway (because we only use EqL in the stratosphere).
+        'EqL': 0.1  
+    }
+    
 
     # will be set to `False` if any of the subtests fail
     files_match = True
@@ -287,7 +285,8 @@ def compare_two_files(check_file, new_file, plots_dir, variable_mapping=None, va
                 # Variable does not exist in the scaling dict - so don't scale it
                 pass
 
-            test_result = _test_single_variable(variable_data, this_new_data)
+            this_atol = atol_overrides.get(variable_name)
+            test_result = _test_single_variable(variable_data, this_new_data, atol=this_atol)
             if not test_result:
                 files_match = False
                 try:
@@ -305,13 +304,16 @@ def compare_two_files(check_file, new_file, plots_dir, variable_mapping=None, va
     return files_match
 
 
-def _test_single_variable(variable_data, this_new_data):
+def _test_single_variable(variable_data, this_new_data, atol=None):
     try:
-        # We need some absolute tolerance, otherwise inconsequential differences cause the test to fail. E.g. as N2O and
-        # CH4 go to zero, a difference of 1e-13 parts triggers a failure, which really doesn't matter. We'll make the
-        # absolute tolerance equal to 0.01% of the maximum value in the original data, because a 0.01% difference in
-        # the prior concentration really shouldn't matter.
-        atol = 1e-4 * np.abs(np.nanmax(variable_data))
+        if atol is None:
+            # We need some absolute tolerance, otherwise inconsequential differences cause the test to fail. E.g. as N2O and
+            # CH4 go to zero, a difference of 1e-13 parts triggers a failure, which really doesn't matter. We'll make the
+            # absolute tolerance equal to 0.01% of the maximum value in the original data, because a 0.01% difference in
+            # the prior concentration really shouldn't matter.
+            #
+            # Some variables will specify an absolute tolerance that better reflects the needed precision in their values.
+            atol = 1e-4 * np.abs(np.nanmax(variable_data))
         return np.isclose(variable_data, this_new_data, atol=atol).all()
     except TypeError:
         # Not all variables with be float arrays. If np.isclose() can't coerce the data to a numeric
