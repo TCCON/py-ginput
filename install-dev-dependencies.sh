@@ -19,4 +19,4 @@ else
   CMD=conda
 fi
 
-${CMD} install -c conda-forge sphinx sphinx_rtd_theme myst-parser linkify-it-py
+${CMD} install -c conda-forge sphinx sphinx_rtd_theme myst-parser linkify-it-py pytest pytest-subtests
