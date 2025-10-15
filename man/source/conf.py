@@ -10,7 +10,8 @@
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
 #
-# import os
+import os
+import re
 # import sys
 # sys.path.insert(0, os.path.abspath('.'))
 
@@ -21,8 +22,17 @@ project = 'ginput'
 copyright = '2021, Joshua Laughner, Sebastien Roche, and Matthaeus Kiel'
 author = 'Joshua Laughner, Sebastien Roche, and Matthaeus Kiel'
 
-# The full version, including alpha/beta/rc tags
-release = '1.4.4'
+# Extract the version from setup.py
+release = 'x.y.z'
+_setup_py_file = os.path.join(os.path.dirname(__file__), '..', '..', 'setup.py')
+with open(_setup_py_file) as _f:
+    for _line in _f:
+        if 'version' in _line:
+            # Assume the line in setup.py looks like version='1.2', version='1.2.0', or similar.
+            # Basically there should always be a major and minor version, but the patch version
+            # can be missing or be something more complex than a number.
+            release = re.search(r"'(\d+\.\d+.*)'", _line).group(1)
+print(f'Using release = {release}')
 
 
 # -- General configuration ---------------------------------------------------

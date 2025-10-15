@@ -19,10 +19,32 @@ improvements to improve the scientific capabilities of this code sometimes requi
 an update to the API because the new best default behavior requires additional
 user input.
 
+## 1.5.0
+
+This release includes several disparate updates:
+
+- Updated usage of `pandas` and `scipy` to remove calls to deprecated functions
+  or using deprecated keywords/time interval formats.
+  This also allows `ginput` to work under Python 3.12. (Credit: @rocheseb)
+    - Because this raised the minimum versions of a few dependencies, we have
+      incremented the minor version number to indicate that users may need to
+      rebuild their environments.
+- The test cases now use `pytest` instead of the built-in unit testing framework.
+    - The tests have now been reorganized to reside in the top level of the repo;
+      the `ginput/testing` subdirectory is deprecated. It will be full removed once
+      the last utility commands are migrated.
+    - This was done to make it easier to run tests while creating a conda-forge
+      package.
+
+
 ## 1.4.4
 
 This release updates the `fo2_prep` program to v1.0.1, which handles a change
 to the Scripps O2/N2 data file format that occurred in 2025.
+
+It also fixes an edge case in the satellite priors code where no sounding had
+valid input met data. Before, it would crash before completely writing the output
+file. Now, that no longer occurs.
 
 ## 1.4.3
 

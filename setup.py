@@ -12,8 +12,8 @@ setup(
     long_description=_readme,
     long_description_content_type='text/markdown',
     author='Joshua Laughner, Sebastien Roche, Matthaeus Kiel',
-    author_email='jlaugh@caltech.edu',
-    version='1.4.4',  # make sure stays in sync with the version in ginput/__init__.py
+    author_email='jllacct119@gmail.com',
+    version='1.5.0',  # make sure stays in sync with the version in ginput/__init__.py
     url='',
     install_requires=[
         'astropy>=3.1.2',
