@@ -4,6 +4,6 @@ authors:
 - family-names: "Total Carbon Column Observing Network"
   given-names: ""
 title: "TCCON/py-ginput"
-version: 1.5.0
+version: 1.5.1
 date-released: 2025-10-15
 url: "https://github.com/TCCON/py-ginput"

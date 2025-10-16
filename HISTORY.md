@@ -19,6 +19,11 @@ improvements to improve the scientific capabilities of this code sometimes requi
 an update to the API because the new best default behavior requires additional
 user input.
 
+## 1.5.1
+
+This release aims to fix cases where the `git` or `hg` commands are not available,
+causing the writers for some files to fail.
+
 ## 1.5.0
 
 This release includes several disparate updates:
