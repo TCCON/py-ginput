@@ -522,13 +522,20 @@ def vcs_commit_info(vcs_dir=None):
 
 def _git_commit_info(git_dir=None):
     git_dir = _vcs_dir_helper(git_dir)
-    # Get the last commit in the current branch
-    parent = subprocess.check_output(['git', 'rev-parse', '--short', 'HEAD'], cwd=git_dir).decode('utf8').strip()
-    # Get the current branch
-    branch = subprocess.check_output(['git', 'rev-parse', '--abbrev-ref', 'HEAD'], cwd=git_dir).decode('utf8').strip()
-    # And the date of the last commit. Git by default doesn't seem to zero pad the date,
-    # so force it to in order to match Mercurial
-    date = subprocess.check_output(['git', 'log', '-1', r'--format=%cd', r'--date=format:"%a %b %d %H:%M:%S %Y %z"'], cwd=git_dir).decode('utf8').strip()
+    try:
+        # Get the last commit in the current branch
+        parent = subprocess.check_output(['git', 'rev-parse', '--short', 'HEAD'], cwd=git_dir).decode('utf8').strip()
+        # Get the current branch
+        branch = subprocess.check_output(['git', 'rev-parse', '--abbrev-ref', 'HEAD'], cwd=git_dir).decode('utf8').strip()
+        # And the date of the last commit. Git by default doesn't seem to zero pad the date,
+        # so force it to in order to match Mercurial
+        date = subprocess.check_output(['git', 'log', '-1', r'--format=%cd', r'--date=format:"%a %b %d %H:%M:%S %Y %z"'], cwd=git_dir).decode('utf8').strip()
+    except FileNotFoundError:
+        # This should mean that the 'git' executable was not found - this can happen when running
+        # tests in a CI for example.
+        parent = '???????'
+        branch = '????'
+        date = '????-??-??'
 
     return parent, branch, date
 
@@ -536,8 +543,12 @@ def _git_commit_info(git_dir=None):
 def _hg_commit_info(hg_dir=None):
     hg_dir = _vcs_dir_helper(hg_dir)
 
-    # Get the last commit (-l 1) in the current branch (-f)
-    summary = subprocess.check_output(['hg', 'log', '-f', '-l', '1'], cwd=hg_dir).splitlines()
+    try:
+        # Get the last commit (-l 1) in the current branch (-f)
+        summary = subprocess.check_output(['hg', 'log', '-f', '-l', '1'], cwd=hg_dir).splitlines()
+    except FileNotFoundError:
+        # This should mean that the 'hg' executable was not found
+        return '???????', '????', '????-??-??'
     log_dict = dict()
     # Since subprocess returns a bytes object (at least on Linux) rather than an encoded string object, all the strings
     # below must be bytes, not unicode strings
