@@ -7,6 +7,22 @@ from ginput.common_utils import mod_utils
 from ginput.mod_maker import mod_maker, tccon_sites
 
 
+def test_git_info_graceful_exit():
+    # All that this test requires is that this does not crash -
+    # we deliberately tell it to use a git path that will not
+    # exist
+    mod_utils._git_commit_info(git_exec='/not/a/bin/git')
+    mod_utils._git_is_commit_clean(git_exec='/not/a/bin/git')
+
+
+def test_hg_info_graceful_exit():
+    # All that this test requires is that this does not crash -
+    # we deliberately tell it to use an hg path that will not
+    # exist
+    mod_utils._hg_commit_info(hg_exec='/not/a/bin/hg')
+    mod_utils._hg_is_commit_clean(hg_exec='/not/a/bin/hg')
+
+
 def test_find_date_substring():
     # Test ideal cases of the three formats of datestring,
     # then also test on an example .mod and .vmr filename

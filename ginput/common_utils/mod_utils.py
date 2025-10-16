@@ -24,6 +24,7 @@ import re
 from numpy.core._multiarray_umath import arctan, tan, sin, cos
 from scipy.interpolate import interp1d, RectBivariateSpline
 import subprocess
+from subprocess import CalledProcessError
 import sys
 from warnings import warn
 
@@ -495,7 +496,7 @@ def _is_git_repo(vcs_dir=None):
     vcs_dir = _vcs_dir_helper(vcs_dir)
     try:
         subprocess.check_call(['git', 'status'], cwd=vcs_dir, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    except (subprocess.CalledProcessError, FileNotFoundError):
+    except (CalledProcessError, FileNotFoundError):
         # FileNotFoundError covers the case of the 'git' program not being found
         return False
     else:
@@ -521,17 +522,17 @@ def vcs_commit_info(vcs_dir=None):
         return _hg_commit_info(vcs_dir)
 
 
-def _git_commit_info(git_dir=None):
+def _git_commit_info(git_dir=None, git_exec='git'):
     git_dir = _vcs_dir_helper(git_dir)
     try:
         # Get the last commit in the current branch
-        parent = subprocess.check_output(['git', 'rev-parse', '--short', 'HEAD'], cwd=git_dir).decode('utf8').strip()
+        parent = subprocess.check_output([git_exec, 'rev-parse', '--short', 'HEAD'], cwd=git_dir).decode('utf8').strip()
         # Get the current branch
-        branch = subprocess.check_output(['git', 'rev-parse', '--abbrev-ref', 'HEAD'], cwd=git_dir).decode('utf8').strip()
+        branch = subprocess.check_output([git_exec, 'rev-parse', '--abbrev-ref', 'HEAD'], cwd=git_dir).decode('utf8').strip()
         # And the date of the last commit. Git by default doesn't seem to zero pad the date,
         # so force it to in order to match Mercurial
-        date = subprocess.check_output(['git', 'log', '-1', r'--format=%cd', r'--date=format:"%a %b %d %H:%M:%S %Y %z"'], cwd=git_dir).decode('utf8').strip()
-    except FileNotFoundError:
+        date = subprocess.check_output([git_exec, 'log', '-1', r'--format=%cd', r'--date=format:"%a %b %d %H:%M:%S %Y %z"'], cwd=git_dir).decode('utf8').strip()
+    except (FileNotFoundError, CalledProcessError):
         # This should mean that the 'git' executable was not found - this can happen when running
         # tests in a CI for example.
         parent = '???????'
@@ -541,13 +542,13 @@ def _git_commit_info(git_dir=None):
     return parent, branch, date
 
 
-def _hg_commit_info(hg_dir=None):
+def _hg_commit_info(hg_dir=None, hg_exec='hg'):
     hg_dir = _vcs_dir_helper(hg_dir)
 
     try:
         # Get the last commit (-l 1) in the current branch (-f)
-        summary = subprocess.check_output(['hg', 'log', '-f', '-l', '1'], cwd=hg_dir).splitlines()
-    except FileNotFoundError:
+        summary = subprocess.check_output([hg_exec, 'log', '-f', '-l', '1'], cwd=hg_dir).splitlines()
+    except (FileNotFoundError, CalledProcessError):
         # This should mean that the 'hg' executable was not found
         return '???????', '????', '????-??-??'
     log_dict = dict()
@@ -610,9 +611,13 @@ def _in_vcs_ignore(f: str, root: str, ignore_files):
             return True
     return False
 
-def _git_is_commit_clean(git_dir=None, ignore_untracked=True, ignore_files=tuple()):
-    git_root = subprocess.check_output(['git', 'rev-parse', '--show-toplevel']).decode('utf8').strip()
-    summary = subprocess.check_output(['git', 'status', '--porcelain']).decode('utf8').strip().splitlines()
+def _git_is_commit_clean(git_dir=None, ignore_untracked=True, ignore_files=tuple(), git_exec='git'):
+    try:
+        git_root = subprocess.check_output([git_exec, 'rev-parse', '--show-toplevel']).decode('utf8').strip()
+        summary = subprocess.check_output([git_exec, 'status', '--porcelain']).decode('utf8').strip().splitlines()
+    except (CalledProcessError, FileNotFoundError):
+        return False
+
     for line in summary:
         stat, filename = line.split(maxsplit=2)
         if stat == '??' and ignore_untracked:
@@ -628,7 +633,7 @@ def _git_is_commit_clean(git_dir=None, ignore_untracked=True, ignore_files=tuple
     return True
 
 
-def _hg_is_commit_clean(hg_dir=None, ignore_untracked=True, ignore_files=tuple()):
+def _hg_is_commit_clean(hg_dir=None, ignore_untracked=True, ignore_files=tuple(), hg_exec='hg'):
     """
     Checks if a mercurial directory is clean.
 
@@ -647,8 +652,11 @@ def _hg_is_commit_clean(hg_dir=None, ignore_untracked=True, ignore_files=tuple()
     :rtype: bool
     """
     hg_dir = _vcs_dir_helper(hg_dir)
-    hg_root = subprocess.check_output(['hg', 'root'], cwd=hg_dir).strip()
-    summary = subprocess.check_output(['hg', 'status'], cwd=hg_dir).splitlines()
+    try:
+        hg_root = subprocess.check_output([hg_exec, 'root'], cwd=hg_dir).strip()
+        summary = subprocess.check_output([hg_exec, 'status'], cwd=hg_dir).splitlines()
+    except (CalledProcessError, FileNotFoundError):
+        return False
 
 
     # Since subprocess returns a bytes object (at least on Linux) rather than an encoded string object, all the strings
