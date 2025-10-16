@@ -495,7 +495,8 @@ def _is_git_repo(vcs_dir=None):
     vcs_dir = _vcs_dir_helper(vcs_dir)
     try:
         subprocess.check_call(['git', 'status'], cwd=vcs_dir, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    except subprocess.CalledProcessError:
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        # FileNotFoundError covers the case of the 'git' program not being found
         return False
     else:
         return True
