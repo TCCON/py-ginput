@@ -4,6 +4,7 @@ import sys
 from .priors import acos_interface as aci, tccon_priors, map_maker, mlo_smo_prep, fo2_prep, automation
 from .mod_maker import mod_maker
 from .download import get_GEOS5, get_NOAA_flask_data, get_fo2_data
+from .tools import tar2nc
 
 
 def main(args=None):
@@ -69,6 +70,9 @@ def parse_args(args):
 
     auto_parser = subparsers.add_parser('auto', help='Entry point for running ginput in an automation environment')
     automation.parse_cl_args(auto_parser)
+
+    tar2nc_parser = subparsers.add_parser('tar2nc', help='Collate multiple .mod and .vmr files into a single .nc file')
+    tar2nc.parse_args(tar2nc_parser)
 
     clargs = vars(parser.parse_args(args))
     if 'driver_fxn' not in clargs:
