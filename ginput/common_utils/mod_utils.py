@@ -22,9 +22,9 @@ import pandas as pd
 import re
 
 from numpy.core._multiarray_umath import arctan, tan, sin, cos
-from scipy.interpolate import interp1d, interp2d
-
+from scipy.interpolate import interp1d, RectBivariateSpline
 import subprocess
+from subprocess import CalledProcessError
 import sys
 from warnings import warn
 
@@ -359,7 +359,7 @@ def format_lon(lon, prec=2, zero_pad=False):
 
 
 def find_lon_substring(string, to_float=False):
-    """
+    r"""
     Find a longitude substring in a string.
 
     A longitude substring will match \d+[EW] or \d+\.\d+[EW].
@@ -429,7 +429,7 @@ def format_lat(lat, prec=2, zero_pad=False):
 
 
 def find_lat_substring(string, to_float=False):
-    """
+    r"""
     Find a latitude substring in a string.
 
     A latitude substring will match \d+[NS] or \d+\.\d+[NS].
@@ -496,7 +496,8 @@ def _is_git_repo(vcs_dir=None):
     vcs_dir = _vcs_dir_helper(vcs_dir)
     try:
         subprocess.check_call(['git', 'status'], cwd=vcs_dir, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    except subprocess.CalledProcessError:
+    except (CalledProcessError, FileNotFoundError):
+        # FileNotFoundError covers the case of the 'git' program not being found
         return False
     else:
         return True
@@ -521,24 +522,35 @@ def vcs_commit_info(vcs_dir=None):
         return _hg_commit_info(vcs_dir)
 
 
-def _git_commit_info(git_dir=None):
+def _git_commit_info(git_dir=None, git_exec='git'):
     git_dir = _vcs_dir_helper(git_dir)
-    # Get the last commit in the current branch
-    parent = subprocess.check_output(['git', 'rev-parse', '--short', 'HEAD'], cwd=git_dir).decode('utf8').strip()
-    # Get the current branch
-    branch = subprocess.check_output(['git', 'rev-parse', '--abbrev-ref', 'HEAD'], cwd=git_dir).decode('utf8').strip()
-    # And the date of the last commit. Git by default doesn't seem to zero pad the date,
-    # so force it to in order to match Mercurial
-    date = subprocess.check_output(['git', 'log', '-1', r'--format=%cd', r'--date=format:"%a %b %d %H:%M:%S %Y %z"'], cwd=git_dir).decode('utf8').strip()
+    try:
+        # Get the last commit in the current branch
+        parent = subprocess.check_output([git_exec, 'rev-parse', '--short', 'HEAD'], cwd=git_dir).decode('utf8').strip()
+        # Get the current branch
+        branch = subprocess.check_output([git_exec, 'rev-parse', '--abbrev-ref', 'HEAD'], cwd=git_dir).decode('utf8').strip()
+        # And the date of the last commit. Git by default doesn't seem to zero pad the date,
+        # so force it to in order to match Mercurial
+        date = subprocess.check_output([git_exec, 'log', '-1', r'--format=%cd', r'--date=format:"%a %b %d %H:%M:%S %Y %z"'], cwd=git_dir).decode('utf8').strip()
+    except (FileNotFoundError, CalledProcessError):
+        # This should mean that the 'git' executable was not found - this can happen when running
+        # tests in a CI for example.
+        parent = '???????'
+        branch = '????'
+        date = '????-??-??'
 
     return parent, branch, date
 
 
-def _hg_commit_info(hg_dir=None):
+def _hg_commit_info(hg_dir=None, hg_exec='hg'):
     hg_dir = _vcs_dir_helper(hg_dir)
 
-    # Get the last commit (-l 1) in the current branch (-f)
-    summary = subprocess.check_output(['hg', 'log', '-f', '-l', '1'], cwd=hg_dir).splitlines()
+    try:
+        # Get the last commit (-l 1) in the current branch (-f)
+        summary = subprocess.check_output([hg_exec, 'log', '-f', '-l', '1'], cwd=hg_dir).splitlines()
+    except (FileNotFoundError, CalledProcessError):
+        # This should mean that the 'hg' executable was not found
+        return '???????', '????', '????-??-??'
     log_dict = dict()
     # Since subprocess returns a bytes object (at least on Linux) rather than an encoded string object, all the strings
     # below must be bytes, not unicode strings
@@ -599,9 +611,13 @@ def _in_vcs_ignore(f: str, root: str, ignore_files):
             return True
     return False
 
-def _git_is_commit_clean(git_dir=None, ignore_untracked=True, ignore_files=tuple()):
-    git_root = subprocess.check_output(['git', 'rev-parse', '--show-toplevel']).decode('utf8').strip()
-    summary = subprocess.check_output(['git', 'status', '--porcelain']).decode('utf8').strip().splitlines()
+def _git_is_commit_clean(git_dir=None, ignore_untracked=True, ignore_files=tuple(), git_exec='git'):
+    try:
+        git_root = subprocess.check_output([git_exec, 'rev-parse', '--show-toplevel']).decode('utf8').strip()
+        summary = subprocess.check_output([git_exec, 'status', '--porcelain']).decode('utf8').strip().splitlines()
+    except (CalledProcessError, FileNotFoundError):
+        return False
+
     for line in summary:
         stat, filename = line.split(maxsplit=2)
         if stat == '??' and ignore_untracked:
@@ -617,7 +633,7 @@ def _git_is_commit_clean(git_dir=None, ignore_untracked=True, ignore_files=tuple
     return True
 
 
-def _hg_is_commit_clean(hg_dir=None, ignore_untracked=True, ignore_files=tuple()):
+def _hg_is_commit_clean(hg_dir=None, ignore_untracked=True, ignore_files=tuple(), hg_exec='hg'):
     """
     Checks if a mercurial directory is clean.
 
@@ -636,8 +652,11 @@ def _hg_is_commit_clean(hg_dir=None, ignore_untracked=True, ignore_files=tuple()
     :rtype: bool
     """
     hg_dir = _vcs_dir_helper(hg_dir)
-    hg_root = subprocess.check_output(['hg', 'root'], cwd=hg_dir).strip()
-    summary = subprocess.check_output(['hg', 'status'], cwd=hg_dir).splitlines()
+    try:
+        hg_root = subprocess.check_output([hg_exec, 'root'], cwd=hg_dir).strip()
+        summary = subprocess.check_output([hg_exec, 'status'], cwd=hg_dir).splitlines()
+    except (CalledProcessError, FileNotFoundError):
+        return False
 
 
     # Since subprocess returns a bytes object (at least on Linux) rather than an encoded string object, all the strings
@@ -726,7 +745,7 @@ def extract_mod_site_abbrevs(mod_files, default='xx'):
         fileparts = modf.split(os.sep)
         if len(fileparts) < 3:
             return default
-        elif not re.match(r'[a-zA-Z]{2}', fileparts[-3]):
+        elif not re.match(r'[a-zA-Z0-9]{2}', fileparts[-3]):
             return default
         else:
             return fileparts[-3]
@@ -909,7 +928,7 @@ def calculate_eq_lat_on_grid(EPV, PT, area):
 
     for itime in range(PT.shape[0]):
         interpolator = calculate_eq_lat(EPV[itime], PT[itime], area)
-        # This is probably going to be horrifically slow - but interp2d sometimes gives weird results when called with
+        # This is probably going to be horrifically slow - but RectBivariateSpline sometimes gives weird results when called with
         # vectors, so unfortunately we have to call this one element at a time
         pbar = ProgressBar(PT[itime].size, prefix='Calculating eq. lat for time {}/{}:'.format(itime, PT.shape[0]),
                            style='counter')
@@ -937,7 +956,7 @@ def calculate_eq_lat(EPV, PT, area):
     :type area: :class:`numpy.ndarray`
 
     :return: a 2D interpolator for equivalent latitude, requires potential vorticity and potential temperature as inputs
-    :rtype: :class:`scipy.interpolate.interp2d`
+    :rtype: :class:`scipy.interpolate.RectBivariateSpline`
 
     Note: when querying the interpolator for equivalent latitude, it is often best to call it with scalar values, even
     though that is slower than calling it with the full vector of PV and PT that you wish to get EL for. The problem is
@@ -951,8 +970,8 @@ def calculate_eq_lat(EPV, PT, area):
     PT[PT > 1e4] = np.nan
     EPV[EPV > 1e8] = np.nan
     for i in range(nlat):
-        pd.DataFrame(PT[:, i, :]).fillna(method='bfill', axis=0, inplace=True)
-        pd.DataFrame(EPV[:, i, :]).fillna(method='bfill', axis=0, inplace=True)
+        pd.DataFrame(PT[:, i, :]).bfill(axis=0, inplace=True)
+        pd.DataFrame(EPV[:, i, :]).bfill(axis=0, inplace=True)
 
     # Define a fixed potential temperature grid, with increasing spacing
     # this is done arbitrarily to get sufficient levels for the interpolation to work well, and not too much for the
@@ -1011,7 +1030,7 @@ def calculate_eq_lat(EPV, PT, area):
     for k in range(new_nlev):
         interp_EL[k] = np.interp(pv_grid,EPV_thresh[k],EL[k])
 
-    return interp2d(pv_grid, theta_grid, interp_EL)
+    return RectBivariateSpline(pv_grid, theta_grid, interp_EL.T, kx=1, ky=1)  # linear interp
 
 
 def get_eqlat_profile(interpolator, epv, theta):
@@ -1052,8 +1071,8 @@ def calculate_eq_lat_field(EPV, PT, area):
     PT[PT > 1e4] = np.nan
     EPV[EPV > 1e8] = np.nan
     for i in range(nlat):
-        pd.DataFrame(PT[:, i, :]).fillna(method='bfill', axis=0, inplace=True)
-        pd.DataFrame(EPV[:, i, :]).fillna(method='bfill', axis=0, inplace=True)
+        pd.DataFrame(PT[:, i, :]).bfill(axis=0, inplace=True)
+        pd.DataFrame(EPV[:, i, :]).bfill(axis=0, inplace=True)
 
     # Define a fixed potential temperature grid, with increasing spacing
     # this is done arbitrarily to get sufficient levels for the interpolation to work well, and not too much for the
@@ -1571,8 +1590,8 @@ def mod_interpolation_new(z_grid, z_met, vals_met, interp_mode='linear'):
         raise ValueError(err_msg)
 
     interp_mode = interp_mode.lower()
-    do_log_x = re.match('^log-\w{3}', interp_mode)
-    do_log_y = re.match('\w{3}-log$', interp_mode)
+    do_log_x = re.match(r'^log-\w{3}', interp_mode)
+    do_log_y = re.match(r'\w{3}-log$', interp_mode)
 
     if do_log_x:
         z_grid = np.log(z_grid)
@@ -2054,7 +2073,7 @@ def frac_years_to_reldelta(frac_year, allow_nans=True):
         raise ValueError('NaNs not permitted in frac_year. Either remove them, or set `allow_nans=True`')
     age_years = np.floor(frac_year)
     age_fracs = np.mod(frac_year, 1)
-    rdels = [relativedelta(years=y, days=days_per_year * d) if not (np.isnan(y) or np.isnan(d)) else np.nan for y, d in zip(age_years, age_fracs)]
+    rdels = [relativedelta(years=y, days=days_per_year * d) if not (np.isnan(y) or np.isnan(d)) else pd.NaT for y, d in zip(age_years, age_fracs)]
     if return_scalar:
         rdels = rdels[0]
 

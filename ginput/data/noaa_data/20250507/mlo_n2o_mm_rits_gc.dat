@@ -1,0 +1,210 @@
+#  file:  mlo_N2O_MM.dat
+#
+#  Nitrous Oxide (N2O) data from hourly in situ samples analyzed on
+#  a gas chromatograph located at Mauna Loa (MLO), Hawaii
+#  (19.539 N, 155.578 W, elevation: 3397 m).
+#
+#  Atmospheric Measurements from the NOAA/ESRL Radiatively Important Trace
+#  Species (RITS) program.  The RITS program started in 1983 and continued
+#  until 2000.  A detailed history of the RITS program can be found at
+#  http://www.esrl.noaa.gov/gmd/hats/insitu/insitu.html
+#
+#  PIs: Dr. James W. Elkins, Dr. Bradley D. Hall, J. David Nance
+#
+#  National Oceanic and Atmospheric Administration (NOAA)
+#  Earth System Research Laboratory (ESRL)
+#  325 Broadway, R/GMD1
+#  Boulder, CO 80305-3328
+#
+#  See (http://www.esrl.noaa.gov/gmd/obop/) for station statistics and personnel.
+#
+#  Data use policy:
+#  If you use this data in a publication or report, we would appreciate that
+#  you contact the principal investigators (PIs) first and discuss your
+#  interests.  We are trying to encourage scientific discussion.  The PIs can
+#  discuss the quality of the data and any potential problems with its
+#  analysis.  Please contact the PIs for more information.
+#
+#  The data should be cited in presentations or publications as the flowing:
+#  Nitrous Oxide data from the NOAA/ESRL halocarbons in situ program.
+#
+#  Calibration scale used: NOAA 2006
+#
+#  More information about the calibration scale can be found at:
+#  http://www.esrl.noaa.gov/gmd/ccl/
+#
+#  The RITS GCs sampled once per hour from the early 1990s onward.
+#  Monthly-averaged data are provided in parts-per-billion (ppb).
+#
+#  Abbreviations:
+#      yr      year
+#      mon     month
+#      min     minute
+#      m       daily/monthly median concentration (or hourly value)
+#      sd      standard deviation
+#      n       number of samples
+#      brw     Barrow, Alaska
+#      nwr     Niwot Ridge, Colorado
+#      mlo     Mauna Loa, Hawaii
+#      smo     Cape Matatula, American Samoa
+#      spo     South  Pole, Antarctica
+#      nan     not-a-number (missing data)
+#
+#  year, mon, concentration in ppb, std. dev, number of samples
+#
+N2OritsMLOyr N2OritsMLOmon N2OritsMLOm N2OritsMLOsd N2OritsMLOn
+1987   6   306.676     1.437   52
+1987   7   306.380     1.278   48
+1987   8   307.142     1.235   60
+1987   9   306.703     0.884   99
+1987  10   306.624     0.611  150
+1987  11   306.619     0.696   48
+1987  12   306.555     1.673   14
+1988   1   307.103     1.612   48
+1988   2   306.465     1.216  113
+1988   3   306.572     1.292  140
+1988   4   306.754     0.991  232
+1988   5   306.739     1.477  191
+1988   6   306.539     1.381  158
+1988   7   306.917     0.746  169
+1988   8   306.752     0.840  198
+1988   9   306.846     1.036  191
+1988  10   307.007     0.916  200
+1988  11   307.162     0.970  145
+1988  12   307.230     1.270  163
+1989   1   307.355     1.055  127
+1989   2   307.425     0.965   82
+1989   3   307.419     0.965  167
+1989   4   306.337     1.616  173
+1989   5   306.814     0.867  256
+1989   6   307.164     0.656  315
+1989   7   307.531     0.666  305
+1989   8   307.820     0.654  332
+1989   9   307.724     0.924  327
+1989  10   308.154     0.782  320
+1989  11   307.981     0.849  352
+1989  12   308.144     1.135  292
+1990   1   308.140     1.200  288
+1990   2   308.129     0.866  237
+1990   3   307.952     1.510  227
+1990   4   308.027     0.726  320
+1990   5   308.434     1.785  705
+1990   6   308.543     2.013  547
+1990   7   308.802     2.126  578
+1990   8   309.018     1.947  649
+1990   9   308.886     2.312  695
+1990  10   308.256     1.465  460
+1990  11   308.177     0.714  505
+1990  12   308.295     0.878  649
+1991   1   308.494     0.686  586
+1991   2   308.536     0.637  554
+1991   3   308.593     0.785  709
+1991   4   308.627     0.626  634
+1991   5   308.648     0.775  535
+1991   6   308.558     0.608  667
+1991   7   308.527     0.657  572
+1991   8   308.573     0.585  348
+1991   9       nan       nan    0
+1991  10       nan       nan    0
+1991  11       nan       nan    0
+1991  12       nan       nan    0
+1992   1       nan       nan    0
+1992   2   309.295     0.563   75
+1992   3   309.359     0.758  517
+1992   4   309.192     0.766  560
+1992   5   309.284     0.738  654
+1992   6   309.188     0.617  600
+1992   7   309.045     0.616  675
+1992   8   309.124     0.678  655
+1992   9   309.099     0.648  635
+1992  10   309.113     0.604  593
+1992  11   309.151     0.640  642
+1992  12   309.138     0.631  661
+1993   1   309.099     0.778  607
+1993   2   309.138     0.629  635
+1993   3   309.098     0.578  640
+1993   4   309.076     0.588  572
+1993   5   309.075     0.620  702
+1993   6   309.249     0.825  701
+1993   7   309.090     0.747  593
+1993   8   309.120     0.792  463
+1993   9   309.298     1.012  487
+1993  10   309.651     1.034  487
+1993  11   309.764     0.974  583
+1993  12   309.962     1.053  640
+1994   1   310.070     0.996  657
+1994   2   310.158     1.015  594
+1994   3   310.269     1.316  666
+1994   4   310.503     1.639  638
+1994   5   310.399     1.501  630
+1994   6   310.610     1.740  696
+1994   7   310.555     1.766  517
+1994   8   310.640     2.077  463
+1994   9   310.311     2.375  595
+1994  10   310.398     1.984  588
+1994  11   310.662     1.937  600
+1994  12   310.886     1.773  611
+1995   1   310.789     1.613  621
+1995   2   310.859     1.773  432
+1995   3   310.524     3.070  652
+1995   4   310.954     2.698  594
+1995   5   309.679     2.873  602
+1995   6   310.030     1.458  681
+1995   7   309.753     1.538  708
+1995   8   309.600     1.624  652
+1995   9   309.393     1.561  710
+1995  10   309.489     1.571  526
+1995  11   311.067     2.296  600
+1995  12   311.100     2.231  641
+1996   1   311.123     2.107  633
+1996   2   311.198     2.634  541
+1996   3   311.508     2.559  712
+1996   4   311.168     2.960  513
+1996   5   311.911     2.940  532
+1996   6   312.377     3.746  649
+1996   7   312.411     4.478  550
+1996   8   312.245     0.585  519
+1996   9   312.290     0.558  549
+1996  10   312.468     0.560  647
+1996  11   312.400     0.615  630
+1996  12   312.450     0.604  682
+1997   1   312.459     0.560  683
+1997   2   312.309     0.590  471
+1997   3   312.037     0.560  328
+1997   4   312.308     0.598  652
+1997   5   312.220     0.631  688
+1997   6   312.510     0.593  579
+1997   7   312.559     0.595  701
+1997   8   312.630     0.510  360
+1997   9   312.268     0.600  343
+1997  10   312.514     0.694  699
+1997  11   312.621     0.687  670
+1997  12   312.752     0.613  650
+1998   1   312.809     0.651  546
+1998   2   313.334     0.779  500
+1998   3   313.823     0.602  559
+1998   4   313.694     0.603  343
+1998   5   313.793     0.617  738
+1998   6   313.729     0.594  657
+1998   7   313.777     0.538  740
+1998   8   313.881     0.506  739
+1998   9   313.989     0.643  666
+1998  10   314.740     0.819  569
+1998  11   314.761     0.737  217
+1998  12   314.726     0.754  496
+1999   1   314.849     0.735  739
+1999   2   314.782     0.784  672
+1999   3   314.670     0.795  423
+1999   4   314.744     0.839  667
+1999   5   314.947     0.795  665
+1999   6   314.776     1.003  640
+1999   7   313.589     0.969  731
+1999   8   313.442     0.935  665
+1999   9   313.462     0.944  590
+1999  10   314.062     0.968  678
+1999  11   314.320     1.137  620
+1999  12   315.632     0.881  395
+2000   1   315.717     0.967  586
+2000   2   315.974     0.983  691
+2000   3   315.985     0.911  695
+2000   4   315.969     0.806  237

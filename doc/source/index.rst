@@ -11,6 +11,7 @@ Welcome to ginput's documentation!
    :maxdepth: 2
    :caption: Using ginput:
 
+   ginput_usage/installation_and_first_steps.md
    ginput_usage/command_line_int.md
    ginput_usage/downloading_met.md
    ginput_usage/making_mod_files.md

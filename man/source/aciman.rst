@@ -65,6 +65,16 @@ Arguments
     Setting this flag disables the MLO/SMO truncation; instead all available MLO/SMO data will be used and whatever extrapolation is needed 
     will be done. This also disables the check that MLO/SMO data includes a certain minimum date.
 
+**--fo2-file FO2_FILE**
+    This option accepts a path to the tabular file created by the `update_fo2` subcommand, which contains the annual mean O2 dry mole
+    fraction. If not given, then the default file in the `ginput` data directory will be used and must be sufficiently up to date.
+
+**--auto-update-fo2-file**
+    This flag will automatically try to update the `FO2_FILE` to include the latest NOAA and Scripps data. It does NOT extrapolate
+    past the end of that data, so if some of that data is too out-of-date, you will need to create an O2 mole fraction file with
+    the `update_fo2` subcommand using its ability to extrapolate to more recent years, and pass the resulting file in using the
+    `--fo2-file` option.
+
 **-n, --nprocs**
     Number of processes to use in parallel when computing the priors. The default is to run in serial. Passing a number >=1 will use
     that many parallel processes. See note below about potential interaction with numpy threads.

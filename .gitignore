@@ -1,17 +1,12 @@
 *.pyc
 *.png
-*.mod
-*.map
-*.nc
-*.nc4
-*.vmr
 *.orig
 *.egg-info
 .idea
 ginput/testing/plots/.*.pdf
 run_ginput.py
-# this will need to be unignored later
-^docs
+doc/build/**/*
 build/**/*
 dist/**/*
 .condaenv/**/*
+**/.ipynb_checkpoints

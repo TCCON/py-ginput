@@ -53,7 +53,7 @@ def read_out_file(out_file, as_dataframes=False, replace_fills=False):
         The contents of the file as a dataframe or dict, depending on `as_dataframes`.
     """
     n_header_lines = mod_utils.get_num_header_lines(out_file)
-    df = pd.read_csv(out_file, header=n_header_lines-1, sep='\s+')
+    df = pd.read_csv(out_file, header=n_header_lines-1, sep=r'\s+')
 
     if replace_fills is True:
         # Get the fill value from the header
@@ -389,7 +389,7 @@ def read_vmr_file(vmr_file, as_dataframes=False, lowercase_names=True, style='ne
                 split_data_line = re.split(r'\s+', data_line)
                 prior_info[category] = np.array([float(x) for x in split_data_line])
 
-    data_table = pd.read_csv(vmr_file, sep='\s+', header=nheader-1)
+    data_table = pd.read_csv(vmr_file, sep=r'\s+', header=nheader-1)
     
     # Also get the information that's only in the file name (namely date and longitude, we'll also read the latitude
     # because it's there).
@@ -472,6 +472,6 @@ def read_tabular_file_with_header(file_path: Union[str, Path], comment_str: str 
                 break
 
         columns = line.strip().split()
-        df = pd.read_csv(f, header=None, delim_whitespace=True)
+        df = pd.read_csv(f, header=None, sep=r"\s+")
         df.columns = columns
         return df

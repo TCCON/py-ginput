@@ -197,6 +197,15 @@ class O2MeanMoleFractionRecord(object):
     :param extrap_basis_years: number of years at the end of the f(O2) data (following truncation) to fit
      for the extrapolation.
 
+    :param auto_update_fo2_file: set to ``True`` to try automatically updating the f(O2) data file. This
+     is ``False`` by default because is does require downloading data from Scripps and NOAA, and our philosophy
+     is that any action taken over the internet should require you to opt-in to that.
+
+    :param auto_update_td: the timedelta defining how long ago the f(O2) data file must have been updated
+     to try updating it again if ``auto_update_fo2_file`` is ``True``. Setting to ``None`` will always try
+     to update the file. If the file does not exist and ``auto_update_fo2_file = True``, then it will always
+     be created.
+
     .. note:: What are ``delay_years`` and ``max_extrap_years`` all about?
        The issue is that there is some latency in the NOAA and Scripps data, and we need to make sure that
        we can reproduce the same output whenever we run ginput. The NOAA data tends to set the latency, since
@@ -222,16 +231,22 @@ class O2MeanMoleFractionRecord(object):
                  o2_mole_fraction_file: Union[str, Path] = fo2_prep.DEFAULT_FO2_FILE,
                  delay_years: int = 2,
                  max_extrap_years: int = 3,
-                 extrap_basis_years: int = 5):
+                 extrap_basis_years: int = 5,
+                 auto_update_fo2_file: bool = False,
+                 auto_update_td: dt.timedelta = dt.timedelta(days=7)):
         if max_extrap_years <= delay_years:
             raise ValueError('max_extrap_years must be greater than delay_years')
+        
+        if auto_update_fo2_file:
+            fo2_prep.fo2_update_driver(o2_mole_fraction_file, time_since_mod=auto_update_td)
         if not os.path.exists(o2_mole_fraction_file):
             raise IOError(f'O2 mole fraction file does not exist at {o2_mole_fraction_file}. Make sure the path is correct and you have run the '
-                          '"update_fo2" subcommand of run_ginput.py at least once.')
+                          '"update_fo2" subcommand of run_ginput.py at least once OR set auto_update_fo2_file = True when instantiating this class.')
         self._o2_df = readers.read_tabular_file_with_header(o2_mole_fraction_file).set_index('year')
         self._delay_years = delay_years
         self._max_extrap_years = max_extrap_years
         self._extrap_basis_years = extrap_basis_years
+
 
     def get_o2_mole_fraction(self, target_date: pd.Timestamp):
         """Calculate the O2 mole fraction for a given date.
@@ -240,20 +255,39 @@ class O2MeanMoleFractionRecord(object):
         long we are allowed to extrapolate for, or a :class:`RuntimeError` will be
         raised.
         """
-        extrapolated_o2_df = self.truncate_and_extrapolate(target_date.year)
+        dtindex = pd.to_datetime([target_date])
+        o2_dmf_arr = self.get_many_o2_mole_fractions(dtindex)
+        return o2_dmf_arr.item()
 
-        # The O2 data contains yearly averages, so we'll treat those as being the value
-        # at the midpoint of the year (around July 1)
-        o2_dates = pd.to_datetime({'year': extrapolated_o2_df.index, 'month': 7, 'day': 1})
-        o2_julian_dates = pd.DatetimeIndex(o2_dates).to_julian_date()
-        o2_values = extrapolated_o2_df['fo2'].to_numpy()
-        target_julian_date = target_date.to_julian_date()
+    def get_many_o2_mole_fractions(self, target_dates: pd.DatetimeIndex):
+        """Calculate the O2 mole fractions for a sequence of dates.
 
-        if target_julian_date < np.min(o2_julian_dates) or target_julian_date > np.max(o2_julian_dates):
-            raise RuntimeError(f'Target date {target_date} is outside the range of dates available from f(O2) input data')
+        The date must be within the bounds of the O2 data availble plus however
+        long we are allowed to extrapolate for, or a :class:`RuntimeError` will be
+        raised.
+        """
+
+        o2_dmfs = np.full(target_dates.size, np.nan)
+        # We have to truncate the input data for each unique year, so we'll
+        # group the calculations by year to speed things up (compared to doing
+        # one date at a time).
+        unique_years = np.unique(target_dates.year)
+        for year in unique_years:
+            extrapolated_o2_df = self.truncate_and_extrapolate(year)
         
-        target_o2_value = np.interp([target_julian_date], o2_julian_dates, o2_values).item()
-        return target_o2_value
+            # The O2 data contains yearly averages, so we'll treat those as being the value
+            # at the midpoint of the year (around July 1)
+            o2_dates = pd.to_datetime({'year': extrapolated_o2_df.index, 'month': 7, 'day': 1})
+            o2_julian_dates = pd.DatetimeIndex(o2_dates).to_julian_date()
+            o2_values = extrapolated_o2_df['fo2'].to_numpy()
+        
+            tt = target_dates.year == year
+            target_julian_dates = target_dates[tt].to_julian_date()
+            if np.any(target_julian_dates < np.min(o2_julian_dates)) or np.any(target_julian_dates > np.max(o2_julian_dates)):
+                raise RuntimeError('At least one target date is outside the range of dates available from f(O2) input data')
+        
+            o2_dmfs[tt] = np.interp(target_julian_dates, o2_julian_dates, o2_values)
+        return o2_dmfs
 
     def truncate_and_extrapolate(self, target_year: int):
         """Return a copy of the O2 dataframe truncated by ``self._delay_years`` and extrapolated.
@@ -271,21 +305,23 @@ class O2MeanMoleFractionRecord(object):
             raise RuntimeError(f'{self._max_extrap_years} is not sufficient, must extrapolate from {last_year_to_keep} to one year past {target_year}')
         
         tt = self._o2_df.index <= last_year_to_keep
+        if tt.sum() < 2:
+            raise RuntimeError(f'Insufficient O2 data to start from year {target_year}: 2 years before required, {tt.sum()} available.')
         df = self._o2_df.loc[tt, :].copy()
-        df['extrap_flag'] = 0
+
+        # This is in here because until v1.4.0 we didn't include this in the file.
+        # To ensure compatibility with older files, add this if needed
+        if 'extrap_flag' not in df.columns:
+            df['extrap_flag'] = 0
 
         first_basis_year = last_year_to_keep - self._extrap_basis_years + 1
-        bb = df.index >= first_basis_year
-        years = df.index[bb].to_numpy().astype(float)
-        fo2_values = df.loc[bb, 'fo2'].to_numpy()
-        fit = np.polynomial.polynomial.Polynomial.fit(years, fo2_values, deg=1)
-        extrap_years = np.arange(last_year_to_keep+1, last_year_to_keep+self._max_extrap_years+1, dtype=float)
-        extrap_fo2_values = fit(extrap_years)
+        target_year = last_year_to_keep+self._max_extrap_years+1
+        extrap_years, extrap_fo2_values = fo2_prep.extrapolate_fo2(df, first_basis_year, target_year)
 
         # The O2 mole fraction seems to follow a pretty linear decrease, so a
         # linear fit over the last few years should do a reasonable job of
         # capturing its trend.
-        extrap_rows = pd.DataFrame({'fo2': extrap_fo2_values, 'extrap_flag': 1}, index=extrap_years.astype(int))
+        extrap_rows = pd.DataFrame({'fo2': extrap_fo2_values, 'extrap_flag': 2}, index=extrap_years)
         return pd.concat([df, extrap_rows])
 
 
@@ -397,6 +433,11 @@ class MloSmoTraceGasRecord(TraceGasRecord):
      recalculated. Default is ``None``, which will save the LUT if recalculated unless it was recalculated to cover the
      time frame requested. This option has no effect if the stratospheric lookup table is read from the netCDF file.
     :type save_strat: bool or None
+
+    :param allow_negative_insitu_values: set to ``True`` to allow the in situ files to include negative DMF values.
+     Normally this is not allowed, as the DMFs for long-lived gases should be positive and negative values normally
+     indicate a fill value is present. Such fill values will lead to incorrect combined MLO+SMO values.
+    :type allow_negative_insitu_values: bool
     """
 
     # The lifetime is used to account for chemical loss between emission and the prior location. Setting to infinity
@@ -450,13 +491,14 @@ class MloSmoTraceGasRecord(TraceGasRecord):
         return self._last_record_date(self.conc_seasonal)
 
     def __init__(self, first_date=None, last_date=None, truncate_date=None, lag=None, mlo_file=None, smo_file=None,
-                 strat_age_scale=1.0, recalculate_strat_lut=None, save_strat=None, recalc_if_custom_dates=True):
+                 strat_age_scale=1.0, recalculate_strat_lut=None, save_strat=None, recalc_if_custom_dates=True,
+                 allow_negative_insitu_values=False):
         has_custom_dates = first_date is not None or last_date is not None or truncate_date is not None
         first_date, last_date, self.sbc_lag, mlo_file, smo_file = self._init_helper(first_date, last_date, lag, mlo_file, smo_file)
         self.mlo_file = mlo_file
         self.smo_file = smo_file
         self.strat_age_scale = strat_age_scale
-        self.conc_seasonal = self.get_mlo_smo_mean(mlo_file, smo_file, first_date, last_date, truncate_date)
+        self.conc_seasonal = self.get_mlo_smo_mean(mlo_file, smo_file, first_date, last_date, truncate_date, allow_negative_insitu_values=allow_negative_insitu_values) 
 
         # Deseasonalize the data by taking a 12 month rolling average. Only do that on the dmf_mean field,
         # leave the latency
@@ -661,7 +703,7 @@ class MloSmoTraceGasRecord(TraceGasRecord):
         return time, delt, age, spectra
 
     @classmethod
-    def read_insitu_gas(cls, full_file_path):
+    def read_insitu_gas(cls, full_file_path, allow_negative_values: bool = False):
         """
         Read a trace gas record file. Assumes that the file is of monthly average concentrations.
 
@@ -682,6 +724,12 @@ class MloSmoTraceGasRecord(TraceGasRecord):
         df = pd.read_csv(full_file_path, skiprows=int(hlines), skipinitialspace=True,
                          delimiter=' ', header=None, names=['site', 'year', 'month', cls._gas_name])
 
+        has_neg_values = (df.loc[:, cls._gas_name] < 0).any()
+        if not allow_negative_values and has_neg_values:
+            raise IOError(f'{full_file_path} has negative mole fraction values. Normally this indicates fill values are present in the data, which should be replaced with NaNs.')
+        elif has_neg_values:
+            logger.warning(f'{full_file_path} has negative mole fraction values. This may indicate fill values are present in the data that will be averaged incorrectly. Fill values should be replaced with NaNs.')
+
         # set datetime index in df (requires 'day' column)
         df['day'] = 1
         df.set_index(pd.to_datetime(df[['year', 'month', 'day']]), inplace=True)
@@ -689,7 +737,7 @@ class MloSmoTraceGasRecord(TraceGasRecord):
         return df
 
     @classmethod
-    def get_mlo_smo_mean(cls, mlo_file, smo_file, first_date, last_date, truncate_date):
+    def get_mlo_smo_mean(cls, mlo_file, smo_file, first_date, last_date, truncate_date, allow_negative_insitu_values=False):
         """
         Generate the Mauna Loa/Samoa mean trace gas record from the files stored in this repository.
 
@@ -716,6 +764,10 @@ class MloSmoTraceGasRecord(TraceGasRecord):
         :param truncate_date: the last date to use *real data* for in the record, after this date the MLO/SMO time
          series will be extrapolated. Note that this is inclusive.
 
+        :param allow_negative_insitu_values: set to ``True`` to allow the in situ files to include negative DMF values.
+         Normally this is not allowed, as the DMFs for long-lived gases should be positive and negative values normally
+         indicate a fill value is present. Such fill values will lead to incorrect combined MLO+SMO values.
+
         :return: the data frame containing the mean trace gas concentration ('dmf_mean'), a flag ('interp_flag') set
          to 1 for any months that had to be interpolated and 2 for months that had to be extrapolated, and the latency
          ('latency') in years that a concentration had to be extrapolated. Index by timestamp.
@@ -724,8 +776,8 @@ class MloSmoTraceGasRecord(TraceGasRecord):
          to 1 for any months that had to be interpolated. Index by timestamp.
         :rtype: :class:`pandas.DataFrame`
         """
-        df_mlo = cls.read_insitu_gas(mlo_file)
-        df_smo = cls.read_insitu_gas(smo_file)
+        df_mlo = cls.read_insitu_gas(mlo_file, allow_negative_values=allow_negative_insitu_values)
+        df_smo = cls.read_insitu_gas(smo_file, allow_negative_values=allow_negative_insitu_values)
         df_combined = pd.concat([df_mlo, df_smo], axis=1)
         if truncate_date is not None and df_combined.index.max() < truncate_date: 
             # Do this before dropping NaNs, as we need to allow for the possibility that there is not NOAA
@@ -879,7 +931,7 @@ class MloSmoTraceGasRecord(TraceGasRecord):
         extrap_julian_dates = extrap_dates.to_julian_date().to_numpy()
 
         cls._check_extrap_fit(df, fit, extrap_julian_dates, direction)
-        df.loc[to_fill, 'dmf_mean'] = fit(extrap_julian_dates) + delta_dmf
+        df.loc[extrap_dates, 'dmf_mean'] = fit(extrap_julian_dates) + delta_dmf
 
     @classmethod
     def _fit_gas_trend(cls, x, y, fit_type=None):
@@ -1023,53 +1075,53 @@ class MloSmoTraceGasRecord(TraceGasRecord):
             old_shape = -1  # will be initialized properly the first time through the loop
 
             for ispec in range(spectra.shape[0]):
+                # The first step is to put the trace gas record on the same time resolution as the age spectra. This
+                # is necessary for the convolution to work. Note that the age spectra aren't assigned to any
+                # specific date, we just need the adjacent points in the age spectra and gas record to have the same
+                # spacing in time.
+                # To handle the reindexing properly, we need to keep the original rows in until we handle the
+                # interpolation to the new values. For this part we need to use the decimal years as the index
+                # and (as of 2022-08-30, pandas 1.4.3), remove columns that we don't need to allow the index
+                # interpolation method to work
+                tmp_index = np.unique(np.concatenate([df_lagged['dec_year'], new_index]))
+                df_asi = df_lagged.set_index('dec_year', drop=False)[['dmf_mean']].reindex(tmp_index).interpolate(method='index').reindex(new_index)
+
+                # Now we can do the convolution. Note: in Arlyn's original R code, she had to flip the age spectrum
+                # to act as the convolution kernel, but testing showed that in order to get the same answer using
+                # numpy's convolution function we had to leave the spectrum unflipped.
+                #
+                # This is because the numpy convolution operation acts to flip the kernel internally. It is defined
+                # as
+                #
+                # (a * v)[n] = \sum_{m=-\infty}^{\infty} a[m]v[n-m]
+                #
+                # Note that v is indexed with n-m. This has the effect of reversing the kernel; for n=10, a[11] gets
+                # multiplied by v[9], a[12] by v[8] and so on. R's convolve function uses a different indexing
+                # pattern that does not reverse the kernel.
+                #
+                # We want the kernel reversed because the trace gas records are defined from old to new, while the
+                # age spectra are from new to old. Therefore, we need to reverse the spectra before convolving to
+                # actually put both in the same direction.
+                conv_result = np.convolve(df_asi['dmf_mean'].values.squeeze(), spectra.iloc[ispec, :].values,
+                                          mode='valid')
+                if conv_dates is None:
+                    conv_dates = new_index[(spectra.shape[1] - 1):]
+                    # The call to dec_year_to_dtindex was ~80% of the time for this function when it was being
+                    # called in every loop. There should be no reason to recalculate on every loop; the spectra
+                    # should not be changing size and should therefore always give results on the same dates
+                    conv_dates = cls._dec_year_to_dtindex(conv_dates, force_first_of_month=False)
+                    old_shape = spectra.shape[1]
+                elif spectra.shape[1] != old_shape:
+                    raise NotImplementedError('Different spectra have different lengths; this is not allowed as '
+                                              'currently implemented')
+
+                # Finally we put the age-convolved gas concentration back onto the dates of the input dataframe,
+                # unless alternate dates were specified.
+                conv_df = pd.DataFrame(conv_result, index=conv_dates)
+                tmp_index = np.unique(np.concatenate([out_dates, conv_dates]))
+                this_out_df = conv_df.reindex(tmp_index).interpolate(method='index').reindex(out_dates)
+
                 for itheta in range(n_theta):
-                    # The first step is to put the trace gas record on the same time resolution as the age spectra. This
-                    # is necessary for the convolution to work. Note that the age spectra aren't assigned to any
-                    # specific date, we just need the adjacent points in the age spectra and gas record to have the same
-                    # spacing in time.
-                    # To handle the reindexing properly, we need to keep the original rows in until we handle the
-                    # interpolation to the new values. For this part we need to use the decimal years as the index
-                    # and (as of 2022-08-30, pandas 1.4.3), remove columns that we don't need to allow the index
-                    # interpolation method to work
-                    tmp_index = np.unique(np.concatenate([df_lagged['dec_year'], new_index]))
-                    df_asi = df_lagged.set_index('dec_year', drop=False)[['dmf_mean']].reindex(tmp_index).interpolate(method='index').reindex(new_index)
-
-                    # Now we can do the convolution. Note: in Arlyn's original R code, she had to flip the age spectrum
-                    # to act as the convolution kernel, but testing showed that in order to get the same answer using
-                    # numpy's convolution function we had to leave the spectrum unflipped.
-                    #
-                    # This is because the numpy convolution operation acts to flip the kernel internally. It is defined
-                    # as
-                    #
-                    # (a * v)[n] = \sum_{m=-\infty}^{\infty} a[m]v[n-m]
-                    #
-                    # Note that v is indexed with n-m. This has the effect of reversing the kernel; for n=10, a[11] gets
-                    # multiplied by v[9], a[12] by v[8] and so on. R's convolve function uses a different indexing
-                    # pattern that does not reverse the kernel.
-                    #
-                    # We want the kernel reversed because the trace gas records are defined from old to new, while the
-                    # age spectra are from new to old. Therefore, we need to reverse the spectra before convolving to
-                    # actually put both in the same direction.
-                    conv_result = np.convolve(df_asi['dmf_mean'].values.squeeze(), spectra.iloc[ispec, :].values,
-                                              mode='valid')
-                    if conv_dates is None:
-                        conv_dates = new_index[(spectra.shape[1] - 1):]
-                        # The call to dec_year_to_dtindex was ~80% of the time for this function when it was being
-                        # called in every loop. There should be no reason to recalculate on every loop; the spectra
-                        # should not be changing size and should therefore always give results on the same dates
-                        conv_dates = cls._dec_year_to_dtindex(conv_dates, force_first_of_month=False)
-                        old_shape = spectra.shape[1]
-                    elif spectra.shape[1] != old_shape:
-                        raise NotImplementedError('Different spectra have different lengths; this is not allowed as '
-                                                  'currently implemented')
-
-                    # Finally we put the age-convolved gas concentration back onto the dates of the input dataframe,
-                    # unless alternate dates were specified.
-                    conv_df = pd.DataFrame(conv_result, index=conv_dates)
-                    tmp_index = np.unique(np.concatenate([out_dates, conv_dates]))
-                    this_out_df = conv_df.reindex(tmp_index).interpolate(method='index').reindex(out_dates)
-
                     # And store this result in the output data frame, remembering that we added an extra row at the
                     # beginning for zero age air, and again using broadcasting.
                     #
@@ -1210,7 +1262,7 @@ class MloSmoTraceGasRecord(TraceGasRecord):
         # We need to subtract the lag, because we're looking up against dates that have been already shifted forward
         # by that lag. That is, the age 0 air in the strat table for 1 Mar 2019 corresponds to the MLO/SMO record from
         # 1 Jan 2019.
-        ancillary_dict['gas_record_dates'] = np.array([pd.Timestamp(date - a - self.sbc_lag) for a in age_rdeltas])
+        ancillary_dict['gas_record_dates'] = np.array([pd.Timestamp(date - self.sbc_lag - a) for a in age_rdeltas])
         ancillary_dict['latency'] = self.get_latency_by_date(ancillary_dict['gas_record_dates'])
 
         if theta is None:
@@ -1318,8 +1370,8 @@ class MloSmoTraceGasRecord(TraceGasRecord):
         monthly_idx = pd.date_range(start_date_subset, end_date_subset, freq='MS')
         monthly_df = pd.DataFrame(index=monthly_idx, columns=['dmf_mean', 'latency'], dtype=float)
         for timestamp in monthly_df.index:
-            monthly_df.dmf_mean[timestamp], info_dict = self.get_gas_by_month(timestamp.year, timestamp.month, deseasonalize=deseasonalize)
-            monthly_df.latency[timestamp] = info_dict['latency']
+            monthly_df.loc[timestamp, "dmf_mean"], info_dict = self.get_gas_by_month(timestamp.year, timestamp.month, deseasonalize=deseasonalize)
+            monthly_df.loc[timestamp, "latency"] = info_dict['latency']
 
         # Now we resample to the dates requested, making sure to keep the values at the start of each month on either
         # end of the record to ensure interpolation is successful
@@ -1646,7 +1698,7 @@ class HFTropicsRecord(MloSmoTraceGasRecord):
     ch4_hf_slopes_file = os.path.join(_data_dir, 'ch4_hf_slopes.nc')
 
     @classmethod
-    def get_mlo_smo_mean(cls, mlo_file, smo_file, first_date, last_date, truncate_date):
+    def get_mlo_smo_mean(cls, mlo_file, smo_file, first_date, last_date, truncate_date, allow_negative_insitu_values=False):
         """
         Generate the Mauna Loa/Samoa mean trace gas record.
 
@@ -1671,6 +1723,12 @@ class HFTropicsRecord(MloSmoTraceGasRecord):
 
         :param truncate_date: unused, since HF has no MLO/SMO data.
 
+        :param allow_negative_insitu_values: set to ``True`` to allow the in situ files to include negative DMF values.
+         Normally this is not allowed, as the DMFs for long-lived gases should be positive and negative values normally
+         indicate a fill value is present. Such fill values will lead to incorrect combined MLO+SMO values. Note, this
+         has no effect for :class:`HFTropicsRecord`, it is included only as part of the required interface.
+        :type allow_negative_insitu_values: bool
+
         :return: the data frame containing the mean trace gas concentration ('dmf_mean'), a flag ('interp_flag') set
          to 1 for any months that had to be interpolated and 2 for months that had to be extrapolated, and the latency
          ('latency') in years that a concentration had to be extrapolated. Index by timestamp.
@@ -1687,7 +1745,7 @@ class HFTropicsRecord(MloSmoTraceGasRecord):
         all_months = pd.date_range(first_date, last_date, freq='MS')
         n_months = all_months.size
 
-        df_combined = pd.DataFrame(index=all_months, columns=['dmf_mean']).fillna(0.0)
+        df_combined = pd.DataFrame(index=all_months, columns=['dmf_mean'], dtype=float).fillna(0.0)
         df_combined = df_combined.assign(interp_flag=np.zeros((n_months,), dtype=int),
                                          latency=np.zeros((n_months,), dtype=int))
 
@@ -2283,7 +2341,7 @@ def get_clams_age(theta, eq_lat, day_of_year, as_timedelta=False, clams_dat=dict
     el_grid, th_grid = np.meshgrid(clams_dat['eqlat'], clams_dat['theta'])
     clams_points = np.array([[el, th] for el, th in zip(el_grid.flat, th_grid.flat)])
 
-    # interp2d does not behave well here; it interpolates to points outside the range of eqlat/theta and gives a much
+    # RectBivariateSpline does not behave well here; it interpolates to points outside the range of eqlat/theta and gives a much
     # noisier result.
     age_interp = LinearNDInterpolator(clams_points, clams_dat['age'][idoy, :, :].flatten())
     prof_ages = np.array([age_interp(el, th).item() for el, th in zip(eq_lat, theta)])
@@ -2866,7 +2924,8 @@ def calculate_meso_co(alt_profile, eqlat_profile, pres_profile, temp_profile, pr
 
 
 def generate_single_tccon_prior(mod_file_data, utc_offset, concentration_record, zgrid=None,
-                                use_eqlat_trop=True, use_eqlat_strat=True, use_adjusted_zgrid=True):
+                                use_eqlat_trop=True, use_eqlat_strat=True, use_adjusted_zgrid=True,
+                                o2_mole_fraction_file=fo2_prep.DEFAULT_FO2_FILE, auto_update_fo2_file=False):
     """
     Driver function to generate the TCCON prior profiles for a single observation.
 
@@ -2906,6 +2965,10 @@ def generate_single_tccon_prior(mod_file_data, utc_offset, concentration_record,
      is used as-is. 
     :type use_adjusted_zgrid: bool
 
+    :param auto_update_fo2_file: if ``True``, automatically update the f(O2) data file if it is missing or it has been
+     more than 7 days since it was last updated.
+    :type auto_update_fo2_file: bool
+
     :return: a dictionary containing all the profiles (including many for debugging) and a dictionary containing the
      units of the values in each profile.
     :rtype: dict, dict
@@ -2922,7 +2985,7 @@ def generate_single_tccon_prior(mod_file_data, utc_offset, concentration_record,
     co_source = mod_file_data['constants'].get('co_source', GeosSource.UNKNOWN)
 
     # We only need the datetime to get the O2 mole fraction
-    o2_record = O2MeanMoleFractionRecord()
+    o2_record = O2MeanMoleFractionRecord(o2_mole_fraction_file=o2_mole_fraction_file, auto_update_fo2_file=auto_update_fo2_file)
     o2_dmf = o2_record.get_o2_mole_fraction(pd.Timestamp(file_date))
 
     # Make the UTC date a datetime object that is rounded to a date (hour/minute/etc = 0)
@@ -3141,7 +3204,7 @@ def generate_full_tccon_vmr_file(mod_data, utc_offsets, save_dir, product='fpit'
 
 def generate_tccon_priors_driver(mod_data, utc_offsets, species, site_abbrevs='xx', write_vmrs=False,
                                  gas_name_order=None, keep_latlon_prec=False, flat_outdir=True, product='fpit',
-                                 special_header_info: Optional[dict] = None, **prior_kwargs):
+                                 special_header_info: Optional[dict] = None, auto_update_fo2_file=False, **prior_kwargs):
     """
     Generate multiple TCCON priors or a file containing multiple gas concentrations
 
@@ -3238,6 +3301,11 @@ def generate_tccon_priors_driver(mod_data, utc_offsets, species, site_abbrevs='x
 
     # if given species names, convert to the actual records.
     species = [gas_records[s]() if isinstance(s, str) else s for s in species]
+
+    # if told to update the f(O2) file, do that once here and keep the False default for the
+    # single priors function to avoid spamming the log with messages from the f(O2) class
+    if auto_update_fo2_file:
+        O2MeanMoleFractionRecord(auto_update_fo2_file=True)
 
     vmrs_dir, write_vmrs = parse_boollike_input(write_vmrs)
 
@@ -3356,6 +3424,9 @@ def _add_common_cl_args(parser):
                         help='A JSON file that configures which files to read MLO/SMO data from. The top level must be a '
                              'dictionary with lowercase gas names as keys. The values must be dictionaries with "mlo_file" '
                              'and "smo_file" as keys, with their values being paths to the files to read.')
+    parser.add_argument('--auto-update-fo2-file', action='store_true',
+                        help='Give this flag to create the required f(O2) file if missing or update it if it was last modified '
+                             'more than 7 days ago')
 
 
 def parse_args(parser=None):
@@ -3434,7 +3505,7 @@ def cl_driver(date_range, mod_dir=None, mod_root_dir=None, save_dir=None, produc
 
     # Expand the date range to explicitly include every 3 hours
     orig_date_range = date_range
-    date_range = pd.date_range(date_range[0], date_range[1], freq='3H')
+    date_range = pd.date_range(date_range[0], date_range[1], freq='3h')
     if date_range[-1] == orig_date_range[-1]:
         # Make sure the end date is not included
         date_range = date_range[:-1]
@@ -3470,7 +3541,7 @@ def cl_driver(date_range, mod_dir=None, mod_root_dir=None, save_dir=None, produc
         msg += '  * ' + '\n  * '.join(missing_files)
         msg += '\nEither correct the mod path or generate these files'
         raise IOError(msg)
-    else:
+    elif len(missing_files) > 0:
         logger.warning(f'{len(missing_files)} .mod files missing from this date range, will not generate the corresponding .vmr files')
 
     # GO!

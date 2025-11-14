@@ -1,5 +1,150 @@
 # Ginput Version History
 
+**A note on versioning:** because of the nature of this code, `ginput` follows
+a different set of criteria for major/minor/patch versions:
+
+- The major version number will be incremented when the output from `ginput`
+  changes so much that retrievals using the new priors are likely to produce
+  different results than those using the previous version's priors.
+- The minor version number will be incremented when a new feature is added
+  or the API (Python internal or command line) changes. Thus, users should
+  expect that upgrading from, e.g., v1.3.x to v1.4.0 may require updates to
+  how they call `ginput`.
+- The patch version will be incremented when changes do not break the API
+  or alter existing output variables are made.
+
+We recognize that this is non-standard, and that breaking API changes should
+result in a major version increase. However, our experience has been that small
+improvements to improve the scientific capabilities of this code sometimes require
+an update to the API because the new best default behavior requires additional
+user input.
+
+## 1.5.1
+
+This release aims to fix cases where the `git` or `hg` commands are not available,
+causing the writers for some files to fail.
+
+## 1.5.0
+
+This release includes several disparate updates:
+
+- Updated usage of `pandas` and `scipy` to remove calls to deprecated functions
+  or using deprecated keywords/time interval formats.
+  This also allows `ginput` to work under Python 3.12. (Credit: @rocheseb)
+    - Because this raised the minimum versions of a few dependencies, we have
+      incremented the minor version number to indicate that users may need to
+      rebuild their environments.
+- The test cases now use `pytest` instead of the built-in unit testing framework.
+    - The tests have now been reorganized to reside in the top level of the repo;
+      the `ginput/testing` subdirectory is deprecated. It will be full removed once
+      the last utility commands are migrated.
+    - This was done to make it easier to run tests while creating a conda-forge
+      package.
+
+
+## 1.4.4
+
+This release updates the `fo2_prep` program to v1.0.1, which handles a change
+to the Scripps O2/N2 data file format that occurred in 2025.
+
+It also fixes an edge case in the satellite priors code where no sounding had
+valid input met data. Before, it would crash before completely writing the output
+file. Now, that no longer occurs.
+
+## 1.4.3
+
+This release just fixes the allowed scipy version, otherwise it is identical
+to 1.4.2.
+
+## 1.4.2
+
+This release addresses two issues.
+
+First, it now errors by default if input in situ data includes negative values,
+assuming that these are fill values which should have been replaced by NaNs.
+
+Second, it fixes a bug in error handling in the satellite priors code.
+Previously, `ginput` would crash if a sounding resulted in an error that
+did not have a string as its first argument; it will now properly convert
+that argument to a string.
+
+
+## 1.4.1
+
+This release fixes a bug when creating satellite prior files with a specific
+O2 dry mole fraction file as input and adds more flexibility to the creation
+of the O2 dry air mole fraction files:
+
+- When passing an O2 file to the `oco` or `acos` subcommands with the `--fo2-file`
+  option, it is now correctly passed down into the functions that calculate the
+  priors. Because these function instantiate an instance of the O2 record class,
+  `ginput` would crash if you specified `--fo2-file` without having the default
+  O2 file in the `ginput` data directory. This is now fixed.
+- The `update_fo2` subcommand now accepts a `--dest-file` argument to specify where
+  to write the new/updated O2 file, rather than assuming that it should overwrite
+  the existing O2 file.
+- The `update_fo2` subcommand now has a `--no-download` flag to disable automatic
+  download of the NOAA and Scripps input files required for the O2 DMF calculation.
+  In that case, the location of these files can be specified through the `--download-dir`
+  option, which can accept either a path to a directory containing the files
+  (which must have the expected names) or a JSON file specifying where to find
+  each of the 4 required files.
+- The `update_fo2` subcommand now has a `--extrap-to-year` option, which will
+  cause the output f(O2) file to be extrapolated to the given year. This allows
+  less dependence on the upstream data files being kept up-to-date.
+
+Other changes:
+
+- A new one time script is included to pad NOAA hourly data with fill values to the
+  end of the current year, in case the available hourly files stop early.
+- NOAA data through 2024 is included in the repo for future-proofing.
+
+## 1.4.0
+
+This release adds mean O2 dry air mole fractions into the satellite .h5 files.
+There will be one value per sounding in the "o2_record/o2_global_dmf" variable
+and a granule mean in the "o2_record/granule_mean_o2_global_dmf" variable.
+Note that the latter is a scalar; if reading with the `h5py` Python package,
+you will need to slice it with an empty tuple rather than a colon to get the 
+value. This change means that running the satellite priors module requires that the
+input data for the O2 DMF calculation be available or it be allowed to automatically
+download and prepare those inputs. Because this is a change to the command line API,
+we have incremented the minor version number.
+
+The `update_fo2` subcommand also now has more options to control where the various
+data files are written, if needed.
+
+Additionally, the time needed to calculate the stratospheric lookup tables for N2O
+and CH4 has been reduced by a factor of 3, with no change to the output values. This
+was accomplished by minimizing duplicate calculations in the inner-most loop for those
+LUTs.
+
+## 1.3.1
+
+This release improves the ergonomics of including the time-varying O2 mole fraction
+by providing an option to the `O2MeanMoleFractionRecord` and a command line flag for
+the `vmr` and `rlvmr` subcommands to automatically download the necessary data and
+create/update the O2 mole fraction data file when creating `.vmr` files.
+
+## 1.3.0
+
+This release primarily adds the ability to calculate a time-varying O2 mole fraction,
+which gets added to the `.vmr` file header. To support this, it includes a new program
+that downloads Scripps O2/N2 data and NOAA global average CO2 data and calculates the
+yearly O2 mole fraction from them. This file is not included with `ginput`, but can be
+obtained by running the `update_fo2` subcommand of `run_ginput.py`. 
+
+Other changes:
+
+- `GeosSource` and `GeosVersion` classes moved from the `mod_constants` module to the
+  new `versioning` module (under `common_utils`).
+- Some type hints in `get_NOAA_flask_data` updated to be backwards compatible to at least
+  Python 3.7.
+- Small update to `mod_maker` to handle taking chemistry variables from a different version
+  of the GEOS files than the met variables. This will support possible TCCON reprocessing
+  with GEOS FP-IT met and GEOS IT CO.
+- GEOS file information now includes checksums
+
 ## 1.2.1
 
 Specific changes:

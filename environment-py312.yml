@@ -1,0 +1,20 @@
+name: ginput-auto-default
+channels:
+  - conda-forge
+dependencies:
+  - astropy==7.1.0
+  - cfunits==3.3.7
+  - ephem==4.2
+  - h5py==3.14.0
+  - jplephem==2.23
+  - matplotlib==3.10.5
+  - netcdf4==1.7.2
+  - pandas==2.3.1
+  - pydap==3.5.5
+  - python==3.12.11
+  - python-dateutil==2.9.0.post0
+  - requests==2.32.4
+  - scipy==1.16.1
+  - sgp4==2.25
+  - skyfield==1.53
+  - xarray==2025.7.1

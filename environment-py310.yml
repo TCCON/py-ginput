@@ -1,7 +1,6 @@
 name: ginput-auto-default
 channels:
   - conda-forge
-  - defaults
 dependencies:
   - astropy==5.1
   - cfunits=3.3.4

@@ -1,6 +1,6 @@
 # Ginput: GGG meteorology and a priori VMR preprocessor
 
-[![DOI](https://data.caltech.edu/badge/534420806.svg)](https://data.caltech.edu/badge/latestdoi/534420806)
+[![Documentation status](https://readthedocs.org/projects/ginput/badge/?version=latest)](https://ginput.readthedocs.io/en/latest/?badge=latest)
 
 ## Copyright notice
 
@@ -18,8 +18,8 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 
 ## Quickstart
 
-* Make sure you have Anaconda Python (https://www.anaconda.com/products/individual) 
-  installed on your system
+* Make sure you have a Python installation with the `conda` package manager
+  on your system. We currently recommend [miniforge](https://github.com/conda-forge/miniforge).
 * Run `make install`
 * Run `./run_ginput.py --help` to see available subcommands
 * For more detailed help, try `man ginput` after running `make install`. 
@@ -78,22 +78,16 @@ The full legal terms are contained in LICENSE.txt file. For a short summary, ple
 [here](https://choosealicense.com/licenses/apache-2.0/#). If you have any questions about
 use, please contact us (contact information is below).
 
-In addition to the Apache license, you should cite the ginput paper in any publications
-resulting from the use of ginput. (At time of release, the manuscript is still in preparation,
-so contact us for the citation.) Please also consider contacting us to let us know you are
-using ginput!
+In addition to the Apache license, you should cite the ginput paper listed in the `CITATION.cff` file
+in any publications resulting from the use of ginput. Please also consider contacting us to let us know
+you are using ginput!
 
 ## Python support
 
 Only Python 3 is supported. Python 2 reached end-of-life on 1 Jan 2020. 
-We also require that the `conda` package manager provided with the Anaconda
-Python distribution be installed, and so only officially support Anaconda or
-Miniconda Python. 
+We also use the `conda` package manager in the install script, which is provided
+by, e.g. miniforge.
 
-If you have Anaconda or Miniconda based on Python 2 installed, that should work,
-as ginput is configured to create a Python 3 environment for itself on install.
-This also ensures that it's dependencies do not conflict with your existing 
-setup.
 
 ## Contact
 

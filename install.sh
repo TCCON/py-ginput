@@ -33,7 +33,8 @@ envname="$1"
 conda -h >& /dev/null
 if [[ $? != 0 ]]; then
     echo "Cannot create a conda environment for ginput because 'conda' is not on your PATH."
-    echo "Install Anaconda (https://www.anaconda.com/distribution/) or ensure that 'conda' is on your PATH."
+    echo "Install Miniforge (https://github.com/conda-forge/miniforge), or another package that provides 'conda', "
+    echo "or ensure that conda is properly initialized in your shell."
     exit 1
 fi
 
@@ -55,10 +56,10 @@ done
 
 if $env_exists; then
     echo "$envname already exists, will update installed packages"
-    conda env update --name "$envname" --file environment-py310.yml
+    conda env update --name "$envname" --file environment-py312.yml
 else
     echo "Will create conda environment '$envname'"
-    conda env create --name "$envname" --file environment-py310.yml
+    conda env create --name "$envname" --file environment-py312.yml
 fi
 
 

@@ -3,11 +3,12 @@ import argparse
 import urllib.request
 import urllib.error
 
+from typing import Sequence
 
 def get_noaa_flask_data(
     out_dir: str,
-    site_list: list[str] = ["mlo", "smo"],
-    gas_list: list[str] = ["co2", "ch4", "co", "n2o"],
+    site_list: Sequence[str] = ["mlo", "smo"],
+    gas_list: Sequence[str] = ["co2", "ch4", "co", "n2o"],
     update: bool = False,
 ) -> None:
     """

@@ -1,19 +1,19 @@
 from abc import ABC, abstractmethod, abstractclassmethod
 from argparse import ArgumentParser
-from enum import Enum
-from logging import warning
+from datetime import datetime
 from dateutil.relativedelta import relativedelta
+from enum import Enum
 import numpy as np
 import os
 import pandas as pd
+from pathlib import Path
 import re
 import xarray as xr
 
-from ..common_utils import mod_utils
 from ..common_utils.ioutils import make_dependent_file_hash
-from ..common_utils.ggg_logging import logger, setup_logger
+from ..common_utils.ggg_logging import logger
 
-from typing import Tuple, Optional
+from typing import Tuple, Optional, Sequence
 
 __version__ = '1.1.1'
 
@@ -22,8 +22,8 @@ class MloPrelimMode(Enum):
     TIME_STRICT_DIFF_BOTH = 1
     TIME_RELAXED_DIFF_EITHER = 2
     TIME_RELAXED_DIFF_BOTH = 3
-    
-    
+
+
 class MloBackgroundMode(Enum):
     TIME_AND_SIGMA = 0
     TIME_AND_PRELIM = 1
@@ -32,7 +32,7 @@ class MloBackgroundMode(Enum):
 class InsituProcessingError(Exception):
     pass
 
-    
+
 MLO_UTC_OFFSET = pd.Timedelta(hours=-10)
 SMO_LON = -170.5644
 SMO_LAT = 14.2474
@@ -55,38 +55,163 @@ class RunSettings:
 
 
 
-def read_surface_file(surface_file: str, datetime_index: Optional[Tuple[str, str]]=('year', 'month')) -> pd.DataFrame:
+def make_geos_2d_file_list(path_pattern: str, start_date, end_date, geos_version: Optional[str] = None) -> Sequence[str]:
+    """Helper function to make a list of GEOS 2D files for the SMO prep.
+
+    Parameters
+    ----------
+    path_pattern
+        A pattern that can use ``strftime`` formatting (``%Y``, ``%m``, etc.) to give the correct path to
+        each GEOS 2D file. If ``geos_version`` is ``None``, this must give the full path to the file. Otherwise,
+        the file name indicated by ``geos_version`` is appended to the end. Note that this will append a "/" to the
+        end of the path if it needs to be concatenated with ``geos_version`` and no "/" is present, so this will
+        not work well on Windows.
+
+    start_date
+        First time to include in the list. Any type acceptable to :func:`pandas.date_range` will do.
+
+    end_date
+        Last time to include in the list.
+
+    geos_version
+        If this is one of the strings "fpit" or "it", it will append the appropriate file name pattern to ``path_pattern``
+        for that GEOS version. Any other string is treated as a file name pattern and is directly appended. If this is
+        ``None``, ``path_pattern`` must include the file name.
+
+    Returns
+    -------
+    paths
+        A list of file paths as strings.
+    """
+    if not path_pattern.endswith('/') and geos_version is not None:
+        path_pattern += '/'
+
+    if geos_version == 'fpit':
+        path_pattern += 'GEOS.fpit.asm.inst3_2d_asm_Nx.GEOS5124.%Y%m%d_%H%M.V01.nc4'
+    elif geos_version == 'it':
+        path_pattern += 'GEOS.it.asm.asm_inst_1hr_glo_L576x361_slv.GEOS5294.%Y-%m-%dT%H%M.V01.nc4'
+    elif geos_version is not None:
+        path_pattern += geos_version
+
+    files = []
+    for t in pd.date_range(start_date, end_date, freq='3h'):
+        files.append(t.strftime(path_pattern))
+    return files
+
+
+def read_surface_file(surface_file: str, datetime_index: Optional[Tuple[str, str]]=('year', 'month'),
+                      match_v1_columns: bool = True, drop_fills: bool = False, fills_to_nan: bool = True,
+                      v3_known_site_codes = ('mlo', 'smo')) -> pd.DataFrame:
     """Read a text file with NOAA surface data, either a monthly average or hourly file
 
     Parameters
     ----------
     surface_file
-        Path to the surface file to read
+      Path to the surface file to read
 
     datetime_index
-        If not `None`, then must be a tuple giving the names of the year and month columns
-        in the file, to be converted to a monthly datetime index. (Only supported for monthly
-        files.)
+      If not `None`, then must be a tuple giving the names of the year and month columns
+      in the file, to be converted to a monthly datetime index. (Only supported for monthly
+      files.)
 
     Returns
     -------
     pd.DataFrame
-        The data from the surface file as a dataframe. If `datetime_index` was not `None`, the
-        index will be a :class:`pandas.DatetimeIndex`.
+      The data from the surface file as a dataframe. If `datetime_index` was not `None`, the
+      index will be a :class:`pandas.DatetimeIndex`.
     """
-    with open(surface_file) as f:
-        line1 = f.readline()
-        nhead = int(line1.split(':')[1])
-        for _ in range(nhead-1):
-            line = f.readline()
-        columns = line.split(':')[1].split()
-    
+    nhead, columns, file_version = _parse_noaa_header(surface_file)
+
     df = pd.read_csv(surface_file, sep=r'\s+', skiprows=nhead, header=None)
     df.columns = columns
     if datetime_index is not None:
         yf, mf = datetime_index
         df.index = pd.DatetimeIndex([pd.Timestamp(int(r[yf]), int(r[mf]), 1) for _, r in df.iterrows()])
+
+    if file_version == 3:
+        # These are the Scripps-style file (i.e., with the deseasonalized value)
+        # that don't include a site code. The best we can do is assume that the
+        # site code is in the file stem as the last part when split on underscores,
+        # and check that it is a known site ID.
+        site_id = Path(surface_file).stem.split('_')[-1]
+        if site_id not in v3_known_site_codes:
+            raise InsituProcessingError(
+                f'Unknown/unexpected site code derived from file name: "{site_id}". '
+                'If this is the expected site code, pass it as one of the ``v3_known_site_codes``.'
+            )
+        df['site'] = site_id.upper()
+
+    if file_version > 1 and match_v1_columns:
+        # The newer file versions have additional/renamed columns, so prune things as needed to make the
+        # returned dataframe match what the rest of the code expects.
+        if file_version == 2:
+            df.rename(columns={'site_code': 'site'}, inplace=True)
+        v1_columns = {'site', 'year', 'month', 'value'}
+        to_drop = [c for c in df.columns if c not in v1_columns]
+        df.drop(columns=to_drop, inplace=True)
+        assert set(df.columns) == v1_columns, 'NOAA file dataframe did not have the expected columns, is this a new file version?'
+
+    if drop_fills:
+        not_fill = df.value > -990
+        df = df.loc[not_fill, :]
+    elif fills_to_nan:
+        is_fill = df.value <= -990
+        df.loc[is_fill, 'value'] = np.nan
     return df
+
+
+def _parse_noaa_header(surface_file):
+    """Read the header of a NOAA file and return the number of header lines, column names, and file version
+
+    Note that the version number given to the file types is not an official NOAA version;
+    it simply represents the order in which the different formats appeared as a simple
+    way to distinguish file types.
+    """
+    with open(surface_file) as f:
+        line1 = f.readline()
+        # v1 will look something like "# number_of_header_lines: 70" while
+        # v2 will look something like # header_lines : 159"
+        # v3 doesn't give the number of header lines, so we have to count them ourselves
+        if 'header_lines' in line1:
+            nhead = int(line1.split(':')[1])
+            header_lines = [f.readline() for _ in range(nhead-1)]
+        else:
+            header_lines = [line1]
+            for line in f:
+                if line.startswith('#'):
+                    header_lines.append(line)
+                else:
+                    break
+            nhead = len(header_lines)
+
+        if header_lines[-1].startswith('# data_fields'):
+            # These files have a last header line like "# data_fields: site year month value"
+            # so we do need to split on the colon first, then spaces
+            columns = header_lines[-1].split(':')[1].split()
+            version = 1
+        elif not header_lines[-1].startswith('#'):
+            # Assume that if the last line does not start with a comment symbol that it is a
+            # v2 file and the column names are just a space-separated list
+            columns = header_lines[-1].strip().split()
+            version = 2
+        elif _is_noaa_v3_header(header_lines):
+            columns = ['year', 'month', 'decimal_date', 'value', 'deseasonalized_value', 'num_days', 'std_dev_of_days', 'uncertainty']
+            version = 3
+        else:
+            raise NotImplementedError('Could not infer NOAA file format from the header')
+
+        return nhead, columns, version
+
+
+def _is_noaa_v3_header(header_lines):
+    # The v3 files end with lines
+    #   "#            decimal       monthly    de-season  #days  st.dev  unc. of"
+    #   "#             date         average     alized          of days  mon mean"
+    # which is really awkward to parse, so we're just going to check if the lines are what
+    # we expect, and specify our own column names in the main reader function.
+    if header_lines[-2].split() != ['#', 'decimal', 'monthly', 'de-season', '#days', 'st.dev', 'unc.', 'of']:
+        return False
+    return header_lines[-1].split() == ['#', 'date', 'average', 'alized', 'of', 'days', 'mon', 'mean']
 
 
 def read_hourly_insitu(hourly_file: str) -> pd.DataFrame:
@@ -110,7 +235,7 @@ def read_hourly_insitu(hourly_file: str) -> pd.DataFrame:
 
 
 def _standardize_rapid_df(df, site_col=None, year_col=None, month_col=None, day_col=None, hour_col=None, minute_col=None, 
-                         value_col=None, unc_col=None, flag_col=None, time_prefix=''):
+                          value_col=None, unc_col=None, flag_col=None, time_prefix=''):
     """Convert a hourly dataframe into one with standardized column names and index
     """
     site_col = _find_column(df, 'site', site_col)
@@ -122,7 +247,7 @@ def _standardize_rapid_df(df, site_col=None, year_col=None, month_col=None, day_
     value_col = _find_column(df, 'value', value_col)
     unc_col = _find_column(df, 'uncertainty', unc_col)
     flag_col = _find_column(df, 'flag', flag_col)
-    
+
     if minute_col is False:
         df['minute'] = 0
         minute_col = 'minute'
@@ -164,12 +289,12 @@ def _filter_rapid_df(df):
         logger.info(msg)
 
     df = df.loc[xx_flag, :].copy()
-    
+
     df.loc[xx_fills, 'value'] = np.nan
     df.loc[xx_fills, 'uncertainty'] = np.nan
     return df
-    
-    
+
+
 def _find_column(df, column_name, given_column=None):
     """Find a column in a NOAA dataframe containing the substring `column_name`
     """
@@ -177,12 +302,12 @@ def _find_column(df, column_name, given_column=None):
         return given_column
     elif given_column is False:
         return False
-    
+
     matching_columns = [c for c in df.columns if column_name in c]
     if len(matching_columns) != 1:
         matches = ', '.join(matching_columns)
         raise TypeError(f'Cannot identify unique {column_name} field, found {matches}')
-        
+
     return matching_columns[0]
 
 
@@ -194,12 +319,12 @@ def _dtindex_from_columns(df, year_col=None, month_col=None, day_col=None, hour_
     day_col = _find_column(df, 'day', day_col)
     hour_col = _find_column(df, 'hour', hour_col)
     minute_col = _find_column(df, 'minute', minute_col)
-    
+
     return pd.to_datetime(df[[year_col, month_col, day_col, hour_col, minute_col]])
-    
+
 
 def noaa_prelim_flagging(noaa_df: pd.DataFrame, hr_std_dev_max: float = 0.2, hr2hr_diff_max: float = 0.25, 
-                        mode: MloPrelimMode = MloPrelimMode.TIME_RELAXED_DIFF_EITHER, full_output: bool = False) -> pd.DataFrame:
+                         mode: MloPrelimMode = MloPrelimMode.TIME_RELAXED_DIFF_EITHER, full_output: bool = False) -> pd.DataFrame:
     """Do preliminary selection of background data for NOAA houly in situ data
 
     Parameters
@@ -236,10 +361,10 @@ def noaa_prelim_flagging(noaa_df: pd.DataFrame, hr_std_dev_max: float = 0.2, hr2
     # The first condition - remove points with standard deviation above some
     # value - is easy. I will also omit times with NaNs
     noaa_df = noaa_df.dropna()
-    
+
     xx_sd = noaa_df['uncertainty'] <= hr_std_dev_max
     noaa_df = noaa_df.loc[xx_sd, :]
-    
+
     # The next one is more complicated, as we want to retain times when the 
     # hour to hour difference is within X ppm. We need to check that both
     # (a) the time difference is 1 hour and (b) the value difference is
@@ -248,7 +373,7 @@ def noaa_prelim_flagging(noaa_df: pd.DataFrame, hr_std_dev_max: float = 0.2, hr2
     xx_tdiff = (td_diff >= pd.Timedelta(minutes=-5)) & (td_diff <= pd.Timedelta(minutes=5))
     values = noaa_df['value'].to_numpy()
     xx_vdiff = np.abs(values[1:] - values[:-1]) <= hr2hr_diff_max
-    
+
     # Want xx_diff to be true for differences that DO NOT exclude
     if mode in {MloPrelimMode.TIME_RELAXED_DIFF_BOTH, MloPrelimMode.TIME_RELAXED_DIFF_EITHER}:
         # These modes mean that when the time difference is greater than an hour we ignore
@@ -265,7 +390,7 @@ def noaa_prelim_flagging(noaa_df: pd.DataFrame, hr_std_dev_max: float = 0.2, hr2
         xx_diff = xx_vdiff & xx_tdiff
     else:
         raise TypeError('Unknown mode')
-    
+
     xx_hr2hr = np.zeros(noaa_df.shape[0], dtype=np.bool_)
     if mode in {MloPrelimMode.TIME_RELAXED_DIFF_EITHER, MloPrelimMode.TIME_STRICT_DIFF_EITHER}:
         # In these modes, a point is kept as long as the difference on at least one side is
@@ -276,7 +401,7 @@ def noaa_prelim_flagging(noaa_df: pd.DataFrame, hr_std_dev_max: float = 0.2, hr2
         xx_hr2hr[1:-1] = xx_diff[:-1] & xx_diff[1:]
     else:
         raise TypeError(f'Unknown `mode` "{mode}"')
-        
+
     # For the first and last points, there's only one difference to consider
     if np.size(xx_hr2hr) > 0 and np.size(xx_diff) > 0:
         xx_hr2hr[0] = xx_diff[0]
@@ -285,15 +410,15 @@ def noaa_prelim_flagging(noaa_df: pd.DataFrame, hr_std_dev_max: float = 0.2, hr2
         logger.info('There are no data points to flag by hour to hour differences')
     else:
         raise NotImplementedError('A case occurred where of two arrays that should both be size 0 or not, one had size 0 and the other did not. This case is not handled.')
-    
+
     if full_output:
         xx_hr2hr_full = np.zeros_like(xx_sd)
         xx_hr2hr_full[xx_sd] = xx_hr2hr
         return noaa_df.loc[xx_hr2hr, :], xx_sd, xx_hr2hr_full
     else:
         return noaa_df.loc[xx_hr2hr, :]
-    
-    
+
+
 def mlo_background_selection(mlo_df: pd.DataFrame, method: MloBackgroundMode) -> pd.DataFrame:
     """Limit a Mauna Loa hourly dataframe to background data.
 
@@ -321,8 +446,8 @@ def mlo_background_selection(mlo_df: pd.DataFrame, method: MloBackgroundMode) ->
         return _mlo_background_time_prelim(mlo_df)
     else:
         raise NotImplementedError(f'Unimplemented method "{method.name}"')
-        
-        
+
+
 def _mlo_background_time_sigma(mlo_df: pd.DataFrame) -> pd.DataFrame:
     """Limit MLO data to background by time and hourly std. dev. only
     """
@@ -342,7 +467,7 @@ def _mlo_background_time_prelim(mlo_df: pd.DataFrame) -> pd.DataFrame:
 
 def compute_wind_for_times(wind_file: str, times: pd.DatetimeIndex, wind_alt: int = 10, run_settings: RunSettings = RunSettings(), allow_missing_geos_files: bool = False) -> pd.DataFrame:
     """Compute winds for specific times from a file already interpolated to a specific lat/lon
-    
+
     Parameters
     ----------
     wind_file
@@ -353,10 +478,10 @@ def compute_wind_for_times(wind_file: str, times: pd.DatetimeIndex, wind_alt: in
         2. A file summarizing the GEOS FP-IT surface variables at the SMO lat/lon.
            It must have `UxM` and `VxM` variables, where "x" is the wind altitude 
            (see `wind_alt`)
-        
+
     times
         Times to interpolate to.
-        
+
     wind_alt
         Which surface wind altitude (2, 10, or 50 meters usually) to use. This will 
         look for variables named e.g. U10M and V10M in the GEOS file(s), with the 
@@ -368,8 +493,8 @@ def compute_wind_for_times(wind_file: str, times: pd.DatetimeIndex, wind_alt: in
     allow_missing_geos_files
         Set to `True` to allow this function to complete if any of the expected 
         GEOS files were missing. By default an error is raised.
-    
-        
+
+
     Returns
     -------
     pd.DataFrame
@@ -377,7 +502,7 @@ def compute_wind_for_times(wind_file: str, times: pd.DatetimeIndex, wind_alt: in
         indexed by time. The vectors and velocity will have the same units as in the
         `winds_file` (usually meters/second) and the wind direction uses the convention
         of what direction the wind is coming FROM in degrees clockwise from north.
-        
+
     Notes
     -----
     10 is the default `wind_alt` because Waterman et al. 1989 (JGR, vol. 94, pp. 14817--14829)
@@ -386,16 +511,16 @@ def compute_wind_for_times(wind_file: str, times: pd.DatetimeIndex, wind_alt: in
     """
     wind_dataset = get_smo_winds_from_file(wind_file, wind_alt=wind_alt)
     _check_geos_times(times, wind_dataset, run_settings=run_settings, allow_missing_geos_files=allow_missing_geos_files)
-    
+
     u = wind_dataset['u'][:]
     v = wind_dataset['v'][:]
-        
+
     u = u.interp(time=times)
     v = v.interp(time=times)
-    
+
     # Velocity is easy - just the magnitude of the combined vector
     velocity = np.sqrt(u**2 + v**2)
-    
+
     # Direction, in the convention of giving the direction the wind
     # goes towards in deg. CCW from east, is just the inverse tangent
     # (accounting for quadrant)
@@ -419,7 +544,7 @@ def compute_wind_for_times(wind_file: str, times: pd.DatetimeIndex, wind_alt: in
     # we just need a u = -v transformation
     direction = np.rad2deg(np.arctan2(-u, -v))
     direction[direction < 0] += 360
-    
+
     return pd.DataFrame({'velocity': velocity, 'direction': direction, 'u': u, 'v': v}, index=times)
 
 
@@ -430,7 +555,7 @@ def _check_geos_times(data_times, geos_dataset, run_settings: RunSettings = RunS
     data_start = data_times.min().floor('D')
     data_end = data_times.max().ceil('D')
     geos_times = set(pd.DatetimeIndex(geos_dataset.time.data))
-    expected_times = set(pd.date_range(data_start, data_end, freq='3H'))
+    expected_times = set(pd.date_range(data_start, data_end, freq='3h'))
     missing_times = expected_times.difference(geos_times)
     n_missing = len(missing_times)
     if run_settings.save_missing_geos_to:
@@ -479,26 +604,26 @@ def merge_insitu_with_wind(insitu_df: pd.DataFrame, wind_file: str, wind_alt: fl
 
 def smo_wind_filter(smo_df: pd.DataFrame, first_wind_dir: float = 330.0, last_wind_dir: float = 160.0, min_wind_speed: float = 2.0) -> pd.DataFrame:
     """Subset an SMO CO2 dataframe to just rows with specific wind conditions
-    
+
     Parameters
     ----------
     smo_df
         The dataframe of SMO CO2 DMFs with wind data included (see :func:`merge_insitu_with_wind`)
-        
+
     first_wind_dir
     last_wind_dir
         These set the range of wind directions permitted; only data with a wind direction in the
         clockwise slice between `first_wind_dir` and `last_wind_dir` are retained.
-        
+
     min_wind_speed
         The slowest wind speed allowed; only rows with a wind speed greater than or equal to this
         are retained.
-        
+
     Returns
     -------
     pd.DataFrame
         A data frame that has a subset of the rows in `smo_df`.
-        
+
     Notes
     -----
     The default wind limits come from  Waterman et al. 1989 (JGR, vol. 94, pp. 14817--14829).
@@ -511,7 +636,7 @@ def smo_wind_filter(smo_df: pd.DataFrame, first_wind_dir: float = 330.0, last_wi
         xx = (smo_df['direction'] >= first_wind_dir) & (smo_df['direction'] <= last_wind_dir)
     else:
         xx = (smo_df['direction'] >= first_wind_dir) | (smo_df['direction'] <= last_wind_dir)
-        
+
     xx &= smo_df['velocity'] >= min_wind_speed
     return smo_df.loc[xx,:]
 
@@ -541,7 +666,7 @@ def monthly_avg_rapid_data(df: pd.DataFrame, year_field: Optional[str] = None, m
     year_field = _find_column(df, 'year', year_field)
     month_field = _find_column(df, 'month', month_field)
 
-    
+
     monthly_df = df.groupby([year_field, month_field]).mean().reset_index()
     monthly_df.index = pd.DatetimeIndex(pd.Timestamp(int(r[year_field]),int(r[month_field]),1) for _,r in monthly_df.iterrows())
     return monthly_df
@@ -601,7 +726,7 @@ def _resample_winds_from_geos_file_list(winds_file, wind_alt=10, lon=SMO_LON, la
                     'u': np.full(geos_files.shape, np.nan),
                     'v': np.full(geos_files.shape, np.nan)
                 }
-            
+
             geos_data['times'][ifile] = ds.time.item()
             geos_data['u'][ifile] = ds[u_var].interp(lon=lon, lat=lat).item()
             geos_data['v'][ifile] = ds[v_var].interp(lon=lon, lat=lat).item()
@@ -724,8 +849,8 @@ class InsituMonthlyAverager(ABC):
 
         while curr_month <= last_expected_month:
             next_month = curr_month + relativedelta(months=1)
-            expected_timestamps = set(pd.date_range(curr_month, next_month, freq='H', closed='left'))
-            
+            expected_timestamps = set(pd.date_range(curr_month, next_month, freq='h', inclusive='left'))
+
             # Do we have all the time stamps for the current month?
             intersection = expected_timestamps.intersection(hourly_df_timestamps)
             if intersection != expected_timestamps:
@@ -739,7 +864,7 @@ class InsituMonthlyAverager(ABC):
                     logger.warning(msg)
                 else:
                     raise InsituProcessingError(msg)
-                
+
             curr_month = next_month
 
         cutoff_date = last_expected_month + relativedelta(months=1)
@@ -750,13 +875,13 @@ class InsituMonthlyAverager(ABC):
             last_month_str = (creation_month - relativedelta(months=1)).strftime('%b %Y')
             logger.warning('The requested final month is later than can be accomodated by the hourly file due to its creation date, the last month that will be added is {}'.format(last_month_str))
             cutoff_date = creation_month
-            
+
         tt = (hourly_df.index >= first_month) & (hourly_df.index < cutoff_date)
         hourly_df = hourly_df.loc[tt, :].copy()
         if hourly_df.shape[0] == 0:
             raise InsituProcessingError('No new hourly data to add given specified last month and/or creation date of the hourly file')
         hourly_df = _filter_rapid_df(hourly_df)
-        return hourly_df, pd.date_range(first_month, cutoff_date, freq='MS', closed='left')
+        return hourly_df, pd.date_range(first_month, cutoff_date, freq='MS', inclusive='left')
 
     @staticmethod
     def check_hourly_file_creation_date(hourly_file: str, last_expected_month: pd.Timestamp = DEFAULT_LAST_MONTH) -> None:
@@ -767,9 +892,9 @@ class InsituMonthlyAverager(ABC):
 
     @classmethod
     def write_monthly_insitu(cls, output_file: str, monthly_df: pd.DataFrame, previous_monthly_file: str, new_hourly_file: str, 
-                             new_months: pd.DatetimeIndex, clobber: bool = False) -> None:
+                             new_months: pd.DatetimeIndex, is_seed_file: bool = False, clobber: bool = False) -> None:
         """Write a new monthly average file
-        
+
         Parameters
         ----------
         output_file
@@ -787,6 +912,11 @@ class InsituMonthlyAverager(ABC):
         new_months
             A sequence of datetimes giving the first of each month added
 
+        is_seed_file
+            Whether this is the first monthly average file built from a NOAA monthly average file,
+            rather than a previous ginput-managed monthly average file. (This controls how the header
+            is constructed.)
+
         clobber
             Whether to allow overwriting the output file if it already exists.
         """
@@ -795,7 +925,10 @@ class InsituMonthlyAverager(ABC):
         if not clobber and os.path.exists(output_file):
             raise IOError('Output file already exists')
 
-        new_header = cls._make_monthly_header(previous_monthly_file=previous_monthly_file, new_hourly_file=new_hourly_file, new_months=new_months)
+        if is_seed_file:
+            new_header = cls._make_seed_file_monthly_header(previous_monthly_file=previous_monthly_file, new_hourly_file=new_hourly_file, new_months=new_months, columns=monthly_df.columns)
+        else:
+            new_header = cls._make_monthly_header(previous_monthly_file=previous_monthly_file, new_hourly_file=new_hourly_file, new_months=new_months)
         with open(output_file, 'w') as outf:
             outf.write('\n'.join(new_header) + '\n')
             monthly_df.to_string(outf, index=False, header=False)
@@ -832,7 +965,7 @@ class InsituMonthlyAverager(ABC):
                 # Remove whitespace (including newlines) from the end of header lines - easier to 
                 # add it back in consistently when writing
                 header.append(line.rstrip()) 
-            
+
         # Check that the first and last lines of the header are what we expect and that we added the history
         if not header[0].startswith('# header_lines'):
             raise InsituProcessingError('Error copying header from {}: first header line does not contain the number of header lines'.format(previous_monthly_file))
@@ -843,6 +976,32 @@ class InsituMonthlyAverager(ABC):
 
         # Update the number of header lines
         header[0] = '# header_lines: {}'.format(len(header))
+        return header
+
+    @staticmethod
+    def _make_seed_file_monthly_header(previous_monthly_file: str, new_hourly_file: str, new_months: pd.DatetimeIndex, columns: Sequence[str]):
+        first_hourly_month = min(new_months)
+        last_hourly_month = max(new_months)
+        monthly_sha1 = make_dependent_file_hash(previous_monthly_file)
+        hourly_sha1 = make_dependent_file_hash(new_hourly_file)
+        columns = ' '.join(columns)
+        now = datetime.now().astimezone().strftime('%Y-%m-%d %H:%M %Z')
+        header = [
+            '#',
+            '# HISTORY:',
+            '#    Initial creation:',
+            f'#        - Initial creation occurred at {now} in working directory',
+            f'#          {os.getcwd()}',
+            f'#        - Data before {first_hourly_month:%b %Y} are taken directly from the NOAA monthly average file',
+            f'#          {previous_monthly_file} (SHA1 sum = {monthly_sha1})',
+            f'#        - Data from {first_hourly_month:%b %Y} to {last_hourly_month:%b %Y} were averaged from the hourly file',
+            f'#          {new_hourly_file} (SHA1 sum = {hourly_sha1})',
+            '# END HISTORY',
+            '#',
+            f'# data_fields: {columns}'
+        ]
+        nhead = len(header) + 1
+        header.insert(0, f'# header_lines: {nhead}')
         return header
 
     @staticmethod
@@ -890,7 +1049,7 @@ class InsituMonthlyAverager(ABC):
         return hourly_sites.item()
 
 
-    def convert(self, noaa_hourly_file: str, previous_monthly_file: str, output_monthly_file: str, allow_alt_sites: bool = False, site_id_override: Optional[str] = None) -> None:
+    def convert(self, noaa_hourly_file: str, previous_monthly_file: str, output_monthly_file: str, allow_alt_sites: bool = False, site_id_override: Optional[str] = None, is_seed_file: bool = False) -> None:
         """Convert a NOAA hourly file to monthly averages and append to the end of an existing file.
 
         Parameters
@@ -921,6 +1080,11 @@ class InsituMonthlyAverager(ABC):
             .. note::
                Passing a string with more than 3 characters for ``site_id_override`` *should* work, but 
                is not officially tested/supported.
+
+        is_seed_file
+            Whether this is the first monthly average file built from a NOAA monthly average file,
+            rather than a previous ginput-managed monthly average file. (This controls how the header
+            is constructed.)
 
         Returns
         -------
@@ -982,16 +1146,16 @@ class InsituMonthlyAverager(ABC):
             creation_month=hourly_creation_month,
             limit_to_avail_data=self._run_settings.limit_by_avail_data
         )
-        
+
         logger.info('Doing background selection')
         hourly_df = self.select_background(hourly_df)
-        
+
         logger.info('Doing monthly averaging')
         new_monthly_df = monthly_avg_rapid_data(hourly_df)
         new_monthly_df = new_monthly_df.reindex(new_month_index)  # ensure that all months are represented, even if some have no data
         new_monthly_df['year'] = new_month_index.year
         new_monthly_df['month'] = new_month_index.month
-        
+
         logger.info('Writing to {}'.format(output_monthly_file))
         new_monthly_df['site'] = noaa_site_id
         new_monthly_df = new_monthly_df[['site', 'year', 'month', 'value']]
@@ -999,7 +1163,7 @@ class InsituMonthlyAverager(ABC):
         first_new_date = new_monthly_df.index.min()
         last_new_date = new_monthly_df.index.max()
         new_monthly_df = pd.concat([monthly_df, new_monthly_df], axis=0)
-        
+
         if output_monthly_file is None:
             return new_monthly_df
         else:
@@ -1009,6 +1173,7 @@ class InsituMonthlyAverager(ABC):
                 previous_monthly_file=previous_monthly_file,
                 new_hourly_file=noaa_hourly_file, 
                 new_months=(first_new_date, last_new_date),
+                is_seed_file=is_seed_file,
                 clobber=self._clobber
             )
             logger.info('New monthly averages written to {}'.format(output_monthly_file))
@@ -1026,8 +1191,8 @@ class MloMonthlyAverager(InsituMonthlyAverager):
 
     def select_background(self, hourly_df):
         return mlo_background_selection(hourly_df, method=self._background_method)
-        
-        
+
+
 class SmoMonthlyAverager(InsituMonthlyAverager):
     def __init__(self, smo_wind_file: str, clobber: bool = False, run_settings: RunSettings = RunSettings(), allow_missing_geos_files: bool = False):
         self._smo_wind_file = smo_wind_file
@@ -1051,7 +1216,7 @@ class SmoMonthlyAverager(InsituMonthlyAverager):
 
 def driver(site, previous_monthly_file, hourly_insitu_file, output_monthly_file, last_month=DEFAULT_LAST_MONTH, geos_2d_file_list=None, 
            allow_missing_geos_files=False, allow_missing_hourly_times=False, allow_missing_creation_date=False, limit_by_avail_data=True,
-           clobber=False, save_missing_geos_to=None, allow_alt_sites=False, site_id_override=None):
+           clobber=False, save_missing_geos_to=None, allow_alt_sites=False, site_id_override=None, is_seed_file=False):
     run_settings = RunSettings(
         save_missing_geos_to=save_missing_geos_to, 
         last_month=last_month, 
@@ -1070,7 +1235,7 @@ def driver(site, previous_monthly_file, hourly_insitu_file, output_monthly_file,
         raise InsituProcessingError('When processing with site == "smo", geos_2d_file_list must be provided')
 
     converter = conversion_classes[site]
-    converter.convert(hourly_insitu_file, previous_monthly_file, output_monthly_file, allow_alt_sites=allow_alt_sites, site_id_override=site_id_override)
+    converter.convert(hourly_insitu_file, previous_monthly_file, output_monthly_file, allow_alt_sites=allow_alt_sites, site_id_override=site_id_override, is_seed_file=is_seed_file)
 
 
 
@@ -1084,7 +1249,7 @@ def parse_args(p: ArgumentParser):
 
         return pd.Timestamp(year, mon, 1)
 
-        
+
     if p is None:
         p = ArgumentParser()
         is_main = True
@@ -1136,6 +1301,8 @@ def parse_args(p: ArgumentParser):
                                                          'output file. This permits ingesting hourly files with mixed site IDs. If you only '
                                                          'need to allow ingesting an hourly file for a site with a different ID than given '
                                                          'by the SITE argument, prefer --allow-alt-noaa-site over this option.')
+    p.add_argument('--is-seed-file', action='store_true', help='Passing this flag indicates that this is being constructed from a NOAA monthly '
+                                                               'file extended with hourly data, which will alter how the header is written.')
     p.add_argument('-c', '--clobber', action='store_true', help='By default, the output file will not overwrite any existing '
                                                                 'file at that path. Setting this flag will cause it to overwrite '
                                                                 'existing files UNLESS that file is the previous monthly file. '

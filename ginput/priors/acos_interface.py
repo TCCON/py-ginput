@@ -5,7 +5,7 @@ Usual GGG users will not need to concern themselves with this file. GGG develope
 is still able to generate equivalent latitudes and CO2 priors from the TCCON prior and mod_maker code.
 
 If you wish to call this code from within other python code, the function :func:`acos_interface_main` is the entry
-point. A command line interface is also provided
+point. A command line interface is also provided.
 """
 
 from __future__ import print_function, division
@@ -20,6 +20,7 @@ from itertools import repeat, product
 import logging
 from multiprocessing import Pool
 import numpy as np
+import pandas as pd
 from pathlib import Path
 import pickle
 import os
@@ -30,7 +31,7 @@ from ..common_utils import mod_utils, mod_constants
 from ..common_utils.sat_utils import time_weight, datetime2datenum
 from ..common_utils.ggg_logging import logger, setup_logger
 from ..mod_maker import mod_maker
-from ..priors import tccon_priors
+from . import tccon_priors, fo2_prep
 from .. import __version__
 
 __acos_int_version__ = '1.2.3'
@@ -131,6 +132,7 @@ _def_errh = ErrorHandler(suppress_error=False)
 
 def acos_interface_main(instrument, met_resampled_file, geos_files, output_file, mlo_co2_file=None, smo_co2_file=None,
                         use_trop_eqlat=False, cache_strat_lut=False, truncate_mlo_smo_by=0, nprocs=0, interp_pickle_dir='.',
+                        fo2_file=fo2_prep.DEFAULT_FO2_FILE, auto_update_fo2_file=False,
                         error_handler=_def_errh):
     """
     The primary interface to create CO2 priors for the ACOS algorithm
@@ -164,6 +166,17 @@ def acos_interface_main(instrument, met_resampled_file, geos_files, output_file,
      truncate the MLO/SMO data to (and extrapolate beyond). The default is 2, e.g. if the latest date in the met file
      is in Aug 2021, the MLO/SMO data will only be used up to June 2021 - but they *must* include data up to that
      month, or an error is raised.
+
+    :param fo2_file: Path to a file containing a timeseries of O2 DMFs. This is typically produced by the "fo2_prep"
+     subcommand of ginput, or it can be created automatically by setting ``auto_update_fo2_file = True``.
+    :type fo2_file: os.PathLike
+
+    :param auto_update_fo2_file: set to ``True`` to enable this function to automatically create or update the O2
+     DMF input file at the path specified by ``fo2_file``. This will by default do nothing if the ``fo2_file`` has
+     been updated within the last 7 days. Otherwise it will download the latest Scripps and NOAA data needed to create
+     the file and check if there is new data in them that requires an update to the ``fo2_file``. If ``fo2_file`` does
+     not exist, the outputs are downloaded and created. Note that outputs will always be downloaded to the default directory.
+     using this option. If you want more control, please use the "update_fo2" subcommand of ``run_ginput.py``.
 
     :return: None, writes results to the HDF5 ``output_file``.
     """
@@ -225,7 +238,7 @@ def acos_interface_main(instrument, met_resampled_file, geos_files, output_file,
     # Also fix the end date of the MLO/SMO record relative to the data date, rather than
     # the execution date. Requested by SDOS on 14 Oct 2021.
     record_end_date = mod_utils.start_of_month(max_date) + relativedelta(years=2, months=1)
-    
+
     if truncate_mlo_smo_by is not None:
         check_date = dt.datetime.today() + dt.timedelta(days=30)
         if max_date > check_date:
@@ -238,7 +251,7 @@ def acos_interface_main(instrument, met_resampled_file, geos_files, output_file,
         truncate_mlo_smo_date = dt.datetime(truncate_mlo_smo_date.year, truncate_mlo_smo_date.month, truncate_mlo_smo_date.day)
     else:
         truncate_mlo_smo_date = None
-        
+
 
     eqlat_array = compute_sounding_equivalent_latitudes(sounding_pv=pv_array, sounding_theta=theta_array,
                                                         sounding_datenums=datenum_array, sounding_qflags=qflag_array,
@@ -248,6 +261,7 @@ def acos_interface_main(instrument, met_resampled_file, geos_files, output_file,
 
     met_data['el'] = eqlat_array.reshape(orig_shape)
     prior_flags = prior_flags.reshape(flags_orig_shape)
+    o2_dmfs = _make_o2_dmf_array(met_data['dates'], fo2_file=fo2_file, auto_update_fo2_file=auto_update_fo2_file)
 
     # Create the priors
     if cache_strat_lut:
@@ -297,11 +311,11 @@ def acos_interface_main(instrument, met_resampled_file, geos_files, output_file,
         if nprocs == 0:
             profiles, units = _prior_serial(orig_shape=orig_shape, var_mapping=var_mapping, var_type_info=var_type_info,
                                             met_data=met_data, gas_record=gas_record, prior_flags=gas_prior_flags,
-                                            use_trop_eqlat=use_trop_eqlat, error_handler=error_handler)
+                                            use_trop_eqlat=use_trop_eqlat, fo2_file=fo2_file, error_handler=error_handler)
         else:
             profiles, units = _prior_parallel(orig_shape=orig_shape, var_mapping=var_mapping, var_type_info=var_type_info,
                                               met_data=met_data, gas_record=gas_record, prior_flags=gas_prior_flags, nprocs=nprocs,
-                                              use_trop_eqlat=use_trop_eqlat, error_handler=error_handler)
+                                              use_trop_eqlat=use_trop_eqlat, fo2_file=fo2_file, error_handler=error_handler)
 
         # Add latitude, longitude, and flags to the priors file
         profiles['sounding_longitude'] = met_data['longitude']
@@ -312,7 +326,12 @@ def acos_interface_main(instrument, met_resampled_file, geos_files, output_file,
         units['prior_failure_flags'] = error_handler.get_error_descriptions()
 
         # Convert the from ppm/ppb to dry mole fraction
-        profiles[gas_field] *= unit_scales[units[gas_field]]
+        gas_unit = units[gas_field]
+        if len(gas_unit) > 0:
+            # If this is an empty string, it probably means that we didn't actually compute profiles for any sounding
+            # Since the values will be all NaNs in that case, I don't have to scale the DMFs anyway, so there's no
+            # need for an "else" block.
+            profiles[gas_field] *= unit_scales[units[gas_field]]
         units[gas_field] = 'dmf'
 
         # Also need to convert the entry dates into decimal years to write to HDF
@@ -333,14 +352,15 @@ def acos_interface_main(instrument, met_resampled_file, geos_files, output_file,
                 logger.debug('GOSAT array "{}" squeezed from {} to {}'.format(key, value.shape, profiles[key].shape))
 
         # Write the priors to the file requested.
+        write_o2_h5(output_file, o2_dmfs)
         write_prior_h5(output_file, profiles, units, prior_group=prior_group.format(gas))
         if gas != 'co':
             insitu_record_to_h5_group(output_file, gas_record.conc_seasonal, gas, record_group=record_group.format(gas))
-        
+
 
 
 def _prior_helper(i_sounding, i_foot, qflag, mod_data, gas_record, var_mapping, var_type_info, use_trop_eqlat=False,
-                  prior_flags=None, error_handler=_def_errh):
+                  fo2_file=fo2_prep.DEFAULT_FO2_FILE, prior_flags=None, error_handler=_def_errh):
     """
     Underlying function that generates individual prior profiles in serial and parallel mode
 
@@ -413,10 +433,11 @@ def _prior_helper(i_sounding, i_foot, qflag, mod_data, gas_record, var_mapping, 
         # which significantly overestimated the seasonal drawdown. The simple fix for now is to turn off
         # that adjustment.
         priors_dict, priors_units, priors_constants = tccon_priors.generate_single_tccon_prior(
-            mod_data, dt.timedelta(hours=0), gas_record, use_eqlat_trop=use_trop_eqlat, use_adjusted_zgrid=False
+            mod_data, dt.timedelta(hours=0), gas_record, use_eqlat_trop=use_trop_eqlat, use_adjusted_zgrid=False,
+            o2_mole_fraction_file=fo2_file
         )
     except Exception as err:
-        new_err = err.__class__(err.args[0] + ' Occurred at sounding = {}, footprint = {}'.format(i_sounding+1, i_foot+1))
+        new_err = err.__class__(str(err.args[0]) + ' Occurred at sounding = {}, footprint = {}'.format(i_sounding+1, i_foot+1))
         error_handler.handle_err(new_err, err_code_name='prior_failure', flags=prior_flags, inds=(i_sounding, i_foot))
         return profiles, None, prior_flags[i_sounding, i_foot]
 
@@ -427,6 +448,20 @@ def _prior_helper(i_sounding, i_foot, qflag, mod_data, gas_record, var_mapping, 
         units[h5_var] = priors_units[tccon_var]
 
     return profiles, units, prior_flags[i_sounding, i_foot]
+
+
+def _make_o2_dmf_array(datetimes: np.array, fo2_file: os.PathLike = fo2_prep.DEFAULT_FO2_FILE, auto_update_fo2_file: bool = False) -> np.ndarray:
+    output_shape = datetimes.shape
+    datetimes = pd.to_datetime(datetimes.ravel())
+    o2_rec = tccon_priors.O2MeanMoleFractionRecord(
+        o2_mole_fraction_file=fo2_file,
+        auto_update_fo2_file=auto_update_fo2_file,
+    )
+    # Timestamp fill values seem to be in 1992 (-999999 from 1 Jan 1993 in seconds probably)
+    tt = datetimes > pd.Timestamp(1993,1,1)
+    o2_dmfs = np.full(datetimes.size, np.nan)
+    o2_dmfs[tt] = o2_rec.get_many_o2_mole_fractions(datetimes[tt])
+    return o2_dmfs.reshape(output_shape)
 
 
 def _make_output_profiles_dict(orig_shape, var_mapping, var_type_info):
@@ -477,7 +512,7 @@ def _make_output_profiles_dict(orig_shape, var_mapping, var_type_info):
 
 
 def _prior_serial(orig_shape, var_mapping, var_type_info, met_data, gas_record, prior_flags=None, use_trop_eqlat=False,
-                  error_handler=_def_errh):
+                  fo2_file=fo2_prep.DEFAULT_FO2_FILE, error_handler=_def_errh):
     """
     Generate the priors, running in serial mode.
 
@@ -502,7 +537,7 @@ def _prior_serial(orig_shape, var_mapping, var_type_info, met_data, gas_record, 
 
             this_profiles, this_units, _ = _prior_helper(i_sounding, i_foot, qflag, mod_data, gas_record,
                                                          var_mapping, var_type_info, prior_flags=prior_flags,
-                                                         use_trop_eqlat=use_trop_eqlat, error_handler=error_handler)
+                                                         use_trop_eqlat=use_trop_eqlat, fo2_file=fo2_file, error_handler=error_handler)
             for h5_var, h5_array in profiles.items():
                 h5_array[i_sounding, i_foot, :] = this_profiles[h5_var]
             if not units_set and this_units is not None:
@@ -513,7 +548,7 @@ def _prior_serial(orig_shape, var_mapping, var_type_info, met_data, gas_record, 
 
 
 def _prior_parallel(orig_shape, var_mapping, var_type_info, met_data, gas_record, nprocs, prior_flags=None,
-                    use_trop_eqlat=False, error_handler=_def_errh):
+                    fo2_file=fo2_prep.DEFAULT_FO2_FILE, use_trop_eqlat=False, error_handler=_def_errh):
     """
     Generate the priors, running in parallel mode.
 
@@ -542,7 +577,8 @@ def _prior_parallel(orig_shape, var_mapping, var_type_info, met_data, gas_record
     with Pool(processes=nprocs) as pool:
         result = pool.starmap(_prior_helper, zip(sounding_inds, footprint_inds, qflags, mod_dicts,
                                                  repeat(gas_record), repeat(var_mapping), repeat(var_type_info),
-                                                 repeat(use_trop_eqlat), repeat(prior_flags), repeat(error_handler)))
+                                                 repeat(use_trop_eqlat), repeat(fo2_file), repeat(prior_flags),
+                                                 repeat(error_handler)))
 
     # At this point, result will be a list of tuples of pairs of dicts, the first dict the profiles dict, the second
     # the units dict or None if the prior calculation did not run. We need to combine the profiles into one array per
@@ -648,7 +684,7 @@ def _eqlat_helper(idx, pv_vec, theta_vec, datenum, quality_flag, eqlat_fxns, geo
 
     :param eqlat_fxns: the collection of equivalent latitude interpolators, must be in the same order as
      ``geos_datenums``.
-    :type eqlat_fxns: list(:class:`scipy.interpolate.interpolate.interp2d`)
+    :type eqlat_fxns: list(:class:`scipy.interpolate.interpolate.RectBivariateSpline`)
 
     :param geos_datenums: the date numbers (see ``datenum``) for the GEOS FP files that bracket this sounding. Should
      be >= 2 and must be ordered the same as ``eqlat_fxns``, so that ``eqlat_fxns[0]`` the the equivalent latitude
@@ -667,7 +703,7 @@ def _eqlat_helper(idx, pv_vec, theta_vec, datenum, quality_flag, eqlat_fxns, geo
     elif prior_flags is not None and prior_flags[idx] != 0:
         logger.info('Sounding {}: prior flag != 0. Skipping eq. lat. calculation.'.format(idx))
         return default_return, prior_flags[idx]
-    
+
     # Because of a limit on the size of objects that can be sent between threads in Python 3.6,
     # we need a workaround for big interpolators. If we got strings/paths, then we had to write
     # those interpolators to files and pass the paths to those files instead. This block can
@@ -756,7 +792,7 @@ def _eqlat_serial(sounding_pv, sounding_theta, sounding_datenums, sounding_qflag
     :type geos_datenums: 1D :class:`numpy.ndarray` or equivalent.
 
     :param eqlat_fxns: a list of equivalent latitude interpolators for the date/times specified by ``geos_datenums``.
-    :type eqlat_fxns: list(:class:`scipy.interpolate.interpolate.interp2d`)
+    :type eqlat_fxns: list(:class:`scipy.interpolate.interpolate.RectBivariateSpline`)
 
     :return: an array of equivalent latitudes for the soundings (dimensions soundings-by-levels).
     :rtype: :class:`numpy.ndarray`
@@ -807,11 +843,11 @@ def _eqlat_pickle_manager(eqlat_fxns, pickle_dir='.'):
         logger.info("Running under Python 3.10 or greater, assuming support for large inter-thread objects. Not writing pickle files for eqlat interpolators.")
         yield eqlat_fxns
         return 
-    
+
     logger.info("Running under Python 3.9 or less, not assuming there is support for large inter-thread objects. Writing pickle files for eqlat interpolators.")
     mypid = os.getpid()
     eqlat_pickle_files = []
-    
+
     for i, fxn in enumerate(eqlat_fxns):
         pickle_file = os.path.join(pickle_dir, f'ginput_eqlat_interpolator_pickle.{mypid}-{i}.pkl')
         if os.path.exists(pickle_file):
@@ -821,7 +857,7 @@ def _eqlat_pickle_manager(eqlat_fxns, pickle_dir='.'):
             pickle.dump(fxn, f)
     file_basenames = ', '.join(os.path.basename(fname) for fname in eqlat_pickle_files)
     logger.info(f'Created {len(eqlat_pickle_files)} pickle files in {os.path.abspath(pickle_dir)}: {file_basenames}')
-    
+
     try:
         yield eqlat_pickle_files
     finally:
@@ -1073,6 +1109,21 @@ def write_prior_h5(output_file, profile_variables, units, prior_group='priors'):
             dset.attrs['units'] = var_unit
 
 
+def write_o2_h5(output_file, o2_dmfs, h5_group='o2_record'):
+    with h5py.File(output_file, 'a') as h5obj:
+        grp = h5obj.create_group(h5_group)
+        dset = grp.create_dataset('o2_global_dmf', data=o2_dmfs, compression='gzip', compression_opts=9, shuffle=True)
+        dset.attrs['description'] = ('Per-sounding global mean O2 dry mole fraction calculated from Scripps O2/N2 data and NOAA global mean CO2 data. '
+                                     'This will vary slightly over the granule from the interpolation to different times for each sounding. '
+                                     'No seasonal cycle is included, only the year-over-year change.')
+        dset.attrs['units'] = 'mol mol^-1'
+        dset.attrs['note'] = 'Only pixels with a fill value for their time (a time before 1 Jan 1993) will have a NaN, all other receive a value.'
+
+        dset = grp.create_dataset('granule_mean_o2_global_dmf', data=np.nanmean(o2_dmfs))
+        dset.attrs['description'] = 'Mean of non-fill values from "o2_global_dmf" for applications that prefer a single value per granule.'
+        dset.attrs['units'] = 'mol mol^-1'
+
+
 def insitu_record_to_h5_group(output_file, df, gas, record_group='mlo_smo_record'):
     def get_unit(col):
         if col == 'dmf_mean':
@@ -1081,7 +1132,7 @@ def insitu_record_to_h5_group(output_file, df, gas, record_group='mlo_smo_record
             return '0 = not interpolated/extrapolated; 1 = interpolated; 2 = extrapolated.'
         if col == 'latency':
             return 'years'
-        
+
         return ''
 
     with h5py.File(output_file, 'a') as h5obj:
@@ -1089,8 +1140,8 @@ def insitu_record_to_h5_group(output_file, df, gas, record_group='mlo_smo_record
         dates = _convert_to_acos_time_strings(df.index.to_pydatetime())
         dset = grp.create_dataset('date', data=dates, fillvalue=_string_fill)
         dset.attrs['description'] = 'Date associated with the MLO/SMO record'
-        
-        
+
+
         for colname, column in df.iteritems():
             column = column.to_numpy().copy()
             column[np.isnan(column)] = _fill_val
@@ -1203,7 +1254,7 @@ def _make_el_profile(pv, theta, interpolator):
 
     :param interpolator: one of the interpolators returned by :func:`mod_utils.equivalent_latitude_functions_from_geos_files`
      that interpolates equivalent latitude to given PV and theta.
-    :type interpolator: :class:`scipy.interpolate.interp2d`
+    :type interpolator: :class:`scipy.interpolate.RectBivariateSpline`
 
     :return: the equivalent latitude profile
     :rtype: 1D :class:`numpy.ndarray`
@@ -1326,6 +1377,15 @@ def parse_args(parser=None, instrument=None):
                              'including the month that they will be truncated at. Default is %(default)d.')
     parser.add_argument('--no-truncate-mlo-smo', action='store_const', const=None, dest='truncate_mlo_smo_by',
                         help='Override the default to truncate MLO/SMO data.')
+    parser.add_argument('--fo2-file', default=str(fo2_prep.DEFAULT_FO2_FILE),
+                        help='Path to the file containing the O2 global mean DMF trend created by "update_fo2". '
+                             'Default is %(default)s.')
+    parser.add_argument('--auto-update-fo2-file', action='store_true',
+                        help='Including this flag will activate logic to automatically check if the file pointed to by '
+                             '--fo2-file needs created or updated. If it does not exist or has not been updated recently, '
+                             'this will download Scripps and NOAA data to the "data" subdirectory within the ginput package '
+                             'and create or update the O2 file if needed. If you need more control over where the data is '
+                             'downloaded, you will need to use the "update_fo2" subcommand of run_ginput.py')
     parser.add_argument('-v', '--verbose', dest='log_level', default=0, action='count',
                         help='Increase logging verbosity')
     parser.add_argument('-q', '--quiet', dest='log_level', const=-1, action='store_const',

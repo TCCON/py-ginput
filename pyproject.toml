@@ -1,0 +1,10 @@
+[build-system]
+requires = ["setuptools >= 59.0"]
+build-backend = "setuptools.build_meta"
+
+# TODO: convert to hatchling build system so we can include these
+# [project.optional-dependencies]
+# testing = [
+#     "pytest",
+#     "pytest-subtests"
+# ]
