@@ -16,11 +16,13 @@ class GeosSource(Enum):
     FPIT = 'fpit'
     FP = 'fp'
     IT = 'it'
+    merra2 = 'merra2'
     UNKNOWN = 'UNKNOWN'
 
     @classmethod
     def from_str(cls, s):
-        if s in {'fpit', 'fp', 'it'}:
+#         print('-----', s)
+        if s in {'fpit', 'fp', 'it','merra2'}:
             return cls(s)
         else:
             return cls.UNKNOWN
@@ -73,6 +75,8 @@ class GeosVersion:
             # Assume a granule name like "GEOS.it.asm.asm_inst_3hr_glo_L576x361_v72.GEOS5294.2008-01-01T0000.V01.nc4"
             # where the "source" is the second component as divided by "."s.
             source_str = granule.split('.')[1]
+            if 'MERRA2' in nc_file: source_str = 'merra2'
+#             print(vstr, source_str, file_name, file_hash)
             return cls(vstr, source_str, file_name, file_hash)
         
 

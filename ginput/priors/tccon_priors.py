@@ -879,7 +879,6 @@ class MloSmoTraceGasRecord(TraceGasRecord):
         extrap_julian_dates = extrap_dates.to_julian_date().to_numpy()
 
         cls._check_extrap_fit(df, fit, extrap_julian_dates, direction)
-
         df.loc[to_fill, 'dmf_mean'] = fit(extrap_julian_dates) + delta_dmf
 
     @classmethod
@@ -2016,7 +2015,7 @@ class CORecord(TraceGasRecord):
         # GEOS IT vs. HIPPO was not exactly 1, but it was close enough that I didn't feel the need to scale. (Also the GEOS FP-IT
         # vs. HIPPO comparison was similar enough to the comparison with ATom that I felt that using HIPPO was a reasonable
         # comparison.)
-        if co_source in {GeosSource.FPIT, GeosSource.FP}:
+        if co_source in {GeosSource.FPIT, GeosSource.FP, GeosSource.merra2}:
             logger.debug('Using GEOS FP/FP-IT CO scaling')
             atom_scale_fac = 1.23
         elif co_source == GeosSource.IT:

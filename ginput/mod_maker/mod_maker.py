@@ -109,13 +109,16 @@ from .slantify import * # code to make slant paths
 from .tccon_sites import site_dict, tccon_site_info, tccon_site_info_for_date
 
 
+import matplotlib.pyplot as plt
+
+
 ####################
 # Module constants #
 ####################
 
 _old_modmaker_modes = ('ncep','merradap42','merradap72','merraglob','fpglob','fpitglob')
 _new_fixedp_modes = ('fpit', 'fp')
-_new_native_modes = ('fpit-eta', 'fp-eta', 'it-eta')
+_new_native_modes = ('fpit-eta', 'fp-eta', 'it-eta','merra2')
 _new_modmaker_modes = _new_fixedp_modes + _new_native_modes
 _default_mode = 'fpit-eta'
 
@@ -1136,6 +1139,7 @@ def GEOS_files(GEOS_path, start_date, end_date, chm=False):
     # all GEOS5-FPIT Np/Nx files and their dates. Use 'glob' to avoid listing other files (e.g. the download link list)
     # in the directory. Whether glob.glob() and os.listdif() returns a sorted list is platform dependendent. Since the
     # main mod_maker logic depends on the profile and surface file lists being in the same order, we need to sort them.
+    
     ncdf_list = sorted(glob.glob(os.path.join(GEOS_path, 'GEOS*.nc4')))
     if chm:
         ncdf_list = np.array([f for f in ncdf_list if 'chm' in os.path.basename(f)])
@@ -1147,7 +1151,26 @@ def GEOS_files(GEOS_path, start_date, end_date, chm=False):
     # just the one between the 'start_date' and 'end_date' dates
     select_files = ncdf_list[(ncdf_dates>=start_date) & (ncdf_dates<end_date)]
     select_dates = ncdf_dates[(ncdf_dates>=start_date) & (ncdf_dates<end_date)]
+    
+    
+    
+    if 'merra2' in GEOS_path:
+        #this needs to be updated for multple dates.
+        yyyymmdd = start_date.strftime('%Y%m%d')
+        merra2file = sorted(glob.glob(os.path.join(GEOS_path, 'MERRA2*'+yyyymmdd+'.nc4'))) 
+        select_dates = []
+        select_files = []
+        if len(merra2file) ==1:
+            
+            syntimes = [0,3,6,9,12,15,18,21]  #MERRA2 synoptic times
 
+            for ss in syntimes:
+                select_dates.append(start_date+ timedelta(hours=ss))
+                select_files.append(merra2file[0])
+                
+        select_dates = np.asarray(select_dates)
+        select_files = np.asarray(select_files)
+        
     if len(select_dates) == 0:
         raise IOError('No GEOS files between {} and {}'.format(start_date,end_date))
 
@@ -1201,9 +1224,12 @@ def equivalent_latitude_functions_native_geos(GEOS_path, start_date=None, end_da
     :return: dictionary of equivalent latitude intepolators, the keys will be the datetime of the interpolators
     :rtype: dict
     """
+    
     GEOS_path = os.path.join(GEOS_path, 'Nv')
     select_files, select_dates = GEOS_files(GEOS_path, start_date, end_date)
-
+    
+    
+    
     if not muted:
         print('\nGenerating equivalent latitude functions for {} native GEOS files'.format(len(select_dates)))
 
@@ -1285,21 +1311,33 @@ def equivalent_latitude_functions_from_native_geos_files(geos_nv_files, geos_dat
     """
     func_dict = dict()
     start = time.time()
+    
     for idx, (geos_file, date) in enumerate(zip(geos_nv_files, geos_dates)):
+ 
+    
+        idx2r = 0
+        if 'MERRA2' in geos_file: idx2r = idx
+    
         with netCDF4.Dataset(geos_file, 'r') as dataset:
             logger.info('Calculating equivalent latitudes for {}/{} GEOS files'.format(idx+1, len(geos_nv_files)))
             lat = dataset['lat'][:]
             lat[np.abs(lat) < 0.001] = 0.0
             lon = dataset['lon'][:]
-            pres = mod_utils.convert_geos_eta_coord(dataset['DELP'][0])
-            EPV = dataset['EPV'][0] * 1e6
-            PT = mod_utils.calculate_potential_temperature(pres, dataset['T'][0])
+            pres = mod_utils.convert_geos_eta_coord(dataset['DELP'][idx2r])
+            EPV = dataset['EPV'][idx2r] * 1e6
+            PT = mod_utils.calculate_potential_temperature(pres, dataset['T'][idx2r])
 
             # Get the area of each grid cell
             lat_res = float(dataset.LatitudeResolution)
             lon_res = float(dataset.LongitudeResolution)
             area = mod_utils.calculate_area(lat, lon, lat_res, lon_res, muted=muted)
-
+       
+    
+#         plt.plot(np.ndarray.flatten(EPV))
+#         fname = 'tstA.png'
+#         if 'MERRA2' in geos_file: fname = 'tstB.png'
+#         plt.savefig(fname)
+                
         # The native 72-level geos files are ordered space-to-surface. The equivalent latitude calculation *may* be okay
         # with that, but I felt it was safer to just go ahead and flip them.
         func_dict[date] = mod_utils.calculate_eq_lat(np.flip(EPV, axis=0), np.flip(PT, axis=0), area)
@@ -1422,7 +1460,7 @@ def show_interp(data,x,y,interp_data,ilev,pres):
     pl.show()
 
 
-def load_chem_variables(geos_file, geos_vars, target_site_dicts, pres_levels=None,
+def load_chem_variables(geos_file, geos_vars, target_site_dicts, idx2r, pres_levels=None,
                         muted=False, extrapolate='no'):
     if not mod_utils.is_geos_on_native_grid(geos_file):
         raise NotImplementedError('GEOS chemistry file ({}) does not appear to be on the native eta grid. This case '
@@ -1437,7 +1475,7 @@ def load_chem_variables(geos_file, geos_vars, target_site_dicts, pres_levels=Non
 
         geos_data = dict()
         for var in geos_vars:
-            geos_data[var] = dataset[var][0]
+            geos_data[var] = dataset[var][idx2r]
             if geos_data[var].shape[0] == 72:
                 # The vertical dimension should be first if present. Flip native variables
                 # to be surface-to-space.
@@ -1723,6 +1761,10 @@ def mod_maker_new(start_date=None, end_date=None, func_dict=None, GEOS_path=None
     When giving dates with _HHMM, dates must correspond exactly to GEOS5 times, so 3 hourly UTC times starting at HHMM=0000
     """
     
+    
+    merra2flag = False
+    if 'MERRA2' in GEOS_path: merra2flag = True
+    
     if lat is not None: # a custom location was given
         site_abbrv = 'xx' if site_abbrv is None else site_abbrv
         locations = {site_abbrv:{'name':'custom site','loc':'custom loc','lat':lat,'lon':lon,'alt':alt}}
@@ -1771,6 +1813,8 @@ def mod_maker_new(start_date=None, end_date=None, func_dict=None, GEOS_path=None
             raise RuntimeError('Dates for the chemistry files do not match the dates for the met file. Something '
                                'went wrong when looking for these files.')
 
+            
+    ##I need to fix the chemical field section (and the EqL)
     nsite = len(locations)
 
     start = time.time()
@@ -1780,23 +1824,37 @@ def mod_maker_new(start_date=None, end_date=None, func_dict=None, GEOS_path=None
         site_dict = tccon_site_info_for_date(UTC_date, site_dict_in=locations)
         mod_dicts[UTC_date] = dict()
         start_it = time.time()
-
+        
         geos_versions = {
             'Met3d': GeosVersion.from_nc_file(select_files[date_ID]),
             'Met2d': GeosVersion.from_nc_file(select_surf_files[date_ID])
         }
         if do_load_chem:
             geos_versions['Chm3d'] = GeosVersion.from_nc_file(select_chem_files[date_ID])
-            
+           
+        
+        print(geos_versions['Met3d'].source)
+        print(geos_versions['Met3d'].source)     
+        print(geos_versions['Chm3d'].source) 
+        
         DATA = {}
         if not muted:
             print('\nNOW DOING date {:4d} / {} :'.format(date_ID+1,len(select_dates)),UTC_date.strftime("%Y-%m-%d %H:%M"),' UTC')
             print('\t-Read global data ...')
 
         file_is_native = mod_utils.is_geos_on_native_grid(select_files[date_ID])
+        
         if file_is_native != native_files:
             raise RuntimeError('Loaded a native level GEOS file but expected a fixed pressure file, or vice versa')
-
+        
+        idx2r = 0 
+        if merra2flag: 
+            hour = UTC_date.hour
+            syntimes = np.asarray([0,3,6,9,12,15,18,21])
+            idx2r = np.argmin(np.abs(syntimes - hour))
+            if syntimes[idx2r] - hour > 0.001:
+                raise RuntimeError('The hour is not part of the synoptic times')
+                
         with netCDF4.Dataset(select_files[date_ID],'r') as dataset:
             for var in varlist:
                 if var == 'lev':
@@ -1806,7 +1864,8 @@ def mod_maker_new(start_date=None, end_date=None, func_dict=None, GEOS_path=None
 
                 # Taking dataset[var][0] is equivalent to dataset[var][0,:,:,:], which since there's only one time per
                 # file just cuts the data from 4D to 3D
-                DATA[var] = dataset[var][0]
+                
+                DATA[var] = dataset[var][idx2r]
                 if file_is_native and DATA[var].shape[0] == 72:
                     # The native 72 eta level files are organized space-to-surface vertically; the 42 fixed pressure
                     # level files are surface-to-space. We want the latter so we need to flip the vertical dimension
@@ -1814,7 +1873,7 @@ def mod_maker_new(start_date=None, end_date=None, func_dict=None, GEOS_path=None
                     DATA[var] = np.flipud(DATA[var])
 
             if file_is_native:
-                pres_levels = mod_utils.convert_geos_eta_coord(dataset['DELP'][0])
+                pres_levels = mod_utils.convert_geos_eta_coord(dataset['DELP'][idx2r])
                 pres_levels = np.flipud(pres_levels)
             else:
                 pres_levels = dataset['lev'][:]
@@ -1844,8 +1903,10 @@ def mod_maker_new(start_date=None, end_date=None, func_dict=None, GEOS_path=None
         SURF_DATA = {}
         with netCDF4.Dataset(select_surf_files[date_ID],'r') as dataset:
             for var in surf_varlist:
-                SURF_DATA[var] = dataset[var][0]
-
+                SURF_DATA[var] = dataset[var][idx2r]
+                
+                
+        
         if not muted:
             print('\t-Interpolate to (lat,lon) of sites ...')
 
@@ -1906,7 +1967,8 @@ def mod_maker_new(start_date=None, end_date=None, func_dict=None, GEOS_path=None
                 # get fill values (i.e. they are below the terrain, usually).
                 chem_plevs = mod_utils._std_model_pres_levels
                 chem_extrap = 'no'
-            CHEM_DATA = load_chem_variables(select_chem_files[date_ID], chem_variables, site_dict, pres_levels=chem_plevs, extrapolate=chem_extrap)
+            
+            CHEM_DATA = load_chem_variables(select_chem_files[date_ID], chem_variables, site_dict, idx2r, pres_levels=chem_plevs, extrapolate=chem_extrap)
             for site in INTERP_DATA.keys():
                 INTERP_DATA[site]['prof'].update(CHEM_DATA[site]['prof'])
 
@@ -2336,6 +2398,7 @@ def runlog_driver(runlog, site_abbrv=None, first_date='2000-01-01', **kwargs):
 
 def driver(date_range, met_path, chem_path=None, save_path=None, keep_latlon_prec=False, save_in_utc=True, muted=False,
            slant=False, alt=None, lon=None, lat=None, site_abbrv=None, mode=_default_mode, include_chm=True, flat_outdir=False, **kwargs):
+    
     """
     Function that when called executes the full mod maker process as if called from the command line
 
@@ -2451,8 +2514,9 @@ def driver(date_range, met_path, chem_path=None, save_path=None, keep_latlon_pre
 
         chem_vars = ('CO',) if include_chm else tuple()
         product = mod_utils.mode_to_product(mode)
+        
         func_dict = eqlat_fxn(GEOS_path=met_path, start_date=start_date, end_date=end_date, muted=muted)
-
+        
         for this_abbrv, this_lat, this_lon, this_alt in zip(site_abbrv, lat, lon, alt):
             mod_maker_new(start_date=start_date, end_date=end_date, func_dict=func_dict, GEOS_path=met_path,
                           chem_path=chem_path, chem_variables=chem_vars, slant=slant, locations=site_dict, muted=muted,
