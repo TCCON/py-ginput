@@ -1507,6 +1507,17 @@ class MloSmoTraceGasRecord(TraceGasRecord):
         """
         return 0.0
 
+    def conc_df_to_nc(self, nc_file: os.PathLike, trend: bool = False):
+        """
+        Write the seasonal or trend concentration dataframe to a netCDF file.
+
+        :param nc_file: path to write the netCDF file to. Will be overwritten if it exists.
+
+        :param trend: if ``True``, writes ``self.conc_trend``. Otherwise, writes ``self.conc_seasonal``.
+        """
+        df = self.conc_trend if trend else self.conc_seasonal
+        writers.priors_conc_to_netcdf(df, self.gas_unit, nc_file)
+
 
 class MidlatTraceGasRecord(TraceGasRecord):
     _std_vmr_file = ''

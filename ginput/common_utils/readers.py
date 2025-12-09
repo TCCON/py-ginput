@@ -68,12 +68,12 @@ def read_out_file(out_file, as_dataframes=False, replace_fills=False):
             if fill_value is None:
                 raise IOError('Could not find fill value in the header of {}'.format(out_file))
 
-            is_fill = lambda val: np.isclose(val, fill_value)
+            def is_fill(val): return np.isclose(val, fill_value)
 
     elif replace_fills is not False:
         fill_value = replace_fills
         replace_fills = True
-        is_fill = lambda val: val >= fill_value
+        def is_fill(val): return val >= fill_value
 
     if replace_fills:
         for colname, coldata in df.iteritems():
@@ -171,7 +171,7 @@ def _read_mod_file_geos_sources(mod_file: str) -> Dict[str, GeosVersion]:
                 key = parts[1].strip()
                 info = parts[2].strip()
                 sources[key] = GeosVersion.from_str(info)
-                
+
 
 
 def _read_mod_file_co_source(mod_file: str, geos_versions: Dict[str, GeosVersion]) -> GeosSource:
@@ -221,7 +221,7 @@ def read_mod_file_units(mod_file):
                 names = line.split()
 
     return {n: u for n, u in zip(names, units)}
- 
+
 
 def read_map_file(map_file, as_dataframes=False, skip_header=False, fmt=None):
     """
@@ -390,7 +390,7 @@ def read_vmr_file(vmr_file, as_dataframes=False, lowercase_names=True, style='ne
                 prior_info[category] = np.array([float(x) for x in split_data_line])
 
     data_table = pd.read_csv(vmr_file, sep=r'\s+', header=nheader-1)
-    
+
     # Also get the information that's only in the file name (namely date and longitude, we'll also read the latitude
     # because it's there).
     file_vars = dict()
@@ -475,3 +475,16 @@ def read_tabular_file_with_header(file_path: Union[str, Path], comment_str: str 
         df = pd.read_csv(f, header=None, sep=r"\s+")
         df.columns = columns
         return df
+
+def read_priors_conc_from_netcdf(nc_file: os.PathLike) -> pd.DataFrame:
+    """
+    Read a concentration dataframe for one of the priors records from a netCDF file.
+
+    :param nc_file: path to the netCDF file to read.
+
+    :return: the concentration dataframe.
+    """
+    with ncdf.Dataset(nc_file) as ds:
+        dates = pd.Timestamp(1970,1,1) + pd.to_timedelta(ds['time'][:], unit='s')
+        columns = {k: v[:] for k, v in ds.variables.items() if k != 'time'}
+        return pd.DataFrame(columns, index=dates)

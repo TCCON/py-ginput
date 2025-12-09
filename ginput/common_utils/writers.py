@@ -1,6 +1,7 @@
 import netCDF4 as ncdf
 import numpy as np
 import os
+import pandas as pd
 from warnings import warn
 
 # Allow the ginput.common_utils.writers module to be imported if there's an issue interacting with the C library. This
@@ -333,8 +334,8 @@ def write_vmr_file(vmr_file, tropopause_alt, profile_date, profile_lat, profile_
                     ' ZTROP_VMR: {:.1f}'.format(tropopause_alt),
                     ' DATE_VMR: {:.3f}'.format(mod_utils.date_to_decimal_year(profile_date)),
                     ' LAT_VMR: {:.2f}'.format(profile_lat)] \
-                + [' ' + l for l in extra_header_info] \
-                + [' '.join(table_header)]
+        + [' ' + l for l in extra_header_info] \
+        + [' '.join(table_header)]
 
     with open(vmr_file, 'w') as fobj:
         _write_header(fobj, header_lines, len(gas_name_order) + 1)
@@ -375,3 +376,32 @@ def _write_header(fobj, header_lines, n_data_columns):
 
 
 
+def priors_conc_to_netcdf(conc_df: pd.DataFrame, gas_unit: str, nc_file: os.PathLike):
+    """
+    Write a concentration dataframe from one of the priors records as a netCDF file
+
+    :param conc_df: the dataframe to write
+
+    :param gas_unit: what units the DMF column is given in
+
+    :param nc_file: path to the netCDF file to write, note it will be overwritten if it exists.
+    """
+    var_info = {
+        'dmf_mean': dict(dtype='f8', attributes={'units': gas_unit, 'description': 'Mean DMF of MLO and SMO data'}),
+        'interp_flag': dict(dtype='i4', attributes={'flag_values': np.array([0, 1, 2], dtype=np.int32), 'flag_meanings': 'real data\ninterpolated\nextrapolated', 'description': 'Flag indicating if and how the DMF was filled in'}),
+        'latency': dict(dtype='f8', attributes={'units': 'years', 'description': 'How far in time the DMF needed to be extrapolated'})
+    }
+    dates = (conc_df.index - pd.Timestamp(1970,1,1)).total_seconds()
+    dim_name = 'time'
+    with ncdf.Dataset(nc_file, 'w') as ds:
+        ds.createDimension(dim_name, dates.size)
+        timevar = ds.createVariable(dim_name, 'i8', (dim_name,))
+        timevar.units = 'seconds since 1970-01-01 00:00:00'
+        timevar[:] = dates
+        for colname, coldata in conc_df.items():
+            dtype = var_info[colname]['dtype']
+            attrs = var_info[colname]['attributes']
+
+            colvar = ds.createVariable(colname, dtype, (dim_name,))
+            colvar.setncatts(attrs)
+            colvar[:] = coldata.to_numpy()
