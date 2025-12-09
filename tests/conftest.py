@@ -106,6 +106,15 @@ def fo2_v2025_pkl():
 
 
 @pytest.fixture(scope='session')
+def mlo_smo_default_expected_dir():
+    return input_data_dir / 'noaa-interp-extrap' / 'expected' / 'default-data'
+
+
+@pytest.fixture(scope='session')
+def mlo_smo_default_end_date():
+    return datetime(2028, 1, 1)
+
+@pytest.fixture(scope='session')
 def test_date():
     return datetime(2018, 1, 1)
 
