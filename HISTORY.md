@@ -19,6 +19,38 @@ improvements to improve the scientific capabilities of this code sometimes requi
 an update to the API because the new best default behavior requires additional
 user input.
 
+## 1.6.0
+
+This release includes the following changes:
+
+### The default method for interpolating & extrapolating NOAA data changed.
+
+Previously, the MLO and SMO timeseries were averaged together first (dropping
+any months where one site was missing data), then any missing months within
+the timeseries were filled in by simple time-linear interpolation and any
+necessary extrapolation at the beginning and end was done with a combination
+of a fit to the secular trend and imposition of an average seasonal cycle.
+
+This, however, performs poorly when either site has a large gap - the linear
+interpolation means that a gap of more than a few months will fail to capture
+a seasonal cycle, biasing the overall trend high or low depending on where the
+gap starts and ends in the cycle. 1.6.0 introduces a new approach by default,
+where MLO and SMO are filled in and extended separately _and_ use the trend +
+seasonal cycle logic to interpolate gaps more than 3 months long.
+
+Because the sites are now gap filled and extended separately, this will result
+in changes even when using MLO and SMO data that do not have gaps. All of the
+command line interface calls use this new method. For simplicity, there is
+no way to revert to the old method from the command line. However, the
+`MloSmoTraceGasRecord` and its child classes _do_ have a new keyword
+(`use_pre1p6_interpolation`) that can be set to `True` to switch them back
+to the old interpolation/extrapolation method. Likewise, the `acos_interface_main`
+function in the `priors.acos_interface` module has a `pre_1p6_interp` keyword
+that, when set to `True`, reverts to the old method. If you truly need to
+use version 1.6+ but retain the old method, please write custom wrapper code
+to call the necessary routines with the custom gas records or options for
+`acos_interface_main`.
+
 ## 1.5.1
 
 This release aims to fix cases where the `git` or `hg` commands are not available,

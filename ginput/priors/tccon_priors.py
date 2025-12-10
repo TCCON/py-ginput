@@ -438,6 +438,10 @@ class MloSmoTraceGasRecord(TraceGasRecord):
      Normally this is not allowed, as the DMFs for long-lived gases should be positive and negative values normally
      indicate a fill value is present. Such fill values will lead to incorrect combined MLO+SMO values.
     :type allow_negative_insitu_values: bool
+
+    :param use_pre1p6_interpolation: set to ``True`` to use the method of interpolating (and extrapolating) MLO and
+     SMO data that was in place before ginput v1.6. This is provided for backwards compatibility only; the new default
+     is recommended as it better handles gaps in the MLO or SMO data.
     """
 
     # The lifetime is used to account for chemical loss between emission and the prior location. Setting to infinity
@@ -492,13 +496,18 @@ class MloSmoTraceGasRecord(TraceGasRecord):
 
     def __init__(self, first_date=None, last_date=None, truncate_date=None, lag=None, mlo_file=None, smo_file=None,
                  strat_age_scale=1.0, recalculate_strat_lut=None, save_strat=None, recalc_if_custom_dates=True,
-                 allow_negative_insitu_values=False):
+                 allow_negative_insitu_values=False, use_pre1p6_interpolation=False):
         has_custom_dates = first_date is not None or last_date is not None or truncate_date is not None
         first_date, last_date, self.sbc_lag, mlo_file, smo_file = self._init_helper(first_date, last_date, lag, mlo_file, smo_file)
         self.mlo_file = mlo_file
         self.smo_file = smo_file
         self.strat_age_scale = strat_age_scale
-        self.conc_seasonal = self.get_mlo_smo_mean(mlo_file, smo_file, first_date, last_date, truncate_date, allow_negative_insitu_values=allow_negative_insitu_values) 
+        self.use_pre1p6_interpolation = use_pre1p6_interpolation
+        self.conc_seasonal = self.get_mlo_smo_mean(
+            mlo_file, smo_file, first_date, last_date, truncate_date,
+            use_pre1p6_interpolation=self.use_pre1p6_interpolation,
+            allow_negative_insitu_values=allow_negative_insitu_values
+        )
 
         # Deseasonalize the data by taking a 12 month rolling average. Only do that on the dmf_mean field,
         # leave the latency
@@ -703,19 +712,20 @@ class MloSmoTraceGasRecord(TraceGasRecord):
         return time, delt, age, spectra
 
     @classmethod
-    def read_insitu_gas(cls, full_file_path, allow_negative_values: bool = False):
+    def read_insitu_gas(cls, full_file_path: os.PathLike, allow_negative_values: bool = False) -> pd.DataFrame:
         """
         Read a trace gas record file. Assumes that the file is of monthly average concentrations.
 
-        :param fpath: the path to the directory containing the file.
-        :type fpath: str
+        :param full_file_path: the path to the file.
 
-        :param fname: the name of the file
-        :type fname: str
+        :param allow_negative_values: set to ``True`` to allow the in situ file to contain negative
+         values. Because we are reading file for gases like CO2, N2O, and CH4 (which have large background
+         concentrations), negative values usually mean a fill value exists in the file. Fill values
+         should be replaced with NaNs. If your file actually has negative values, then you will need
+         to set this to ``True``.
 
         :return: a data frame containing the monthly trace gas data along with the site, year, month, and day. The index will
          be a timestamp of the measurment time.
-        :rtype: :class:`pandas.DataFrame`
         """
 
         with open(full_file_path, 'r') as f:
@@ -737,9 +747,208 @@ class MloSmoTraceGasRecord(TraceGasRecord):
         return df
 
     @classmethod
-    def get_mlo_smo_mean(cls, mlo_file, smo_file, first_date, last_date, truncate_date, allow_negative_insitu_values=False):
+    def read_and_fill_insitu_gas(cls, full_file_path: os.PathLike, first_date: dt.datetime, last_date: dt.datetime,
+                                 truncate_date: dt.datetime, allow_negative_values: bool = False,
+                                 max_months_simple_interp: int = 3, nyears: Optional[int] = None) -> pd.DataFrame:
+        """
+        Read a trace gas file and fill in missing values out to the first and last date required.
+
+        Assumes that the file contains monthly mean DMFs.
+
+        :param full_file_path: path to the monthly mean file to read.
+
+        :param first_date: the earliest date required in the timeseries. If the monthly mean file does not
+         extend back to this date, it will be extrapolated. Should be a date on the first of a month.
+
+        :param last_date: the latest date required in the timeseries. If the monthly mean file does not
+         extend forward to this date, it will be extrapolated. Should be a date on the first of a month.
+
+        :param truncate_date: the last date of real data to use in the timeseries. If the input file does not
+         include this date, a :class:`GasRecordDateError` will be raised. Otherwise, the data from the
+         file will be cut off at this date and extrapolated from there to ``last_date``. This allows you
+         to ensure reproducibility even if you update the input file with additional data.
+
+        :param allow_negative_values: set to ``True`` to allow the in situ file to contain negative
+         values. Because we are reading file for gases like CO2, N2O, and CH4 (which have large background
+         concentrations), negative values usually mean a fill value exists in the file. Fill values
+         should be replaced with NaNs. If your file actually has negative values, then you will need
+         to set this to ``True``.
+
+        :param max_months_simple_interp: controls how missing data within the file is filled in.
+         For gaps of this many months or fewer, the gap will be filled with a simple linear interpolation
+         in time. For larger gaps, it will be filled with the same logic as is used for the extrapolation,
+         using a combination of the fitted secular trend and mean seasonal cycle.
+
+        :param nyears: the number of years used to fit the secular trend for interpolating large gaps and
+         extrapolating backward from the start and forward from the end of the real data. For interpolation,
+         the trend is fit and mean seasonal cycle calculated using this many years on either side of the gap.
+         For extrapolation, it uses this many years from the start or end of the record. If this value is not
+         specified, then it uses ``cls._nyears_for_extrap_avg``.
+
+        :returns: a dataframe containing the gas values, latency (for extrapolated values), and two flags
+         describing the interpolation/extrapolation. ``interp_flag`` will be 0 for real data, 1 for interpolated
+         data, and 2 for extrapolated data. ``interp_detail_flag`` is a bit flag: the 1s bit indicates it was
+         extrapolated, the 2s bit indicates the simple, linear interpolation was used, and the 4s bit indicates
+         the trend + seasonal cycle interpolation was used. 
+        """
+        df = cls.read_insitu_gas(full_file_path, allow_negative_values=allow_negative_values)
+
+        if truncate_date is not None and df.index.max() < truncate_date:
+            # Do this before dropping NaNs, as we need to allow for the possibility that there is not NOAA
+            # data for a month at the end of the record (that is, there *should* be NOAA data, but their instrument
+            # was down or something)
+            raise GasRecordDateError('MLO/SMO records do not extend up to the truncation date, {}'.format(truncate_date))
+        elif truncate_date is not None:
+            df = df.loc[df.index <= truncate_date]
+            
+        df = df[[cls._gas_name]].rename(columns={cls._gas_name: 'dmf_mean'})
+
+        # Make sure that first_date and last_date are at the start of a month. If not, go to the start of month that
+        # makes sure we cover the requested time period  
+        if first_date.day != 1:
+            first_date = mod_utils.start_of_month(first_date)
+        if last_date.day != 1:
+            last_date = mod_utils.start_of_month(last_date) + relativedelta(months=1)
+
+        # Ensure that the dataframe has one value per month between the target first and
+        # last monthsThis way the interpolation can count the rows with NaNs to correctly
+        # know if a gap is big enough to need seasonal-cycle-aware interpolation, plus the
+        # rest of the code can rely on this being a true monthly dataframe.
+        all_months = pd.date_range(first_date, last_date, freq='MS')
+        df = df.reindex(all_months)
+
+        df['interp_flag'] = 0
+        df['interp_detail_flag'] = 0
+        df['site_latency'] = 0.0
+
+        # First, we will handle the periods within the data that are long enough to need
+        # explicit treatment of the seasonal cycle.
+        interp_blocks = cls.find_mlo_smo_interp_blocks(df.dmf_mean, include_edge_blocks=False)
+        nyears = cls._nyears_for_extrap_avg if nyears is None else nyears
+        avg_period = relativedelta(years=nyears, months=-1)
+        for block in interp_blocks:
+            if block['nmonths'] > max_months_simple_interp:
+                # Unlike extrapolation, we may have data on both ends of the data that needs
+                # filled in, so we may as well use it.
+                first_date = block['start'] - avg_period
+                last_date = block['end'] + avg_period
+                fill_dates = df.index[(df.index >= block['start']) & (df.index <= block['end'])]
+                filled_values = cls.do_seasonal_fill(
+                    df.dmf_mean, first_fit_date=first_date, last_fit_date=last_date,
+                    fill_dates=fill_dates
+                )
+                df.loc[fill_dates, 'dmf_mean'] = filled_values.to_numpy()
+                df.loc[fill_dates, 'interp_detail_flag'] |= 4
+
+        # Now that the longer periods are filled in, all that is left should be the periods
+        # we think are short enough that a simple linear interpolation is better (because it
+        # makes fewer assumptions).
+        missing = df.dmf_mean.isna()
+        df.interpolate(method='index', inplace=True, limit_area='inside')
+        xx_lin = missing & ~pd.isna(df.dmf_mean)
+        df.loc[xx_lin, 'interp_detail_flag'] |= 2
+
+        interpolated = df.interp_detail_flag != 0
+        extrapolated = missing & pd.isna(df.dmf_mean)
+        df.loc[interpolated, 'interp_flag'] = 1
+        df.loc[extrapolated, 'interp_flag'] = 2
+        df.loc[extrapolated, 'interp_detail_flag'] |= 1
+
+        cls._extend_mlo_smo_mean(df, 'forward')
+        cls._extend_mlo_smo_mean(df, 'backward')
+
+        df['latency'] = cls.calc_latency(df.index, cls._first_record_date(df), cls._last_record_date(df))
+        return df
+
+    @classmethod
+    def get_mlo_smo_mean(cls, mlo_file, smo_file, first_date, last_date, truncate_date, use_pre1p6_interpolation=False, allow_negative_insitu_values=False):
+        if use_pre1p6_interpolation:
+            return cls.get_mlo_smo_mean_joint_fill(mlo_file, smo_file, first_date, last_date, truncate_date, allow_negative_insitu_values=allow_negative_insitu_values)
+        else:
+            return cls.get_mlo_smo_mean_separate_fill(mlo_file, smo_file, first_date, last_date, truncate_date, allow_negative_insitu_values=allow_negative_insitu_values)
+
+    @classmethod
+    def get_mlo_smo_mean_separate_fill(cls, mlo_file: os.PathLike, smo_file: os.PathLike, first_date: dt.datetime, last_date: dt.datetime,
+                                       truncate_date: dt.datetime, allow_negative_insitu_values: bool = False) -> pd.DataFrame:
+        """
+        Compute the mean timeseries of MLO and SMO data by filling in missing data for each site separately.
+
+        :param mlo_file: path to the MLO (Mauna Loa) monthly average file.
+        
+        :param smo_file: path to the SMO (American Samoa) monthly average file.
+
+        :param first_date: the earliest date required in the timeseries. If the monthly mean file does not
+         extend back to this date, it will be extrapolated. Should be a date on the first of a month.
+
+        :param last_date: the latest date required in the timeseries. If the monthly mean file does not
+         extend forward to this date, it will be extrapolated. Should be a date on the first of a month.
+
+        :param truncate_date: the last date of real data to use in the timeseries. If the input file does not
+         include this date, a :class:`GasRecordDateError` will be raised. Otherwise, the data from the
+         file will be cut off at this date and extrapolated from there to ``last_date``. This allows you
+         to ensure reproducibility even if you update the input file with additional data.
+
+        :param allow_negative_values: set to ``True`` to allow the in situ file to contain negative
+         values. Because we are reading file for gases like CO2, N2O, and CH4 (which have large background
+         concentrations), negative values usually mean a fill value exists in the file. Fill values
+         should be replaced with NaNs. If your file actually has negative values, then you will need
+         to set this to ``True``.
+
+        :return: a dataframe with columns:
+         - "dmf_mean": the mean mole fraction between MLO and SMO
+         - "latency": the mean extrapolation latency between the two sites.
+         - "interp_flag": a flag that will be 0 if both sites had real data, 1 if both sites were interpolated,
+           2 if both sites were extrapolated, and 3 if the two sites differed in how that month's value was obtained.
+         - "mlo_interp_detail_flag": the detailed interpolation flag for MLO, see :func:`read_and_fill_insitu_gas` for
+           the bit meanings.
+         - "smo_interp_detail_flag": same, but for SMO.
+        """
+        # Changed in v1.6: before we just read in both sites and averaged together months where both sites reported
+        # data. (get_mlo_smo_mean_joint_fill) However, this gave poor results when SMO was offline for 9 months.
+        # That made it so that the pre-1.6 code linearly interpolated across those 9 months, which meant that the seasonal
+        # cycle was completely lost, and resulted in the OCO priors having a marked step increase when that period went
+        # from extrapolating (which did its best to retain the seasonal cycle) to interpolating (which did not, and
+        # so had boreal winter CO2 levels all year).
+        #
+        # Now, the key change is that we use the seasonal cycle-aware extrapolation logic for interpolation as well, at
+        # least when the gap in data is large enough. I debated whether to apply that to the MLO+SMO average or to the
+        # individual sites.
+        df_mlo = cls.read_and_fill_insitu_gas(
+            mlo_file, first_date=first_date, last_date=last_date, truncate_date=truncate_date,
+            allow_negative_values=allow_negative_insitu_values
+        )
+        df_smo = cls.read_and_fill_insitu_gas(
+            smo_file, first_date=first_date, last_date=last_date, truncate_date=truncate_date,
+            allow_negative_values=allow_negative_insitu_values
+        )
+
+        if not np.array_equal(df_mlo.index, df_smo.index):
+            raise GasRecordDateError('MLO and SMO dataframes do not have the same dates after being read in and filled out')
+
+        # Create a combined interpolation flag that accounts for cases
+        # where the two sites had different ways of being filled in or not
+        combo_interp_flag = df_mlo.interp_flag.copy()
+        combo_interp_flag[combo_interp_flag != df_smo.interp_flag] = 3
+        df_combined = pd.DataFrame({
+            'dmf_mean': 0.5 * (df_mlo.dmf_mean + df_smo.dmf_mean),
+            'interp_flag': combo_interp_flag,
+            'latency': 0.5 * (df_mlo.latency + df_smo.latency),
+            'mlo_interp_detail_flag': df_mlo.interp_detail_flag,
+            'smo_interp_detail_flag': df_smo.interp_detail_flag,
+        })
+
+        return df_combined
+
+    @classmethod
+    def get_mlo_smo_mean_joint_fill(cls, mlo_file: os.PathLike, smo_file: os.PathLike, first_date: dt.datetime, last_date: dt.datetime,
+                                    truncate_date: dt.datetime, allow_negative_insitu_values: bool = False) -> pd.DataFrame:
         """
         Generate the Mauna Loa/Samoa mean trace gas record from the files stored in this repository.
+
+        This is the original method used in v1.0 to v1.5. It only uses months where both MLO and SMO had data and
+        fills in the rest with linear interpolation or trend + seasonal cycle extrapolation. However, this means
+        it does not handle large gaps in data from either site well, hence why this was deprecated in v1.6 in favor
+        of :func:`get_mlo_smo_mean_separate_fill`.
 
         Reads in the given Mauna Loa and Samoa record files, averages then, fills in missing values by interpolation,
         extrapolates as needed to provide the full record requested, and returns the result.
@@ -771,10 +980,6 @@ class MloSmoTraceGasRecord(TraceGasRecord):
         :return: the data frame containing the mean trace gas concentration ('dmf_mean'), a flag ('interp_flag') set
          to 1 for any months that had to be interpolated and 2 for months that had to be extrapolated, and the latency
          ('latency') in years that a concentration had to be extrapolated. Index by timestamp.
-
-        :return: the data frame containing the mean trace gas concentration ('dmf_mean') and a flag ('interp_flag') set
-         to 1 for any months that had to be interpolated. Index by timestamp.
-        :rtype: :class:`pandas.DataFrame`
         """
         df_mlo = cls.read_insitu_gas(mlo_file, allow_negative_values=allow_negative_insitu_values)
         df_smo = cls.read_insitu_gas(smo_file, allow_negative_values=allow_negative_insitu_values)
@@ -893,7 +1098,7 @@ class MloSmoTraceGasRecord(TraceGasRecord):
     @classmethod
     def _extend_mlo_smo_mean(cls, df, direction, nyears=None, fit_type=None):
         nyears = cls._nyears_for_extrap_avg if nyears is None else nyears
-
+        
         xx = np.flatnonzero(df.interp_flag < 2)
         avg_period = relativedelta(years=nyears, months=-1)
         if direction == 'forward':
@@ -906,33 +1111,70 @@ class MloSmoTraceGasRecord(TraceGasRecord):
             to_fill = slice(None, xx[0])
         else:
             raise ValueError('direction must be "forward" or "backward"')
+    
+        fill_dates = df.index[to_fill]
+        new_values, fit = cls.do_seasonal_fill(df.dmf_mean, first_date, last_date, fill_dates, fit_type=fit_type, return_fit=True)
+        fill_julian_dates = new_values.index.to_julian_date().to_numpy()
+        cls._check_extrap_fit(df, fit, fill_julian_dates, direction)
+        df.loc[fill_dates, 'dmf_mean'] = new_values
+                
+    @classmethod
+    def find_mlo_smo_interp_blocks(cls, dmf_series: pd.Series, include_edge_blocks=True):
+        blocks = []
+        in_block = False
+        start = None
+        end = None
+        nmonths = 0
+        first_date = dmf_series.index[0]
+        
+        for date, dmf in dmf_series.items():
+            if not in_block and np.isnan(dmf):
+                in_block = True
+                start = date
+                end = date
+                nmonths = 1
+            elif in_block and np.isnan(dmf):
+                end = date
+                nmonths += 1
+            elif in_block and not np.isnan(dmf):
+                if include_edge_blocks or start != first_date:
+                    blocks.append({'start': start, 'end': end, 'nmonths': nmonths})
+                in_block = False
+                start = None
+                end = None
+                nmonths = 0
 
+        if in_block and include_edge_blocks:
+            # Ensure we capture a block at the end of the series
+            blocks.append({'start': start, 'end': end, 'nmonths': nmonths})
+
+        return blocks
+
+    @classmethod
+    def do_seasonal_fill(cls, dmf_series, first_fit_date, last_fit_date, fill_dates, fit_type=None, return_fit=False):
         # Find the first non-extrapolated points, get the next or previous n years, detrend, and average them
-        dmf = df.dmf_mean[first_date:last_date]
-
-        # Fit with a quadratic to allow for nonlinear increase
+        dmf = dmf_series.dropna()[first_fit_date:last_fit_date]
+        
+        # We may use various forms of fitting to allow for nonlinear increase
         x = dmf.index.to_julian_date().to_numpy()
         y = dmf.to_numpy()
         fit = cls._fit_gas_trend(x, y, fit_type=fit_type)
 
-        avg_dmf_detrended = np.nanmean((y - fit(x)).reshape(-1, 12), axis=0)
-        months = dmf.index.month.to_numpy().reshape(-1, 12)
-        if not np.isclose(months - months[0, :], 0).all():
-            raise RuntimeError('Something went wrong while extending the MLO/SMO record - the months array was not '
-                               'reshaped to have the same month in every row of one column.')
-        months = months[0, :]
-
+        dmf_detrended = pd.Series(y - fit(x), index=dmf.index)
+        delta_dmf_by_month = dmf_detrended.groupby(lambda d: d.month).mean()
+        
         # Now, avg_dmf_detrended is the different in concentration from the quadratic fit. So, for every point to be
         # extrapolated, find out what the fit thinks the concentration should be then add the seasonal offset for that
         # month
-        delta_dmf_by_month = pd.DataFrame({'dmf_mean': avg_dmf_detrended}, index=months)
-        extrap_dates = df.index[to_fill]
-        delta_dmf = delta_dmf_by_month.reindex(extrap_dates.month).to_numpy().squeeze()
-        extrap_julian_dates = extrap_dates.to_julian_date().to_numpy()
-
-        cls._check_extrap_fit(df, fit, extrap_julian_dates, direction)
-
-        df.loc[extrap_dates, 'dmf_mean'] = fit(extrap_julian_dates) + delta_dmf
+        delta_dmf = delta_dmf_by_month.reindex(fill_dates.month).to_numpy().squeeze()
+        fill_julian_dates = fill_dates.to_julian_date().to_numpy()
+        
+        new_values = fit(fill_julian_dates) + delta_dmf
+        new_values = pd.Series(new_values, index=fill_dates)
+        if return_fit:
+            return new_values, fit
+        else:
+            return new_values
 
     @classmethod
     def _fit_gas_trend(cls, x, y, fit_type=None):
@@ -2292,15 +2534,6 @@ class HDORecord(TraceGasRecord):
 gas_records = {r._gas_name: r for r in [CO2TropicsRecord, N2OTropicsRecord, CH4TropicsRecord, HFTropicsRecord,
                                         CORecord, O3Record, H2ORecord, HDORecord]}
 
-
-def regenerate_gas_strat_lut_files():
-    """
-    Driver function to regenerate the stratospheric concentration lookup tables for all of the gas records.
-
-    :return: None
-    """
-    for record in gas_records.values():
-        record(force_strat_calculation=True, save_strat=True)
 
 
 def get_clams_age(theta, eq_lat, day_of_year, as_timedelta=False, clams_dat=dict()):
