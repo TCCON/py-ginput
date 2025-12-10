@@ -34,5 +34,8 @@ setup(
         'xarray>=0.12.1',
     ],
     packages=find_packages(),
+    entry_points={'console_scripts': [
+        'ginput_cli=ginput.__main__:main'
+    ]},
     include_package_data=True,
 )

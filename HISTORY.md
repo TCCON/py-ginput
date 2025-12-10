@@ -51,6 +51,17 @@ use version 1.6+ but retain the old method, please write custom wrapper code
 to call the necessary routines with the custom gas records or options for
 `acos_interface_main`.
 
+### Improved CLI access
+
+Ginput traditionally creates a `run_ginput.py` script when installed manually.
+We have now added a console script entry point so that, when installed with
+`pip`, the `ginput_cli` script will be added to your current environment as
+well. This simplifies the install process.
+
+The `main()` function is also now found in `ginput.__main__` and can accept
+a list of command line arguments. This means that you can mimic CLI calls
+from within Python more easily.
+
 ## 1.5.1
 
 This release aims to fix cases where the `git` or `hg` commands are not available,
