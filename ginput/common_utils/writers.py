@@ -376,7 +376,7 @@ def _write_header(fobj, header_lines, n_data_columns):
 
 
 
-def priors_conc_to_netcdf(conc_df: pd.DataFrame, gas_unit: str, nc_file: os.PathLike):
+def priors_conc_to_netcdf(conc_df: pd.DataFrame, gas_unit: str, nc_file: os.PathLike, root_attrs=None):
     """
     Write a concentration dataframe from one of the priors records as a netCDF file
 
@@ -394,6 +394,9 @@ def priors_conc_to_netcdf(conc_df: pd.DataFrame, gas_unit: str, nc_file: os.Path
     dates = (conc_df.index - pd.Timestamp(1970,1,1)).total_seconds()
     dim_name = 'time'
     with ncdf.Dataset(nc_file, 'w') as ds:
+        if root_attrs is not None:
+            ds.setncatts(root_attrs)
+
         ds.createDimension(dim_name, dates.size)
         timevar = ds.createVariable(dim_name, 'i8', (dim_name,))
         timevar.units = 'seconds since 1970-01-01 00:00:00'

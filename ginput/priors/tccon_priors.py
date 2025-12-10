@@ -1516,7 +1516,8 @@ class MloSmoTraceGasRecord(TraceGasRecord):
         :param trend: if ``True``, writes ``self.conc_trend``. Otherwise, writes ``self.conc_seasonal``.
         """
         df = self.conc_trend if trend else self.conc_seasonal
-        writers.priors_conc_to_netcdf(df, self.gas_unit, nc_file)
+        source_files = {'mlo_file': str(self.mlo_file), 'smo_file': str(self.smo_file)}
+        writers.priors_conc_to_netcdf(df, self.gas_unit, nc_file, root_attrs=source_files)
 
 
 class MidlatTraceGasRecord(TraceGasRecord):
