@@ -34,6 +34,11 @@ $ ./run_ginput.py vmr \
 ```
 
 ```{note}
+Remember, if you installed with conda or pip, you probably want to use `ginput_cli`
+instead of `./run_ginput.py`. 
+```
+
+```{note}
 ginput v1.3 added a requirement for O2 mole fraction data when generating the `.vmr` files.
 For v1.3, you would have to execute the command `./run_ginput update_fo2` once before creating any `.vmr` files.
 From v1.3.1 on, you can use the `--auto-update-fo2-file` flag for the `vmr` subcommand as shown below.

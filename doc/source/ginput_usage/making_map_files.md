@@ -22,6 +22,11 @@ $ ./run_ginput.py map \
     VMR_FILE_DIR/fp/xx/vmrs-vertical
 ```
 
+```{note}
+Remember, if you installed with conda or pip, you probably want to use `ginput_cli`
+instead of `./run_ginput.py`. 
+```
+
 If you want netCDF `.map` files instead, change `--map-fmt txt` to `--map-fmt nc`.
 
 As with the other sections, if you are generating `.map` files for different locations or dates, make sure to pass the correct `--lat`, `--lon` and date range values.

@@ -1,6 +1,31 @@
 # Installation and first steps
 
-## Standard installation
+## Standard installation with conda, pixi, or pip
+
+Recent versions of ginput are available to install with your preferred Python package manager.
+If you use the conda ecosystem, install with:
+
+```
+conda install -c conda-forge ginput
+```
+
+This should also work using `mamba` or `micromamba` instead of `conda`.
+
+Likewise, if you use [pixi](https://pixi.sh/latest/), it can be added to your
+environment with:
+
+```
+pixi add ginput
+```
+
+If you prefer `pip`, the command is similar:
+
+```
+pip install ginput
+```
+
+
+## Standard installation from repo
 
 First, download or clone `ginput` to your computer and `cd` into the top directory of the repo (the one with the README file).
 If you have GNU Make and `conda` installed on your computer, then running `make install` will create the default conda environment

@@ -46,6 +46,11 @@ $ ./run_ginput.py oco \
     # other additional arguments
 ```
 
+```{note}
+Remember, if you installed with conda or pip, you probably want to use `ginput_cli`
+instead of `./run_ginput.py`. 
+```
+
 Since `geocarb` generates CO2, CH4, and CO profiles, it uses these same command line options to specify the paths for both CO2 and CH4. To do so, your files must follow two rules:
 
 * The file names must include the gas in lower case (i.e. "co2" or "ch4", not "CO2" or "CH4")

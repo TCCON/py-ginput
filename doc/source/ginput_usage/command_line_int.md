@@ -6,7 +6,20 @@ If you installed `ginput` using:
 * the `install.sh` script, or
 * you ran the `install-runscript.sh` script with the proper Conda environment active,
 
-then there will be a `run_ginput.py` script in the root directory of the `ginput` repo. This is the main entry point to run `ginput` from the command line. To see all the possible options, call it as `./run_ginput.py --help` from the root directory of the `ginput` repo. This prints out all the possible subcommands:
+then there will be a `run_ginput.py` script in the root directory of the `ginput` repo. This is the main entry point to run `ginput` from the command line. To see all the possible options, call it as `./run_ginput.py --help` from the root directory of the `ginput` repo. 
+
+Starting from v1.6, installing with `pip` or the various `conda`-type installers will also create a `ginput_cli` script in your environment's `bin` directory.
+This means that as long as you either (a) have that environment active or (b) linked this `ginput_cli` script to somewhere on your regular `PATH`,
+you can call `ginput_cli` from anywhere to run ginput.
+
+```{note}
+`ginput_cli` and `./run_ginput.py` are completely interchangeable.
+The rest of the documentation uses the latter in examples since, historically, most users have used that entry point.
+However, you can replace `./run_ginput.py` with `ginput_cli` in _any_ example in the rest of this documentation, and
+it will work the same!
+```
+
+This prints out all the possible subcommands:
 
 ```
 $ ./run_ginput.py --help
