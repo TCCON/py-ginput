@@ -388,8 +388,10 @@ def priors_conc_to_netcdf(conc_df: pd.DataFrame, gas_unit: str, nc_file: os.Path
     """
     var_info = {
         'dmf_mean': dict(dtype='f8', attributes={'units': gas_unit, 'description': 'Mean DMF of MLO and SMO data'}),
+        'latency': dict(dtype='f8', attributes={'units': 'years', 'description': 'How far in time the DMF needed to be extrapolated'}),
         'interp_flag': dict(dtype='i4', attributes={'flag_values': np.array([0, 1, 2], dtype=np.int32), 'flag_meanings': 'real data\ninterpolated\nextrapolated', 'description': 'Flag indicating if and how the DMF was filled in'}),
-        'latency': dict(dtype='f8', attributes={'units': 'years', 'description': 'How far in time the DMF needed to be extrapolated'})
+        'mlo_interp_detail_flag': dict(dtype='i4', attributes={'flag_masks': np.array([1, 2, 4], dtype=np.int32), 'flag_meanings': 'extrapolated\nlinearly interpolated\ninterpolated with trend+seasonal cycle'}),
+        'smo_interp_detail_flag': dict(dtype='i4', attributes={'flag_masks': np.array([1, 2, 4], dtype=np.int32), 'flag_meanings': 'extrapolated\nlinearly interpolated\ninterpolated with trend+seasonal cycle'}),
     }
     dates = (conc_df.index - pd.Timestamp(1970,1,1)).total_seconds()
     dim_name = 'time'

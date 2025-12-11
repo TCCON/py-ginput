@@ -20,7 +20,7 @@ def test_mlo_smo_default_filling(
     seas_out_file = mlo_smo_default_out_dir / f'{noaa_gas}_seasonal.nc'
     trend_out_file = mlo_smo_default_out_dir / f'{noaa_gas}_trend.nc'
     rec.conc_df_to_nc(seas_out_file, trend=False)
-    rec.conc_df_to_nc(trend_out_file, trend=False)
+    rec.conc_df_to_nc(trend_out_file, trend=True)
 
     with subtests.test(dataframe='seasonal'):
         expected_df = read_priors_conc_from_netcdf(
