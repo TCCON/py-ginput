@@ -174,6 +174,14 @@ def smo_gap_test_file():
 
 
 @pytest.fixture(scope='session')
+def mlo_trunc_test_file():
+    return TruncationTestFile(site='ML')
+
+@pytest.fixture(scope='session')
+def smo_trunc_test_file():
+    return TruncationTestFile(site='SMO')
+
+@pytest.fixture(scope='session')
 def gap_test_expected():
     """Return an instance which can provide the path a netCDF file containing
     the expected mean MLO/SMO timeseries for a given gas, test gap, etc.
@@ -266,6 +274,20 @@ def _ensure_gitignored(dir: Path):
         with open(gitignore, 'w') as f:
             f.write('*')
 
+
+class TruncationTestFile:
+    def __init__(self, site: str):
+        self.site = site
+
+    def get_test_file(self, gas: str, short: bool) -> Path:
+        if short:
+            subdir = 'truncation'
+            pat = '{site}_monthly_obs_short_{gas}.txt'
+        else:
+            subdir = 'gap-tests'
+            pat = '{site}_monthly_obs_{gas}.txt'
+
+        return input_data_dir / 'noaa-interp-extrap' / 'monthly-inputs' / subdir / pat.format(site=self.site, gas=gas)
 
 class GapTestFile:
     """Creates and provides the path to an MLO or SMO monthly input file for timeseries interpolation tests.
