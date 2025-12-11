@@ -4,6 +4,7 @@ from hashlib import sha1
 import os
 from pathlib import Path
 import pytest
+import re
 
 
 def pytest_configure(config):
@@ -19,6 +20,8 @@ fo2_dir = input_data_dir / 'fo2'
 gap_test_dir = input_data_dir / 'noaa-interp-extrap' / 'monthly-inputs' / 'gap-tests'
 gap_test_expected_dir = input_data_dir / 'noaa-interp-extrap' / 'expected' / 'gap-tests'
 gap_test_out_dir = output_data_dir / 'noaa-interp-extrap' / 'expected' / 'gap-tests'
+_large_file_dir = input_data_dir / 'large-files'
+_large_file_out_dir = output_data_dir / 'large-files'
 
 @pytest.fixture(scope='session')
 def check_geos_hashes():
@@ -244,6 +247,43 @@ def test_site():
     """Return the default test site for creating .mod and .vmr files in the end-to-end test."""
     return 'oc'
 
+
+@pytest.fixture(scope='session')
+def large_files_dir():
+    # TODO: download the DOIed tarball if not present
+    return _large_file_dir
+
+@pytest.fixture(scope='session')
+def geos_files_by_datetime(large_files_dir):
+    """Returns the available GEOS FP-IT and IT files as dictionary indexed by their UTC datetime
+    """
+    geos_dir = large_files_dir / 'geos'
+    geos_files = dict()
+    date_patterns = [
+        (r'\d{4}-\d{2}-\d{2}T\d{4}', '%Y-%m-%dT%H%M') # GEOS IT
+    ]
+    for file in geos_dir.glob('GEOS*.nc4'):
+        for re_pat, date_pat in date_patterns:
+            m = re.search(re_pat, file.stem)
+            if m is not None:
+                date = datetime.strptime(m.group(), date_pat)
+                geos_files[date] = file
+                continue
+
+    return geos_files
+
+
+@pytest.fixture(scope='session')
+def oco_file_dir(large_files_dir):
+    return large_files_dir / 'oco'
+
+
+@pytest.fixture(scope='session')
+def oco_file_out_dir():
+    out_dir = _large_file_out_dir / 'oco'
+    out_dir.mkdir(parents=True, exist_ok=True)
+    _ensure_gitignored(out_dir)
+    return out_dir
 
 # ---------------- #
 # Helper functions #
