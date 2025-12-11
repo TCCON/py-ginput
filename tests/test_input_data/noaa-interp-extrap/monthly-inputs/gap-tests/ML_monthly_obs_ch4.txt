@@ -1,0 +1,498 @@
+# number_of_header_lines: 70
+# comment:  
+# comment:  ************ USE OF ESRL GMD DATA ****************
+# comment:  
+# comment: These data are made freely available to the public and the
+# comment: scientific community in the belief that their wide dissemination
+# comment: will lead to greater understanding and new scientific insights.
+# comment: The availability of these data does not constitute publication
+# comment: of the data.  NOAA relies on the ethics and integrity of the user to
+# comment: ensure that ESRL receives fair credit for their work.  If the data 
+# comment: are obtained for potential use in a publication or presentation, 
+# comment: ESRL should be informed at the outset of the nature of this work.  
+# comment: If the ESRL data are essential to the work, or if an important 
+# comment: result or conclusion depends on the ESRL data, co-authorship
+# comment: may be appropriate.  This should be discussed at an early stage in
+# comment: the work.  Manuscripts using the ESRL data should be sent to ESRL
+# comment: for review before they are submitted for publication so we can
+# comment: ensure that the quality and limitations of the data are accurately
+# comment: represented.
+# comment:  
+# comment: Every effort is made to produce the most accurate and precise
+# comment: measurements possible.  However, we reserve the right to make
+# comment: corrections to the data based on recalibration of standard gases
+# comment: or for other reasons deemed scientifically justified.
+# comment: 
+# comment: We are not responsible for results and conclusions based on use
+# comment: of these data without regard to this warning.
+# comment: 
+# contact_parameter: CH4 CCGG (Individual Flasks)
+# contact_name: Ed Dlugokencky
+# contact_telephone: (303) 497-6228
+# contact_email: Ed.Dlugokencky@noaa.gov
+# comment: 
+# comment:  ************ COLLABORATORS ***************
+# comment: 
+# comment: NOAA thanks the following collaborators without
+# comment: whom these measurements would not be possible.
+# comment: 
+# collaborator_name: NOAA Earth System Research Laboratory, Global
+# collaborator_name: Monitoring Division [NOAA ESRL GMD]
+# collaborator_url: http://www.esrl.noaa.gov/gmd
+# comment: 
+# comment:  ************ RECIPROCITY AGREEMENT ***************
+# comment: 
+# comment: Use of these data implies an agreement to reciprocate.
+# comment: Laboratories making similar measurements agree to make their
+# comment: own data available to the general public and to the scientific
+# comment: community in an equally complete and easily accessible form.
+# comment: Modelers are encouraged to make available to the community,
+# comment: upon request, their own tools used in the interpretation
+# comment: of the ESRL data, namely well documented model code, transport
+# comment: fields, and additional information necessary for other
+# comment: scientists to repeat the work and to run modified versions.
+# comment: Model availability includes collaborative support for new
+# comment: users of the models.
+# comment:
+# comment:  ************ DATA DESCRIPTION ***************
+# comment:
+# description_site-code: mlo
+# description_project-abbr: ccg_surface
+# description_strategy-abbr: flask
+# description_analysis-constraints: flag:..%
+# description_creation-time: 2019-07-16 14:08:01
+# comment:
+# comment:  ************ DATA DOCUMENTATION ***************
+# comment:
+# comment: Please refer to the species-specific README file in the
+# comment: appropriate directory folder at ftp://aftp.cmdl.noaa.gov/data/trace_gases/.
+# comment:
+# data_fields: site year month value
+MLO 1983  5  1639.35
+MLO 1983  6  1633.49
+MLO 1983  7  1633.19
+MLO 1983  8  1631.43
+MLO 1983  9  1648.37
+MLO 1983 10  1663.78
+MLO 1983 11  1658.29
+MLO 1983 12  1654.27
+MLO 1984  1  1658.99
+MLO 1984  2  1656.54
+MLO 1984  3  1655.68
+MLO 1984  4  1657.71
+MLO 1984  5  1649.38
+MLO 1984  6  1633.77
+MLO 1984  7  1629.66
+MLO 1984  8  1643.81
+MLO 1984  9  1663.24
+MLO 1984 10  1673.74
+MLO 1984 11  1676.15
+MLO 1984 12  1671.15
+MLO 1985  1  1662.46
+MLO 1985  2  1665.31
+MLO 1985  3  1677.30
+MLO 1985  4  1674.25
+MLO 1985  5  1666.01
+MLO 1985  6  1658.57
+MLO 1985  7  1653.49
+MLO 1985  8  1653.78
+MLO 1985  9  1667.56
+MLO 1985 10  1680.80
+MLO 1985 11  1680.01
+MLO 1985 12  1677.21
+MLO 1986  1  1675.12
+MLO 1986  2  1666.15
+MLO 1986  3  1671.99
+MLO 1986  4  1687.73
+MLO 1986  5  1685.40
+MLO 1986  6  1684.25
+MLO 1986  7  1681.99
+MLO 1986  8  1669.92
+MLO 1986  9  1679.68
+MLO 1986 10  1690.44
+MLO 1986 11  1691.81
+MLO 1986 12  1697.30
+MLO 1987  1  1692.02
+MLO 1987  2  1689.74
+MLO 1987  3  1694.33
+MLO 1987  4  1695.56
+MLO 1987  5  1694.26
+MLO 1987  6  1687.12
+MLO 1987  7  1680.60
+MLO 1987  8  1678.25
+MLO 1987  9  1680.99
+MLO 1987 10  1700.86
+MLO 1987 11  1716.01
+MLO 1987 12  1707.49
+MLO 1988  1  1697.70
+MLO 1988  2  1700.64
+MLO 1988  3  1705.41
+MLO 1988  4  1707.58
+MLO 1988  5  1705.20
+MLO 1988  6  1698.40
+MLO 1988  7  1687.25
+MLO 1988  8  1691.26
+MLO 1988  9  1700.71
+MLO 1988 10  1708.29
+MLO 1988 11  1719.33
+MLO 1988 12  1725.69
+MLO 1989  1  1720.88
+MLO 1989  2  1712.71
+MLO 1989  3  1714.99
+MLO 1989  4  1723.48
+MLO 1989  5  1724.42
+MLO 1989  6  1713.11
+MLO 1989  7  1699.87
+MLO 1989  8  1706.71
+MLO 1989  9  1720.78
+MLO 1989 10  1722.01
+MLO 1989 11  1726.26
+MLO 1989 12  1730.65
+MLO 1990  1  1727.96
+MLO 1990  2  1728.55
+MLO 1990  3  1733.79
+MLO 1990  4  1737.54
+MLO 1990  5  1734.65
+MLO 1990  6  1722.26
+MLO 1990  7  1712.70
+MLO 1990  8  1718.06
+MLO 1990  9  1733.83
+MLO 1990 10  1736.94
+MLO 1990 11  1741.53
+MLO 1990 12  1749.58
+MLO 1991  1  1734.88
+MLO 1991  2  1731.11
+MLO 1991  3  1746.50
+MLO 1991  4  1749.60
+MLO 1991  5  1747.41
+MLO 1991  6  1739.96
+MLO 1991  7  1730.94
+MLO 1991  8  1722.09
+MLO 1991  9  1734.58
+MLO 1991 10  1751.78
+MLO 1991 11  1750.38
+MLO 1991 12  1752.38
+MLO 1992  1  1755.65
+MLO 1992  2  1750.13
+MLO 1992  3  1752.36
+MLO 1992  4  1753.28
+MLO 1992  5  1744.65
+MLO 1992  6  1743.29
+MLO 1992  7  1736.29
+MLO 1992  8  1725.80
+MLO 1992  9  1729.81
+MLO 1992 10  1740.80
+MLO 1992 11  1755.41
+MLO 1992 12  1758.33
+MLO 1993  1  1747.89
+MLO 1993  2  1745.77
+MLO 1993  3  1747.92
+MLO 1993  4  1746.76
+MLO 1993  5  1749.67
+MLO 1993  6  1745.54
+MLO 1993  7  1731.93
+MLO 1993  8  1732.07
+MLO 1993  9  1744.50
+MLO 1993 10  1760.24
+MLO 1993 11  1768.11
+MLO 1993 12  1763.52
+MLO 1994  1  1759.92
+MLO 1994  2  1752.18
+MLO 1994  3  1754.61
+MLO 1994  4  1763.81
+MLO 1994  5  1755.22
+MLO 1994  6  1746.62
+MLO 1994  7  1737.43
+MLO 1994  8  1734.05
+MLO 1994  9  1757.17
+MLO 1994 10  1778.64
+MLO 1994 11  1781.22
+MLO 1994 12  1779.30
+MLO 1995  1  1764.57
+MLO 1995  2  1757.18
+MLO 1995  3  1764.79
+MLO 1995  4  1762.96
+MLO 1995  5  1762.28
+MLO 1995  6  1759.18
+MLO 1995  7  1749.38
+MLO 1995  8  1751.24
+MLO 1995  9  1761.46
+MLO 1995 10  1768.93
+MLO 1995 11  1768.39
+MLO 1995 12  1772.91
+MLO 1996  1  1771.37
+MLO 1996  2  1770.55
+MLO 1996  3  1769.85
+MLO 1996  4  1759.11
+MLO 1996  5  1755.11
+MLO 1996  6  1753.74
+MLO 1996  7  1747.19
+MLO 1996  8  1745.66
+MLO 1996  9  1767.14
+MLO 1996 10  1774.70
+MLO 1996 11  1770.01
+MLO 1996 12  1773.03
+MLO 1997  1  1769.98
+MLO 1997  2  1768.74
+MLO 1997  3  1775.58
+MLO 1997  4  1780.64
+MLO 1997  5  1776.69
+MLO 1997  6  1768.20
+MLO 1997  7  1751.53
+MLO 1997  8  1750.39
+MLO 1997  9  1775.67
+MLO 1997 10  1784.91
+MLO 1997 11  1784.12
+MLO 1997 12  1783.22
+MLO 1998  1  1772.29
+MLO 1998  2  1766.20
+MLO 1998  3  1774.58
+MLO 1998  4  1780.40
+MLO 1998  5  1781.26
+MLO 1998  6  1779.06
+MLO 1998  7  1762.54
+MLO 1998  8  1757.28
+MLO 1998  9  1771.12
+MLO 1998 10  1787.43
+MLO 1998 11  1798.44
+MLO 1998 12  1803.00
+MLO 1999  1  1796.38
+MLO 1999  2  1784.83
+MLO 1999  3  1788.11
+MLO 1999  4  1788.41
+MLO 1999  5  1773.31
+MLO 1999  6  1771.14
+MLO 1999  7  1767.00
+MLO 1999  8  1768.72
+MLO 1999  9  1785.84
+MLO 1999 10  1794.50
+MLO 1999 11  1796.58
+MLO 1999 12  1801.85
+MLO 2000  1  1802.11
+MLO 2000  2  1793.91
+MLO 2000  3  1791.87
+MLO 2000  4  1786.89
+MLO 2000  5  1773.96
+MLO 2000  6  1772.29
+MLO 2000  7  1769.47
+MLO 2000  8  1762.13
+MLO 2000  9  1773.84
+MLO 2000 10  1797.00
+MLO 2000 11  1798.77
+MLO 2000 12  1790.72
+MLO 2001  1  1789.21
+MLO 2001  2  1793.42
+MLO 2001  3  1800.99
+MLO 2001  4  1797.36
+MLO 2001  5  1783.23
+MLO 2001  6  1773.30
+MLO 2001  7  1769.25
+MLO 2001  8  1764.73
+MLO 2001  9  1779.85
+MLO 2001 10  1790.90
+MLO 2001 11  1793.09
+MLO 2001 12  1796.01
+MLO 2002  1  1787.43
+MLO 2002  2  1782.94
+MLO 2002  3  1786.09
+MLO 2002  4  1781.94
+MLO 2002  5  1778.39
+MLO 2002  6  1774.52
+MLO 2002  7  1766.40
+MLO 2002  8  1766.14
+MLO 2002  9  1780.37
+MLO 2002 10  1795.45
+MLO 2002 11  1801.20
+MLO 2002 12  1792.57
+MLO 2003  1  1785.95
+MLO 2003  2  1791.82
+MLO 2003  3  1796.85
+MLO 2003  4  1794.96
+MLO 2003  5  1786.95
+MLO 2003  6  1790.52
+MLO 2003  7  1785.32
+MLO 2003  8  1773.11
+MLO 2003  9  1788.19
+MLO 2003 10  1806.07
+MLO 2003 11  1807.66
+MLO 2003 12  1794.49
+MLO 2004  1  1789.82
+MLO 2004  2  1797.97
+MLO 2004  3  1806.87
+MLO 2004  4  1805.52
+MLO 2004  5  1787.81
+MLO 2004  6  1779.77
+MLO 2004  7  1774.59
+MLO 2004  8  1769.84
+MLO 2004  9  1778.15
+MLO 2004 10  1790.74
+MLO 2004 11  1800.55
+MLO 2004 12  1796.66
+MLO 2005  1  1788.51
+MLO 2005  2  1796.16
+MLO 2005  3  1802.75
+MLO 2005  4  1791.29
+MLO 2005  5  1780.93
+MLO 2005  6  1780.00
+MLO 2005  7  1771.31
+MLO 2005  8  1766.51
+MLO 2005  9  1787.20
+MLO 2005 10  1806.14
+MLO 2005 11  1803.18
+MLO 2005 12  1798.29
+MLO 2006  1  1794.48
+MLO 2006  2  1785.92
+MLO 2006  3  1786.14
+MLO 2006  4  1800.64
+MLO 2006  5  1798.40
+MLO 2006  6  1779.60
+MLO 2006  7  1765.37
+MLO 2006  8  1762.20
+MLO 2006  9  1775.46
+MLO 2006 10  1788.48
+MLO 2006 11  1791.51
+MLO 2006 12  1794.54
+MLO 2007  1  1799.21
+MLO 2007  2  1802.68
+MLO 2007  3  1802.57
+MLO 2007  4  1801.65
+MLO 2007  5  1795.31
+MLO 2007  6  1781.30
+MLO 2007  7  1771.38
+MLO 2007  8  1779.00
+MLO 2007  9  1793.71
+MLO 2007 10  1801.90
+MLO 2007 11  1803.38
+MLO 2007 12  1805.07
+MLO 2008  1  1809.47
+MLO 2008  2  1803.05
+MLO 2008  3  1792.30
+MLO 2008  4  1792.11
+MLO 2008  5  1796.07
+MLO 2008  6  1791.26
+MLO 2008  7  1782.40
+MLO 2008  8  1779.46
+MLO 2008  9  1794.51
+MLO 2008 10  1813.68
+MLO 2008 11  1811.95
+MLO 2008 12  1812.32
+MLO 2009  1  1816.17
+MLO 2009  2  1814.79
+MLO 2009  3  1815.21
+MLO 2009  4  1807.04
+MLO 2009  5  1802.78
+MLO 2009  6  1806.19
+MLO 2009  7  1794.26
+MLO 2009  8  1788.13
+MLO 2009  9  1801.80
+MLO 2009 10  1811.52
+MLO 2009 11  1814.73
+MLO 2009 12  1815.47
+MLO 2010  1  1810.93
+MLO 2010  2  1817.95
+MLO 2010  3  1821.17
+MLO 2010  4  1818.01
+MLO 2010  5  1816.57
+MLO 2010  6  1803.03
+MLO 2010  7  1793.50
+MLO 2010  8  1800.66
+MLO 2010  9  1810.51
+MLO 2010 10  1826.34
+MLO 2010 11  1830.59
+MLO 2010 12  1821.12
+MLO 2011  1  1823.73
+MLO 2011  2  1819.76
+MLO 2011  3  1815.40
+MLO 2011  4  1815.99
+MLO 2011  5  1811.59
+MLO 2011  6  1810.20
+MLO 2011  7  1803.08
+MLO 2011  8  1799.96
+MLO 2011  9  1813.02
+MLO 2011 10  1823.83
+MLO 2011 11  1827.50
+MLO 2011 12  1831.74
+MLO 2012  1  1827.58
+MLO 2012  2  1819.32
+MLO 2012  3  1824.00
+MLO 2012  4  1834.90
+MLO 2012  5  1829.63
+MLO 2012  6  1813.96
+MLO 2012  7  1803.92
+MLO 2012  8  1804.04
+MLO 2012  9  1815.73
+MLO 2012 10  1828.93
+MLO 2012 11  1836.51
+MLO 2012 12  1836.18
+MLO 2013  1  1833.36
+MLO 2013  2  1837.01
+MLO 2013  3  1838.73
+MLO 2013  4  1830.35
+MLO 2013  5  1825.27
+MLO 2013  6  1814.74
+MLO 2013  7  1804.79
+MLO 2013  8  1813.68
+MLO 2013  9  1838.09
+MLO 2013 10  1844.52
+MLO 2013 11  1840.47
+MLO 2013 12  1848.02
+MLO 2014  1  1840.74
+MLO 2014  2  1831.08
+MLO 2014  3  1846.98
+MLO 2014  4  1855.55
+MLO 2014  5  1844.25
+MLO 2014  6  1831.44
+MLO 2014  7  1818.95
+MLO 2014  8  1824.34
+MLO 2014  9  1840.98
+MLO 2014 10  1844.06
+MLO 2014 11  1854.82
+MLO 2014 12  1863.82
+MLO 2015  1  1853.44
+MLO 2015  2  1848.74
+MLO 2015  3  1858.30
+MLO 2015  4  1866.27
+MLO 2015  5  1862.25
+MLO 2015  6  1844.53
+MLO 2015  7  1831.99
+MLO 2015  8  1827.60
+MLO 2015  9  1840.32
+MLO 2015 10  1860.38
+MLO 2015 11  1866.20
+MLO 2015 12  1863.41
+MLO 2016  1  1858.26
+MLO 2016  2  1858.40
+MLO 2016  3  1864.51
+MLO 2016  4  1873.35
+MLO 2016  5  1870.78
+MLO 2016  6  1855.66
+MLO 2016  7  1835.75
+MLO 2016  8  1840.75
+MLO 2016  9  1863.11
+MLO 2016 10  1876.22
+MLO 2016 11  1874.35
+MLO 2016 12  1864.81
+MLO 2017  1  1870.51
+MLO 2017  2  1869.36
+MLO 2017  3  1862.73
+MLO 2017  4  1867.98
+MLO 2017  5  1869.53
+MLO 2017  6  1856.68
+MLO 2017  7  1839.53
+MLO 2017  8  1839.51
+MLO 2017  9  1862.70
+MLO 2017 10  1882.71
+MLO 2017 11  1885.26
+MLO 2017 12  1879.45
+MLO 2018  1  1876.48
+MLO 2018  2  1875.37
+MLO 2018  3  1871.24
+MLO 2018  4  1869.50
+MLO 2018  5  1866.05
+MLO 2018  6  1857.49
+MLO 2018  7  1854.08
+MLO 2018  8  1854.57
+MLO 2018  9  1864.16
+MLO 2018 10  1884.56
+MLO 2018 11  1895.04
+MLO 2018 12  1890.58
