@@ -35,6 +35,39 @@ def test_mlo_smo_default_filling(
         compare_dataframes(expected_df, rec.conc_trend)
 
 
+def test_mlo_smo_default_filling_backwards_compat(
+    subtests,
+    noaa_gas,
+    mlo_smo_default_back_compat_expected_dir,
+    mlo_smo_default_back_compat_out_dir,
+    mlo_smo_default_end_date,
+):
+    rec_class = tccon_priors.gas_records[noaa_gas]
+    rec = rec_class(
+        last_date=mlo_smo_default_end_date,
+        save_strat=False,
+        recalculate_strat_lut=False,
+        recalc_if_custom_dates=False,
+        use_pre1p6_interpolation=True
+    )
+    seas_out_file = mlo_smo_default_back_compat_out_dir / f'{noaa_gas}_seasonal.nc'
+    trend_out_file = mlo_smo_default_back_compat_out_dir / f'{noaa_gas}_trend.nc'
+    rec.conc_df_to_nc(seas_out_file, trend=False)
+    rec.conc_df_to_nc(trend_out_file, trend=True)
+
+    with subtests.test(dataframe='seasonal'):
+        expected_df = read_priors_conc_from_netcdf(
+            mlo_smo_default_back_compat_expected_dir / f'{noaa_gas}_seasonal.nc'
+        )
+        compare_dataframes(expected_df, rec.conc_seasonal)
+
+    with subtests.test(dataframe='trend'):
+        expected_df = read_priors_conc_from_netcdf(
+            mlo_smo_default_back_compat_expected_dir / f'{noaa_gas}_trend.nc'
+        )
+        compare_dataframes(expected_df, rec.conc_trend)
+
+
 def test_real_smo_gap_filling(
     subtests,
     smo_real_gap_input_dir,

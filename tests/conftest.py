@@ -110,14 +110,28 @@ def fo2_v2025_pkl():
 
 @pytest.fixture(scope='session')
 def mlo_smo_default_expected_dir():
-    return input_data_dir / 'noaa-interp-extrap' / 'expected' / 'default-data'
+    return input_data_dir / 'noaa-interp-extrap' / 'expected' / 'default-data' / 'post1.6'
+
+@pytest.fixture(scope='session')
+def mlo_smo_default_back_compat_expected_dir():
+    return input_data_dir / 'noaa-interp-extrap' / 'expected' / 'default-data' / 'pre1.6'
 
 @pytest.fixture(scope='session')
 def mlo_smo_default_out_dir():
     """Returns the directory where the MLO/SMO priors record class tests
     should place the current MLO/SMO mean timeseries netCDF files
     """
-    out_dir = output_data_dir / 'noaa-interp-extrap' / 'expected' / 'default-data'
+    out_dir = output_data_dir / 'noaa-interp-extrap' / 'expected' / 'default-data' / 'post1.6'
+    out_dir.mkdir(parents=True, exist_ok=True)
+    _ensure_gitignored(out_dir)
+    return out_dir
+
+@pytest.fixture(scope='session')
+def mlo_smo_default_back_compat_out_dir():
+    """Returns the directory where the MLO/SMO priors record class tests
+    should place the current MLO/SMO mean timeseries netCDF files
+    """
+    out_dir = output_data_dir / 'noaa-interp-extrap' / 'expected' / 'default-data' / 'pre1.6'
     out_dir.mkdir(parents=True, exist_ok=True)
     _ensure_gitignored(out_dir)
     return out_dir

@@ -509,9 +509,10 @@ class MloSmoTraceGasRecord(TraceGasRecord):
             allow_negative_insitu_values=allow_negative_insitu_values
         )
 
-        # Deseasonalize the data by taking a 12 month rolling average. Only do that on the dmf_mean field,
-        # leave the latency
-        self.conc_trend = self.conc_seasonal.rolling(self.months_avg_for_trend, center=True).mean().dropna().drop('interp_flag', axis=1)
+        # Deseasonalize the data by taking a 12 month rolling average. Remove the flags because
+        # they stop making sense with the rolling average.
+        to_drop = [c for c in self.conc_seasonal.columns if 'flag' in c]
+        self.conc_trend = self.conc_seasonal.rolling(self.months_avg_for_trend, center=True).mean().dropna().drop(columns=to_drop)
 
         # For the stratosphere, we need a lookup table that contains concentrations for given dates and ages. (Some
         # species may depend on additional variables, such as potential temperature.) This calculation involves
