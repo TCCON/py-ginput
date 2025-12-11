@@ -276,7 +276,7 @@ class GapTestFile:
     def __init__(self, site):
         self.site = site
 
-    def get_test_file(self, gas: str, n_months_missing: int, start_date: datetime = datetime(2010,1,1)) -> Path:
+    def get_test_file(self, gas: str, n_months_missing: int, start_date: datetime = datetime(2012,1,1)) -> Path:
         """Create a monthly NOAA input file with some months set to NaN and return the path to that file.
 
         :param gas: which gas (co2, n2o, or ch4) to create the file for.
