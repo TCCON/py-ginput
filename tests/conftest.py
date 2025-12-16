@@ -11,6 +11,9 @@ def pytest_configure(config):
     config.addinivalue_line(
         "markers", "slow: mark test as slow/long-running (deselect with `-m 'not slow'`)"
     )
+    config.addinivalue_line(
+        "markers", "glacial: mark test as extremely long running (deselect with `-m 'not glacial'`)"
+    )
 
 
 _mydir = Path(__file__).parent.resolve()
@@ -47,48 +50,63 @@ def fo2_pre2025_csv():
 
 
 @pytest.fixture(scope='session')
-def geos_fpit_dir():
-    return input_data_dir / 'geosfp-it'
+def geos_dir(large_files_dir):
+    return large_files_dir / 'geos'
+
+
+@pytest.fixture(scope='session')
+def geos_3d_met_files_by_datetime(large_files_dir):
+    """Returns the available GEOS FP-IT and IT files as dictionary indexed by their UTC datetime
+    """
+    geos_dir = large_files_dir / 'geos' / 'met' / 'Nv'
+    geos_files = dict()
+    date_patterns = [
+        (r'\d{4}-\d{2}-\d{2}T\d{4}', '%Y-%m-%dT%H%M') # GEOS IT
+    ]
+    for file in geos_dir.glob('GEOS*.nc4'):
+        for re_pat, date_pat in date_patterns:
+            m = re.search(re_pat, file.stem)
+            if m is not None:
+                date = datetime.strptime(m.group(), date_pat)
+                geos_files[date] = file
+                continue
+
+    return geos_files
 
 
 @pytest.fixture(scope='session')
 def mod_input_dir():
-    return input_data_dir / 'mod_files' / 'fpit'
-
-
-@pytest.fixture(scope='session')
-def test_site_mod_input_dir(mod_input_dir, test_site):
-    return mod_input_dir / test_site / 'vertical'
+    return input_data_dir / 'mod_files'
 
 
 @pytest.fixture(scope='session')
 def vmr_input_dir():
-    return input_data_dir / 'vmr_files' / 'fpit'
+    return input_data_dir / 'vmr_files'
 
 
 @pytest.fixture(scope='session')
 def map_input_dir():
-    return input_data_dir / 'map_files' / 'fpit'
+    return input_data_dir / 'map_files'
 
 
 @pytest.fixture(scope='session')
 def mod_output_dir():
-    return output_data_dir / 'mod_files' / 'fpit'
+    return output_data_dir / 'mod_files'
 
 
 @pytest.fixture(scope='session')
 def vmr_output_dir():
-    return output_data_dir / 'vmr_files' / 'fpit'
+    return output_data_dir / 'vmr_files'
 
 
 @pytest.fixture(scope='session')
 def map_output_dir():
-    return output_data_dir / 'map_files' / 'fpit'
+    return output_data_dir / 'map_files'
 
 
 @pytest.fixture(scope='session')
 def map_dry_output_dir():
-    return output_data_dir / 'map_files_dry' / 'fpit'
+    return output_data_dir / 'map_files_dry'
 
 
 @pytest.fixture(scope='session')
@@ -172,6 +190,13 @@ def smo_real_gap_out_dir():
     return out_dir
 
 @pytest.fixture(scope='session')
+def smo_real_gap_o2_file():
+    """Returns the path to an O2 file that goes up to 2024, sufficient for testing
+    the files after the SMO data gap ending in Feb 2025.
+    """
+    return input_data_dir / 'noaa-interp-extrap' / 'monthly-inputs' / 'real-smo-gap' / 'o2_dmf_yearly_2024.txt'
+
+@pytest.fixture(scope='session')
 def mlo_gap_test_file():
     """Return an instance which will create and return paths to modified MLO
     input files for different gases with different gaps in the data.
@@ -252,26 +277,6 @@ def test_site():
 def large_files_dir():
     # TODO: download the DOIed tarball if not present
     return _large_file_dir
-
-@pytest.fixture(scope='session')
-def geos_files_by_datetime(large_files_dir):
-    """Returns the available GEOS FP-IT and IT files as dictionary indexed by their UTC datetime
-    """
-    geos_dir = large_files_dir / 'geos'
-    geos_files = dict()
-    date_patterns = [
-        (r'\d{4}-\d{2}-\d{2}T\d{4}', '%Y-%m-%dT%H%M') # GEOS IT
-    ]
-    for file in geos_dir.glob('GEOS*.nc4'):
-        for re_pat, date_pat in date_patterns:
-            m = re.search(re_pat, file.stem)
-            if m is not None:
-                date = datetime.strptime(m.group(), date_pat)
-                geos_files[date] = file
-                continue
-
-    return geos_files
-
 
 @pytest.fixture(scope='session')
 def oco_file_dir(large_files_dir):

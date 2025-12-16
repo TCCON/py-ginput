@@ -10,9 +10,10 @@ import os
 import pytest
 
 
+@pytest.mark.glacial
 @pytest.mark.slow
 def test_oco2_priors(
-    geos_files_by_datetime,
+    geos_3d_met_files_by_datetime,
     oco_file_dir,
     oco_file_out_dir,
     smo_real_gap_input_dir,
@@ -32,7 +33,7 @@ def test_oco2_priors(
             datetime(2025,3,2,18),
             datetime(2025,3,2,21),
         ]
-        geos_files = ','.join(str(geos_files_by_datetime[d]) for d in geos_dates)
+        geos_files = ','.join(str(geos_3d_met_files_by_datetime[d]) for d in geos_dates)
 
         nprocs = os.getenv('GINPUT_TEST_NPROCS', '8')
         cli_args = [
