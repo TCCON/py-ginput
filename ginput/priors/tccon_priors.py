@@ -1954,7 +1954,8 @@ class HFTropicsRecord(MloSmoTraceGasRecord):
     ch4_hf_slopes_file = os.path.join(_data_dir, 'ch4_hf_slopes.nc')
 
     @classmethod
-    def get_mlo_smo_mean(cls, mlo_file, smo_file, first_date, last_date, truncate_date, allow_negative_insitu_values=False):
+    def get_mlo_smo_mean(cls, mlo_file, smo_file, first_date, last_date, truncate_date, allow_negative_insitu_values=False,
+                         use_pre1p6_interpolation=False):
         """
         Generate the Mauna Loa/Samoa mean trace gas record.
 
@@ -1985,6 +1986,9 @@ class HFTropicsRecord(MloSmoTraceGasRecord):
          has no effect for :class:`HFTropicsRecord`, it is included only as part of the required interface.
         :type allow_negative_insitu_values: bool
 
+        :param use_pre1p6_interpolation: unused, since HF has no MLO/SMO data.
+        :type use_pre1p6_interpolation: bool
+
         :return: the data frame containing the mean trace gas concentration ('dmf_mean'), a flag ('interp_flag') set
          to 1 for any months that had to be interpolated and 2 for months that had to be extrapolated, and the latency
          ('latency') in years that a concentration had to be extrapolated. Index by timestamp.
@@ -2003,7 +2007,9 @@ class HFTropicsRecord(MloSmoTraceGasRecord):
 
         df_combined = pd.DataFrame(index=all_months, columns=['dmf_mean'], dtype=float).fillna(0.0)
         df_combined = df_combined.assign(interp_flag=np.zeros((n_months,), dtype=int),
-                                         latency=np.zeros((n_months,), dtype=int))
+                                         mlo_interp_detail_flag=np.zeros((n_months,), dtype=int),
+                                         smo_interp_detail_flag=np.zeros((n_months,), dtype=int),
+                                         latency=np.zeros((n_months,), dtype=float))
 
         # Post processing is currently unnecessary for HF (since all concentrations are 0). However, we keep this call
         # in for consistency.
