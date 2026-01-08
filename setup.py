@@ -13,7 +13,7 @@ setup(
     long_description_content_type='text/markdown',
     author='Joshua Laughner, Sebastien Roche, Matthaeus Kiel',
     author_email='jllacct119@gmail.com',
-    version='1.5.1',  # make sure stays in sync with the version in ginput/__init__.py
+    version='1.6.0',  # make sure stays in sync with the version in ginput/__init__.py
     url='',
     install_requires=[
         'astropy>=3.1.2',
