@@ -3492,7 +3492,8 @@ def cl_driver(date_range, mod_dir=None, mod_root_dir=None, save_dir=None, produc
 
     # Read the MLO/SMO JSON if given
     if isinstance(mlo_smo_files, (str, Path)):
-        mlo_smo_files = json.load(mlo_smo_files)
+        with open(mlo_smo_files) as f:
+            mlo_smo_files = json.load(f)
 
     # Normalize scalar and collection abbreviations, lats, and lons
     site_abbrev, site_lat, site_lon, _ = mod_utils.check_site_lat_lon_alt(abbrev=site_abbrev, lat=site_lat, lon=site_lon, alt=None if site_lat is None else 0.0)
