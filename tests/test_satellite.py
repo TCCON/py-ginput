@@ -23,8 +23,6 @@ def test_oco2_priors(
     met_file = oco_file_dir / 'oco2_L2MetND_56742a_250302.h5'
     out_prior_file = oco_file_out_dir / 'oco2_priors_56742a_250302.h5'
 
-    import pdb
-    pdb.set_trace()
     if skip_gen != '1':
         # This test will use the command line interface, since that is
         # how OCO ops interacts with this code.
