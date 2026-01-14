@@ -750,7 +750,7 @@ class MloSmoTraceGasRecord(TraceGasRecord):
     @classmethod
     def read_and_fill_insitu_gas(cls, full_file_path: os.PathLike, first_date: dt.datetime, last_date: dt.datetime,
                                  truncate_date: dt.datetime, allow_negative_values: bool = False,
-                                 max_months_simple_interp: int = 3, nyears: Optional[int] = None) -> pd.DataFrame:
+                                 max_months_simple_interp: int = 0, nyears: Optional[int] = None) -> pd.DataFrame:
         """
         Read a trace gas file and fill in missing values out to the first and last date required.
 
@@ -812,7 +812,7 @@ class MloSmoTraceGasRecord(TraceGasRecord):
             last_date = mod_utils.start_of_month(last_date) + relativedelta(months=1)
 
         # Ensure that the dataframe has one value per month between the target first and
-        # last monthsThis way the interpolation can count the rows with NaNs to correctly
+        # last months. This way the interpolation can count the rows with NaNs to correctly
         # know if a gap is big enough to need seasonal-cycle-aware interpolation, plus the
         # rest of the code can rely on this being a true monthly dataframe.
         all_months = pd.date_range(first_date, last_date, freq='MS')
