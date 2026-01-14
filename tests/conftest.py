@@ -158,6 +158,18 @@ def mlo_smo_default_back_compat_out_dir():
     return out_dir
 
 @pytest.fixture(scope='session')
+def interp_cutoff_noaa_expected_dir():
+    root_dir = input_data_dir / 'noaa-interp-extrap' / 'expected' / 'interp-cutoff'
+    return root_dir
+
+@pytest.fixture(scope='session')
+def interp_cutoff_noaa_file_root():
+    root_dir = output_data_dir / 'noaa-interp-extrap' / 'interp-cutoff-inputs'
+    root_dir.mkdir(parents=True, exist_ok=True)
+    _ensure_gitignored(root_dir)
+    return root_dir
+
+@pytest.fixture(scope='session')
 def mlo_smo_default_end_date():
     """Return the default end date for the MLO/SMO priors record class timeseries tests.
     Using this for the ``last_date`` keyword ensures the tests are repeatable.
@@ -357,7 +369,10 @@ class GapTestFile:
     def __init__(self, site):
         self.site = site
 
-    def get_test_file(self, gas: str, n_months_missing: int, start_date: datetime = datetime(2012,1,1)) -> Path:
+    def get_base_file(self, gas: str):
+        return gap_test_dir / f'{self.site}_monthly_obs_{gas}.txt'
+
+    def get_test_file(self, gas: str, n_months_missing: int, start_date: datetime = datetime(2012,1,1), dest_dir: Path = gap_test_dir / 'modified-files') -> Path:
         """Create a monthly NOAA input file with some months set to NaN and return the path to that file.
 
         :param gas: which gas (co2, n2o, or ch4) to create the file for.
@@ -369,16 +384,16 @@ class GapTestFile:
 
         :return: the path to the monthly mean NOAA file.
         """
-        base_file = gap_test_dir / f'{self.site}_monthly_obs_{gas}.txt'
+        base_file = self.get_base_file(gas)
         if n_months_missing is None:
             return base_file
 
-        dest_file = gap_test_dir / 'modified-files' / f'{self.site}_month_obs_{gas}_gap_{n_months_missing}.txt'
+        dest_file = dest_dir / f'{self.site}_month_obs_{gas}_gap_{n_months_missing}.txt'
         self._make_test_noaa_file(base_file, dest_file, n_months_missing, start_date=start_date)
         return dest_file
 
     @staticmethod
-    def _make_test_noaa_file(base_file, dest_file, n_months_missing, start_date=datetime(2010,1,1)):
+    def _make_test_noaa_file(base_file, dest_file, n_months_missing, start_date):
         end_date = start_date + relativedelta(months=n_months_missing)
         with open(base_file, 'r') as base, open(dest_file, 'w') as dest:
             for line in base:
