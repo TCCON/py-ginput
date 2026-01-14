@@ -19,6 +19,11 @@ def test_oco2_priors(
     smo_real_gap_input_dir,
     test_plots_dir
 ):
+    """Run a test to generate an OCO-2 priors file and compare against a benchmark.
+
+    In case you need to re-run the comparison without generating the .h5 file again
+    (because that is extremely slow), set the GINPUT_TEST_SKIP_GEN environmental
+    variable to 1."""
     skip_gen = os.getenv('GINPUT_TEST_SKIP_GEN', '0')
     met_file = oco_file_dir / 'oco2_L2MetND_56742a_250302.h5'
     out_prior_file = oco_file_out_dir / 'oco2_priors_56742a_250302.h5'

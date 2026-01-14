@@ -22,6 +22,8 @@ DATE_RANGE_2025 = [datetime(2025, 3, 2, 15), datetime(2025, 3, 3)]
 
 @pytest.mark.slow
 def test_mod_files_jan2018(subtests, mod_input_dir, mod_output_dir, test_plots_dir, generate_files_with_defaults):
+    """This test confirms that .mod files for Lamont on 1 Jan 2018 are the same as previously produced.
+    """
     # generate_files_with_defaults is needed to ensure the output files are created - it's
     # a setup fixture.
     comparison_helper(
@@ -35,6 +37,11 @@ def test_mod_files_jan2018(subtests, mod_input_dir, mod_output_dir, test_plots_d
 
 @pytest.mark.slow
 def test_vmr_files_jan2018(subtests, vmr_input_dir, vmr_output_dir, test_plots_dir, generate_files_with_defaults):
+    """This test confirms that .vmr files for Lamont on 1 Jan 2018 are the same as previously produced.
+
+    It uses freshly generated .mod files as input, so changes to the .mod files that affect the .vmr files will
+    also cause this test to fail.
+    """
     # generate_files_with_defaults is needed to ensure the output files are created - it's
     # a setup fixture.
     comparison_helper(
@@ -48,6 +55,11 @@ def test_vmr_files_jan2018(subtests, vmr_input_dir, vmr_output_dir, test_plots_d
 
 @pytest.mark.slow
 def test_map_files_jan2018(subtests, map_input_dir, map_output_dir, test_plots_dir, generate_files_with_defaults):
+    """This test confirms that .map and .map.nc files for Lamont on 1 Jan 2018 are the same as previously produced.
+
+    It uses freshly generated .mod and .vmr files as input, so changes to either of those files will
+    also cause this test to fail. Note that this only tests the wet .map/.map.nc files.
+    """
     # generate_files_with_defaults is needed to ensure the output files are created - it's
     # a setup fixture.
     comparison_helper(
@@ -68,6 +80,17 @@ def test_map_files_jan2018(subtests, map_input_dir, map_output_dir, test_plots_d
 
 @pytest.mark.slow
 def test_mod_files_mar2025(subtests, mod_input_dir, mod_output_dir, test_plots_dir, generate_files_smo_gap):
+    """This test confirms that a few .mod files for Lamont on 2 Mar 2025 are the same as previously produced.
+
+    This date was chosen since it falls at the beginning of the time period affected by the May 2024 to Jan 2025
+    SMO data gap for OCO-2 & OCO-3. When the Feb 2025 data was added, that gap changed from being filled by extrapolation
+    to interpolation. Before ginput v1.6.0, interpolation was always done as linear, which meant that the drawdown during
+    summer 2024 went from being estimated to ignored, causing a step change in the prior CO2. This test is to confirm
+    that the current gap filling strategy has not changed the resulting output.
+
+    While the .mod files should be unaffected, they are needed for the .vmr files. By including this test, we
+    have a way to check that changes in the Mar 2025 .vmr files is or is not due to changes in the .mod files.
+    """
     # generate_files_smo_gap is needed to ensure the output files are created - it's
     # a setup fixture.
     comparison_helper(
@@ -81,6 +104,10 @@ def test_mod_files_mar2025(subtests, mod_input_dir, mod_output_dir, test_plots_d
 
 @pytest.mark.slow
 def test_vmr_files_mar2025(subtests, vmr_input_dir, vmr_output_dir, test_plots_dir, generate_files_smo_gap):
+    """This test confirms that a few .mod files for Lamont on 2 Mar 2025 are the same as previously produced.
+
+    See :func:`test_mod_files_mar2025` for the rationale for testing this date.
+    """
     # generate_files_smo_gap is needed to ensure the output files are created - it's
     # a setup fixture.
     comparison_helper(
@@ -100,6 +127,15 @@ def test_nc_map_files_against_upstream(
     test_plots_dir,
     generate_dry_map_files
 ):
+    """This test generates dry VMR .map and .map.nc files from the benchmark .mod and .vmr files,
+    and compares the .map files' contents to the .mod and .vmr files. Compared to
+    :func:`test_map_files_jan2018`, this is checking that the .map.nc files correctly copy
+    the .mod and .vmr files' contents, whereas :func:`test_map_files_jan2018` is testing that the
+    .map.nc files have not changed from the benchmarks.
+
+    Using dry VMRs here simplifies the comparison to the .vmr files (also dry) and complements the
+    wet VMR files tested in :func:`test_map_files_jan2018`.
+    """
     mod_iterator = iter_file_pairs_by_time(
         pattern='*.mod',
         test_pattern='*.map.nc',
@@ -144,6 +180,8 @@ def test_txt_map_files_against_upstream(
     test_plots_dir,
     generate_dry_map_files
 ):
+    """Like :func:`test_nc_map_files_against_upstream`, but for the text (.map) files.
+    """
     mod_iterator = iter_file_pairs_by_time(
         pattern='*.mod',
         test_pattern='*.map',

@@ -18,6 +18,9 @@ def test_mlo_smo_default_filling(
     mlo_smo_default_out_dir,
     mlo_smo_default_end_date,
 ):
+    """This test verifies that the interpolation and extrapolation done
+    by the MLO/SMO gas classes by default has not changed.
+    """
     rec_class = tccon_priors.gas_records[noaa_gas]
     rec = rec_class(
         last_date=mlo_smo_default_end_date,
@@ -50,6 +53,10 @@ def test_mlo_smo_default_filling_backwards_compat(
     mlo_smo_default_back_compat_out_dir,
     mlo_smo_default_end_date,
 ):
+    """This test verifies that the interpolation option used before ginput
+    version 1.6 is still produced by setting the ``use_pre1p6_interpolation``
+    flag to ``True`` on the MLO/SMO gas classes.
+    """
     rec_class = tccon_priors.gas_records[noaa_gas]
     rec = rec_class(
         last_date=mlo_smo_default_end_date,
@@ -83,6 +90,10 @@ def test_real_smo_gap_filling(
     smo_real_gap_out_dir,
     mlo_smo_default_end_date,
 ):
+    """This test verifies that the CO2 files covering the period in 2024/2025
+    when SMO had a large data gap still handles that interpolation the same
+    as it has been.
+    """
     seas_filename = 'co2_seasonal.nc'
     trend_filename = 'co2_trend.nc'
 
@@ -121,6 +132,9 @@ def test_mlo_and_smo_gap_filling(
     mlo_smo_default_end_date,
     smo_gap_only
 ):
+    """This test verifies that filling gaps in the combined MLO/SMO gas records
+    has not changed from the previous benchmark for a number of synthetic gap tests.
+    """
     # Since noaa_gas, noaa_gap_month, and smo_gap_only are parameterized, this will run once
     # for each combination of the inputs
     if smo_gap_only:
@@ -158,6 +172,17 @@ def test_mlo_smo_interp_cutoff(
     noaa_gas,
     test_plots_dir,
 ):
+    """This test generates a large number of synthetic gaps in the MLO & SMO
+    data for all three NOAA gases and tests the interpolation against the true
+    timeseries. Unlike the other tests above, this compares the individual site
+    results, rather than the MLO+SMO mean. The purpose of this test is to check
+    if alterations to the interpolation method (NOT the defaults used by the 
+    actual MLO/SMO gas classes) result in better or worse reproduction of the true
+    timeseries. Essentially, this is one level down from the above tests: those
+    check that the timeseries used to create the priors remain the same, this
+    checks that the way the individual NOAA sites' data are filled in performs
+    as well as it has previously.
+    """
     setup_logger(level=1)
     start_dates = pd.date_range('2000-01-01', '2017-12-01', freq='MS')
     # start_dates = pd.date_range('2010-01-01', '2010-12-01', freq='MS')

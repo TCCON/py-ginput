@@ -5,6 +5,12 @@ import numpy as np
 
 
 def test_truncation(subtests, noaa_gas, mlo_trunc_test_file, smo_trunc_test_file, mlo_smo_default_end_date):
+    """This test verifies that the ``truncate_date`` argument of the MLO/SMO gas classes works correctly.
+
+    The ``truncate_date`` argument must force those classes to behave exactly as if
+    they received input MLO and SMO timeseries that end on that month. This is required
+    to allow reproducibility of old priors when using more recent NOAA data.
+    """
     rec_class = tccon_priors.gas_records[noaa_gas]
     mlo_full_file = mlo_trunc_test_file.get_test_file(noaa_gas, short=False)
     mlo_short_file = mlo_trunc_test_file.get_test_file(noaa_gas, short=True)
