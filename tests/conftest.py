@@ -61,6 +61,7 @@ def geos_3d_met_files_by_datetime(large_files_dir):
     geos_dir = large_files_dir / 'geos' / 'met' / 'Nv'
     geos_files = dict()
     date_patterns = [
+        (r'\d{8}_\d{4}', '%Y%m%d_%H%M'), # GEOS FP-IT
         (r'\d{4}-\d{2}-\d{2}T\d{4}', '%Y-%m-%dT%H%M') # GEOS IT
     ]
     for file in geos_dir.glob('GEOS*.nc4'):
@@ -294,10 +295,31 @@ def large_files_dir():
 def oco_file_dir(large_files_dir):
     return large_files_dir / 'oco'
 
+@pytest.fixture(scope='session')
+def gosat_empty_file_dir(large_files_dir):
+    return large_files_dir / 'gosat' / 'empty' 
+
+@pytest.fixture(scope='session')
+def gosat_nonempty_file_dir(large_files_dir):
+    return large_files_dir / 'gosat' / 'nonempty' 
 
 @pytest.fixture(scope='session')
 def oco_file_out_dir():
     out_dir = _large_file_out_dir / 'oco'
+    out_dir.mkdir(parents=True, exist_ok=True)
+    _ensure_gitignored(out_dir)
+    return out_dir
+
+@pytest.fixture(scope='session')
+def gosat_empty_file_out_dir():
+    out_dir = _large_file_out_dir / 'gosat' / 'empty'
+    out_dir.mkdir(parents=True, exist_ok=True)
+    _ensure_gitignored(out_dir)
+    return out_dir
+
+@pytest.fixture(scope='session')
+def gosat_nonempty_file_out_dir():
+    out_dir = _large_file_out_dir / 'gosat' / 'nonempty'
     out_dir.mkdir(parents=True, exist_ok=True)
     _ensure_gitignored(out_dir)
     return out_dir

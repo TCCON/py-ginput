@@ -36,23 +36,14 @@ def test_oco2_priors(
             datetime(2025,3,2,18),
             datetime(2025,3,2,21),
         ]
-        geos_files = ','.join(str(geos_3d_met_files_by_datetime[d]) for d in geos_dates)
-
-        nprocs = os.getenv('GINPUT_TEST_NPROCS', '8')
-        cli_args = [
-            'oco',
-            '--verbose',
-            '--mlo-co2-file', str(smo_real_gap_input_dir / 'co2_mlo_monthly.txt'),
-            '--smo-co2-file', str(smo_real_gap_input_dir / 'co2_smo_monthly.txt'),
-            '--truncate-mlo-smo-by', '1',
-            '--fo2-file', str(smo_real_gap_input_dir / 'o2_dmf_yearly_2024.txt'),
-            '--nprocs', nprocs,
-            geos_files,
-            str(met_file),
-            str(out_prior_file)
-        ]
-
-        main(cli_args)
+        _generate_prior_h5_file(
+            instrument='oco',
+            met_file=met_file,
+            out_prior_file=out_prior_file,
+            geos_dates=geos_dates,
+            geos_3d_met_files_by_datetime=geos_3d_met_files_by_datetime,
+            mlo_smo_input_dir=smo_real_gap_input_dir
+        )
     elif not out_prior_file.exists():
         raise FileNotFoundError(f'Output file {out_prior_file} does not exist. (GINPUT_TEST_SKIP_GEN was set to {skip_gen}, causing file generation to be skipped.)')
 
@@ -66,9 +57,129 @@ def test_oco2_priors(
     )
 
 
-def compare_prior_h5_files(expected_file, current_file, met_file, plot_file=None):
-    expected_data = _load_prior_h5_file(expected_file, met_file)
-    current_data = _load_prior_h5_file(current_file, met_file)
+@pytest.mark.glacial
+@pytest.mark.slow
+def test_gosat_empty_priors(
+    geos_3d_met_files_by_datetime,
+    gosat_empty_file_dir,
+    gosat_empty_file_out_dir,
+    smo_real_gap_input_dir,
+    test_plots_dir,
+):
+    """Tests that a GOSAT priors file is generated even when there are no valid soundings.
+
+    This is more likely with GOSAT than OCO-2/3 because of the limited number of soundings.
+    This was a test case that CSU ran into during ACOS B11 processing that caused a crash.
+    """
+    skip_gen = os.getenv('GINPUT_TEST_SKIP_GEN', '0')
+    met_file = gosat_empty_file_dir / 'acos_L2Met_090430_15_B11_20250418191958.h5'
+    out_prior_file = gosat_empty_file_out_dir / 'acos_priors_090430.h5'
+
+    if skip_gen != '1':
+        # This test will use the command line interface, since that is
+        # how most users ops interact with this code.
+        geos_dates = [
+            datetime(2009,4,30,6),
+            datetime(2009,4,30,9),
+            datetime(2009,4,30,12),
+        ]
+        _generate_prior_h5_file(
+            instrument='acos',
+            met_file=met_file,
+            out_prior_file=out_prior_file,
+            geos_dates=geos_dates,
+            geos_3d_met_files_by_datetime=geos_3d_met_files_by_datetime,
+            mlo_smo_input_dir=smo_real_gap_input_dir
+        )
+    elif not out_prior_file.exists():
+        raise FileNotFoundError(f'Output file {out_prior_file} does not exist. (GINPUT_TEST_SKIP_GEN was set to {skip_gen}, causing file generation to be skipped.)')
+
+    expected_file = gosat_empty_file_dir / 'acos_priors_090430.h5'
+    plot_file = test_plots_dir / 'test_acos_priors_empty.png'
+    compare_prior_h5_files(
+        expected_file=expected_file,
+        current_file=out_prior_file,
+        met_file=met_file,
+        instrument='gosat',
+        plot_file=plot_file
+    )
+
+
+@pytest.mark.glacial
+@pytest.mark.slow
+def test_gosat_nonempty_priors(
+    geos_3d_met_files_by_datetime,
+    gosat_nonempty_file_dir,
+    gosat_nonempty_file_out_dir,
+    smo_real_gap_input_dir,
+    test_plots_dir,
+):
+    """Tests that the GOSAT priors for one test granule match a benchmark.
+    """
+    skip_gen = os.getenv('GINPUT_TEST_SKIP_GEN', '0')
+    met_file = gosat_nonempty_file_dir / 'gosat_resampler.h5'
+    out_prior_file = gosat_nonempty_file_out_dir / 'acos_priors_120620.h5'
+
+    if skip_gen != '1':
+        # This test will use the command line interface, since that is
+        # how most users interact with this code.
+        geos_dates = [
+            datetime(2012,6,20,0),
+            datetime(2012,6,20,3),
+        ]
+        _generate_prior_h5_file(
+            instrument='acos',
+            met_file=met_file,
+            out_prior_file=out_prior_file,
+            geos_dates=geos_dates,
+            geos_3d_met_files_by_datetime=geos_3d_met_files_by_datetime,
+            mlo_smo_input_dir=smo_real_gap_input_dir
+        )
+    elif not out_prior_file.exists():
+        raise FileNotFoundError(f'Output file {out_prior_file} does not exist. (GINPUT_TEST_SKIP_GEN was set to {skip_gen}, causing file generation to be skipped.)')
+
+    expected_file = gosat_nonempty_file_dir / 'acos_priors_120620.h5'
+    plot_file = test_plots_dir / 'test_acos_priors_nonempty.png'
+    compare_prior_h5_files(
+        expected_file=expected_file,
+        current_file=out_prior_file,
+        met_file=met_file,
+        instrument='gosat',
+        plot_file=plot_file
+    )
+
+
+def _generate_prior_h5_file(
+    instrument,
+    met_file,
+    out_prior_file,
+    geos_dates,
+    geos_3d_met_files_by_datetime,
+    mlo_smo_input_dir,
+):
+    # This test will use the command line interface, since that is
+    # how ops interacts with this code.
+    geos_files = ','.join(str(geos_3d_met_files_by_datetime[d]) for d in geos_dates)
+
+    nprocs = os.getenv('GINPUT_TEST_NPROCS', '8')
+    cli_args = [
+        instrument,
+        '--verbose',
+        '--mlo-co2-file', str(mlo_smo_input_dir / 'co2_mlo_monthly.txt'),
+        '--smo-co2-file', str(mlo_smo_input_dir / 'co2_smo_monthly.txt'),
+        '--truncate-mlo-smo-by', '1',
+        '--fo2-file', str(mlo_smo_input_dir / 'o2_dmf_yearly_2024.txt'),
+        '--nprocs', nprocs,
+        geos_files,
+        str(met_file),
+        str(out_prior_file)
+    ]
+
+    main(cli_args)
+
+def compare_prior_h5_files(expected_file, current_file, met_file, instrument='oco', plot_file=None):
+    expected_data = _load_prior_h5_file(expected_file, met_file, instrument=instrument)
+    current_data = _load_prior_h5_file(current_file, met_file, instrument=instrument)
 
     if plot_file is not None:
         _, axs = plt.subplots(2, 2, figsize=(12,8), gridspec_kw={'wspace': 0.4, 'hspace': 0.4})
@@ -82,7 +193,7 @@ def compare_prior_h5_files(expected_file, current_file, met_file, plot_file=None
     assert np.allclose(expected_data['co2_prior'], current_data['co2_prior'], equal_nan=True), 'Files CO2 profiles differ'
 
 
-def _load_prior_h5_file(file, met_file=None):
+def _load_prior_h5_file(file, met_file=None, instrument='oco'):
     with h5py.File(file) as f:
         if 'CO2Prior' in f.keys():
             # OCO-style L2CPr file
@@ -106,6 +217,19 @@ def _load_prior_h5_file(file, met_file=None):
 
         for v in data.values():
             v[v < -999.0] = np.nan
+
+        if instrument == 'gosat':
+            # GOSAT will give 2D prior and pressure, 1D lat and lon, and 3D surface pressure.
+            # To be consistent with OCO, that needs to be 3D prior and pressure (with the vertical
+            # dimension last), 2D lat and lon, and 2D surface pressure. The second dimension of
+            # surface pressure needs cut down to 1 to match our lat/lon.
+            data['co2_prior'] = data['co2_prior'][:, np.newaxis, :]
+            data['pres'] = data['pres'][:, np.newaxis, :]
+            data['surf_pres'] = data['surf_pres'][:, :1, 0]
+            data['lat'] = data['lat'][:, np.newaxis]
+            data['lon'] = data['lon'][:, np.newaxis]
+        elif instrument != 'oco':
+            raise NotImplementedError(f'instrument = {instrument}')
 
         return data
 
