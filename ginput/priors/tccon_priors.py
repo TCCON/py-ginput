@@ -3218,13 +3218,17 @@ def generate_single_tccon_prior(mod_file_data, utc_offset, concentration_record,
      is used as-is. 
     :type use_adjusted_zgrid: bool
 
+    :param o2_mole_fraction_file: path to the file containing yearly pre-calculated O2 mole fractions. Pass ``None`` as
+     this parameter to skip calculating the O2 DMF. In that case, the 'global_o2_dry_mole_fraction' entry in the third
+     returned dictionary will be ``None``.
+
     :param auto_update_fo2_file: if ``True``, automatically update the f(O2) data file if it is missing or it has been
      more than 7 days since it was last updated.
     :type auto_update_fo2_file: bool
 
-    :return: a dictionary containing all the profiles (including many for debugging) and a dictionary containing the
-     units of the values in each profile.
-    :rtype: dict, dict
+    :return: a dictionary containing all the profiles (including many for debugging), a dictionary containing the
+     units of the values in each profile, and a dictionary of additional constants.
+    :rtype: dict, dict, dict
     """
     if isinstance(mod_file_data, str):
         mod_file_data = readers.read_mod_file(mod_file_data)
@@ -3238,8 +3242,11 @@ def generate_single_tccon_prior(mod_file_data, utc_offset, concentration_record,
     co_source = mod_file_data['constants'].get('co_source', GeosSource.UNKNOWN)
 
     # We only need the datetime to get the O2 mole fraction
-    o2_record = O2MeanMoleFractionRecord(o2_mole_fraction_file=o2_mole_fraction_file, auto_update_fo2_file=auto_update_fo2_file)
-    o2_dmf = o2_record.get_o2_mole_fraction(pd.Timestamp(file_date))
+    if o2_mole_fraction_file is not None:
+        o2_record = O2MeanMoleFractionRecord(o2_mole_fraction_file=o2_mole_fraction_file, auto_update_fo2_file=auto_update_fo2_file)
+        o2_dmf = o2_record.get_o2_mole_fraction(pd.Timestamp(file_date))
+    else:
+        o2_dmf = None
 
     # Make the UTC date a datetime object that is rounded to a date (hour/minute/etc = 0)
     obs_utc_date = dt.datetime.combine((file_date - utc_offset).date(), dt.time())
