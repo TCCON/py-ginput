@@ -102,8 +102,8 @@ def test_potential_temperature():
         assert abs(theta - th_chk) < 0.01
 
 
-def test_lat_lon_interp(lat_lon_file, test_date):
-    sites = tccon_sites.tccon_site_info_for_date(test_date)
+def test_lat_lon_interp(lat_lon_file):
+    sites = tccon_sites.tccon_site_info_for_date(dtime(2018,1,1))
     failed_sites = []
     for sid, info in sites.items():
         lat = info['lat']

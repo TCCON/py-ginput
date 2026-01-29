@@ -71,6 +71,11 @@ $ ./run_ginput.py getg5 --mode FP --filetypes met --levels surf --path GEOS_MET_
 $ ./run_ginput.py getg5 --mode FP --filetypes chm --levels eta --path GEOS_CHEM_DIR 20180101
 ```
 
+```{note}
+Remember, if you installed with conda or pip, you probably want to use `ginput_cli`
+instead of `./run_ginput.py`. 
+```
+
 `GEOS_MET_DIR` and `GEOS_CHEM_DIR` can be whatever path you wish. 
 Note that in the third command, the argument to `--filetypes` is "chm" (no "e").
 If you wished to download the GEOS FP-IT data used for the standard priors, you would change the "FP" argument of `--mode` to "FPIT" (note that this would require a data subscription from NASA Goddard).

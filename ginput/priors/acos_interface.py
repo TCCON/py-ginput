@@ -132,7 +132,7 @@ _def_errh = ErrorHandler(suppress_error=False)
 
 def acos_interface_main(instrument, met_resampled_file, geos_files, output_file, mlo_co2_file=None, smo_co2_file=None,
                         use_trop_eqlat=False, cache_strat_lut=False, truncate_mlo_smo_by=0, nprocs=0, interp_pickle_dir='.',
-                        fo2_file=fo2_prep.DEFAULT_FO2_FILE, auto_update_fo2_file=False,
+                        fo2_file=fo2_prep.DEFAULT_FO2_FILE, auto_update_fo2_file=False, pre_1p6_interp: bool = False,
                         error_handler=_def_errh):
     """
     The primary interface to create CO2 priors for the ACOS algorithm
@@ -177,6 +177,10 @@ def acos_interface_main(instrument, met_resampled_file, geos_files, output_file,
      the file and check if there is new data in them that requires an update to the ``fo2_file``. If ``fo2_file`` does
      not exist, the outputs are downloaded and created. Note that outputs will always be downloaded to the default directory.
      using this option. If you want more control, please use the "update_fo2" subcommand of ``run_ginput.py``.
+
+    :param pre_1p6_interp: set to ``True`` to revert how MLO/SMO data are interpolated and extrapolated to the
+     pre-1.6 approach. Note that this approach does not handle large gaps in either site well, and therefore
+     should only be used if you truly need backwards compatibility with ginput version 1.5.x and earlier.
 
     :return: None, writes results to the HDF5 ``output_file``.
     """
@@ -289,7 +293,8 @@ def acos_interface_main(instrument, met_resampled_file, geos_files, output_file,
                           recalculate_strat_lut=regen_lut, 
                           save_strat=save_lut, 
                           truncate_date=truncate_mlo_smo_date,
-                          last_date=record_end_date)
+                          last_date=record_end_date,
+                          use_pre1p6_interpolation=pre_1p6_interp)
         if gas == 'co':
             record_kws = dict()
         record_class = tccon_priors.gas_records[gas]

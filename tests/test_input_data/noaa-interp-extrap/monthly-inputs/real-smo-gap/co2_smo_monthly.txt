@@ -1,0 +1,738 @@
+# header_lines: 152
+#
+# HISTORY:
+#    Initial creation:
+#        - Data before Jan 2010 are taken directly from the NOAA monthly average file
+#          co2_smo_surface-insitu_1_ccgg_MonthlyData.txt (SHA1 sum = 5b854f9dd4882cdebb90dd7a22e08853bb00f75a)
+#          downloaded from https://gml.noaa.gov/dv/data/index.php?parameter_name=Carbon%2BDioxide&type=Insitu&frequency=Monthly%2BAverages&site=SMO
+#          on 7 Jul 2021.
+#    Added 2010-01 to 2021-06 using mlo_smo_prep version 1.0.1:
+#        - Previous monthly file: sources/co2_smo_surface-insitu_1_ccgg_custom_monthly.txt (SHA1 = c711eed376a2ead012b5ac77fa43f877bf793f25)
+#        - New hourly file: sources/co2_smo_surface-insitu_1_ccgg_hour_merge.txt (SHA1 = 16fc806d18b2fb06c6321fd6e2bf86fb4ce8c7ae)
+#    Added 2021-07 to 2022-01 using mlo_smo_prep version 1.0.1:
+#        - Previous monthly file: /scf_archive/oco2/scf/pcs/repo/product/SCF/QTSv11/r02/co2/202106/co2_smo_monthly_202106_mlo_smo_prep_v1.0.1.txt (SHA1 = c25e1bdbbd87fdf6f6206c739c09bca0817b58d4)
+#        - New hourly file: /oco2/flask/2022-02-10/co2_smo_surface-insitu_1_ccgg_hour_.txt (SHA1 = a2325b6bc4d6459555d258c8e85d0acf04b2a363)
+#    Added 2022-02 to 2022-02 using mlo_smo_prep version 1.0.1:
+#        - Previous monthly file: /oco2/product/Version1/co2/202201/co2_smo_monthly_202210_seed_220228220633t.txt (SHA1 = 1b935a413a5d20b4b9107bf3b4b4fc24e83e73b6)
+#        - New hourly file: /oco2/ingest/co2/Version1/202202/co2_smo_surface-insitu_1_ccgg_hour_202202_220310010015N.txt (SHA1 = 7b4d30eff84740011349c517d17f7fac1e434103)
+#    Added 2022-03 to 2022-03 using mlo_smo_prep version 1.0.1:
+#        - Previous monthly file: /oco2/product/Version1/co2/202202/co2_smo_monthly_202202_B11006_220329170729.txt (SHA1 = faf8abfa28c2218df610d7483fa25333a744981e)
+#        - New hourly file: /oco2/ingest/co2/Version1/202203/co2_smo_surface-insitu_1_ccgg_hour_202203_20220410010013N.txt (SHA1 = 6f337b9a4e4284b01840c2c953c0dd2c2c43166a)
+#    Added 2022-04 to 2022-04 using mlo_smo_prep version 1.0.1:
+#        - Previous monthly file: /oco2/product/Version1/co2/202203/co2_smo_monthly_202203_B11006_220411202701.txt (SHA1 = 84d9626669969921e8c3347624b25e2a5a1790b5)
+#        - New hourly file: /oco2/ingest/co2/Version1/202204/co2_smo_surface-insitu_1_ccgg_hour_202204_20220510010028N.txt (SHA1 = 9396d0df111a55a9e6c0e054e24f066ab7bd6aaf)
+#    Added 2022-05 to 2022-05 using mlo_smo_prep version 1.0.1:
+#        - Previous monthly file: /oco2/product/Version1/co2/202204/co2_smo_monthly_202204_B11008_220510165658.txt (SHA1 = 7a501041ce766715fd3d915ff5f48ae03a0b6987)
+#        - New hourly file: /oco2/ingest/co2/Version1/202205/co2_smo_surface-insitu_1_ccgg_hour_202205_20220610010028N.txt (SHA1 = 1c2e925320be28f80cfe40d5a522cf09166b727f)
+#    Added 2022-06 to 2022-06 using mlo_smo_prep version 1.0.1:
+#        - Previous monthly file: /oco2/product/Version1/co2/202205/co2_smo_monthly_202205_B11008_220610183947.txt (SHA1 = ca5b1078a1bc5b1cf8019bf6f2c1072accf2f326)
+#        - New hourly file: /oco2/ingest/co2/Version1/202206/co2_smo_surface-insitu_1_ccgg_hour_202206_20220710010022N.txt (SHA1 = 3c97cca1fde4ed216f6099b5200223d234e47217)
+#    Added 2022-07 to 2022-07 using mlo_smo_prep version 1.0.1:
+#        - Previous monthly file: /oco2/product/Version1/co2/202206/co2_smo_monthly_202206_B11008_220710222720.txt (SHA1 = f39835c280ab342f3757a4617e130939594d19f4)
+#        - New hourly file: /oco2/ingest/co2/Version1/202207/co2_smo_surface-insitu_1_ccgg_hour_202207_20220810010047N.txt (SHA1 = 10667aa0d3c42bf046fee771132dc69a844d3780)
+#    Added 2022-08 to 2022-08 using mlo_smo_prep version 1.0.1:
+#        - Previous monthly file: /oco2/product/Version1/co2/202207/co2_smo_monthly_202207_B11008_220810180544.txt (SHA1 = a5538cf0bbeec8c16308365853b6c8a72dd41753)
+#        - New hourly file: /oco2/ingest/co2/Version1/202208/co2_smo_surface-insitu_1_ccgg_hour_202208_20220910010034N.txt (SHA1 = 8e3938af458226825b83c506880e2a92358da077)
+#    Added 2022-09 to 2022-09 using mlo_smo_prep version 1.0.1:
+#        - Previous monthly file: /oco2/product/Version1/co2/202208/co2_smo_monthly_202208_B11008_220912133916.txt (SHA1 = a6d83496bc418898ed7fe3dd50042347448f1231)
+#        - New hourly file: /oco2/ingest/co2/Version1/202209/co2_smo_surface-insitu_1_ccgg_hour_202209_20221010010024N.txt (SHA1 = e1fe08abbc57174eb2f0451dd5fcc0fa7939f3ed)
+#    Added 2022-10 to 2022-10 using mlo_smo_prep version 1.0.1:
+#        - Previous monthly file: /oco2/product/Version1/co2/202209/co2_smo_monthly_202209_B11008_221010170032.txt (SHA1 = 03de84dbc71c68274c6c26591c1b2db61747403a)
+#        - New hourly file: /oco2/ingest/co2/Version1/202210/co2_smo_surface-insitu_1_ccgg_hour_202210_20221128122232N.txt (SHA1 = a4284d84c5de84cf58a22cfe60d327ea0c7484ec)
+#    Added 2022-11 to 2022-11 using mlo_smo_prep version 1.0.1:
+#        - Previous monthly file: /oco2/product/Version1/co2/202210/co2_smo_monthly_202210_B11008_221128205300.txt (SHA1 = 9f3387f9afc3a8fe73b18b9ba7efee0e192e7b09)
+#        - New hourly file: /oco2/ingest/co2/Version1/202211/co2_smo_surface-insitu_1_ccgg_hour_202211_20221213154708N.txt (SHA1 = d6a37dda3f0e30941e6fd3aa7058f988fcfd519f)
+#    Added 2022-12 to 2022-12 using mlo_smo_prep version 1.0.1:
+#        - Previous monthly file: /oco2/product/Version1/co2/202211/co2_smo_monthly_202211_B11008_221214003055.txt (SHA1 = a4dbf6cb5c52ca936cf481aaa72117b96ecf28d2)
+#        - New hourly file: /oco2/ingest/co2/Version1/202212/co2_smo_surface-insitu_1_ccgg_hour_202212_20230110010108N.txt (SHA1 = 3a9bb9a509372fdc25b403377980a5e21fee8b1e)
+#    Added 2023-01 to 2023-01 using mlo_smo_prep version 1.0.1:
+#        - Previous monthly file: /oco2/product/Version1/co2/202212/co2_smo_monthly_202212_B11008_230110185929.txt (SHA1 = db807abe779d647292044cb570b73d723c8d58f3)
+#        - New hourly file: /oco2/ingest/co2/Version1/202301/co2_smo_surface-insitu_1_ccgg_hour_202301_20230210010133N.txt (SHA1 = a8d8ab55ff29a5f6df09dca5aec5c2f46992db26)
+#    Added 2023-02 to 2023-02 using mlo_smo_prep version 1.0.1:
+#        - Previous monthly file: /oco2/product/Version1/co2/202301/co2_smo_monthly_202301_B11008_230210190247.txt (SHA1 = 5eddf939b568400dbd8f9017c8241770ac954283)
+#        - New hourly file: /oco2/ingest/co2/Version1/202302/co2_smo_surface-insitu_1_ccgg_hour_202302_20230310010125N.txt (SHA1 = 6a9597088ac9ba09f741567d37f1c45003b3809a)
+#    Added 2023-03 to 2023-03 using mlo_smo_prep version 1.0.1:
+#        - Previous monthly file: /oco2/product/Version1/co2/202302/co2_smo_monthly_202302_B11008_230310172633.txt (SHA1 = a65d056e3ca82c79306ba6079132003725209ee1)
+#        - New hourly file: /oco2/ingest/co2/Version1/202303/co2_smo_surface-insitu_1_ccgg_hour_202303_20230410010051N.txt (SHA1 = 7b3fa47679aa642ccb6efecc850f2d58d4ac88d8)
+#    Added 2023-04 to 2023-04 using mlo_smo_prep version 1.0.1:
+#        - Previous monthly file: /oco2/product/Version1/co2/202303/co2_smo_monthly_202303_B11008_230410195922.txt (SHA1 = 8e6dfb92635145db462c40a2154e389f46957983)
+#        - New hourly file: /oco2/ingest/co2/Version1/202304/co2_smo_surface-insitu_1_ccgg_hour_202304_20230510010051N.txt (SHA1 = dfd3d402051083fc3aae2f5a00d3f0a28d46c05c)
+#    Added 2023-05 to 2023-05 using mlo_smo_prep version 1.0.1:
+#        - Previous monthly file: /oco2/product/Version1/co2/202304/co2_smo_monthly_202304_B11008_230510173937.txt (SHA1 = 0af943914987f65ad498df7b1aab9583304ed16a)
+#        - New hourly file: /oco2/ingest/co2/Version1/202305/co2_smo_surface-insitu_1_ccgg_hour_202305_20230610010007N.txt (SHA1 = 5aa7315b428d093385aeee2032a8b110a291bb4c)
+#    Added 2023-06 to 2023-06 using mlo_smo_prep version 1.0.1:
+#        - Previous monthly file: /oco2/product/Version1/co2/202305/co2_smo_monthly_202305_B11008_230612172056.txt (SHA1 = d3d248a6cf3d961a1466e45c4173fb2df5f99d08)
+#        - New hourly file: /oco2/ingest/co2/Version1/202306/co2_smo_surface-insitu_1_ccgg_hour_202306_20230710010008N.txt (SHA1 = 2cbf78e0469afcb8eeba848216e78811e7a36c43)
+#    Added 2023-07 to 2023-07 using mlo_smo_prep version 1.0.1:
+#        - Previous monthly file: /oco2/product/Version1/co2/202306/co2_smo_monthly_202306_B11008_230710173801.txt (SHA1 = 8e556ebe904422b50137b027d7d485a275698179)
+#        - New hourly file: /oco2/ingest/co2/Version1/202307/co2_smo_surface-insitu_1_ccgg_hour_202307_20230810010007N.txt (SHA1 = b99534cb018bb295a4411a04c278493ea75e9621)
+#    Added 2023-08 to 2023-08 using mlo_smo_prep version 1.0.1:
+#        - Previous monthly file: /oco2/product/Version1/co2/202307/co2_smo_monthly_202307_B11008_230811163843.txt (SHA1 = fa7ab18591dc27d032e49fa1d5e228a4d8e0af29)
+#        - New hourly file: /oco2/ingest/co2/Version1/202308/co2_smo_surface-insitu_1_ccgg_hour_202308_20230910010006N.txt (SHA1 = 00d4a563121649cec587aa2bb28f9cae47bb1645)
+#    Added 2023-09 to 2023-09 using mlo_smo_prep version 1.0.1:
+#        - Previous monthly file: /oco2/product/Version1/co2/202308/co2_smo_monthly_202308_B11008_230911164907.txt (SHA1 = 39b736ea2ef3a8687379b2825a40a5d4cf89fb28)
+#        - New hourly file: /oco2/ingest/co2/Version1/202309/co2_smo_surface-insitu_1_ccgg_hour_202309_20231010010118N.txt (SHA1 = ebf6c97b661bc6b07b665be6fdf58f76ef29537f)
+#    Added 2023-10 to 2023-10 using mlo_smo_prep version 1.0.1:
+#        - Previous monthly file: /oco2/product/Version1/co2/202309/co2_smo_monthly_202309_B11008_231010152322.txt (SHA1 = fe1910411ca935cb3f9c4faab27e935bba47eed1)
+#        - New hourly file: /oco2/ingest/co2/Version1/202310/co2_smo_surface-insitu_1_ccgg_hour_202310_20231110010048N.txt (SHA1 = b2fb11e54bde9bea770364a758164b4c3cafc663)
+#    Added 2023-11 to 2023-11 using mlo_smo_prep version 1.0.1:
+#        - Previous monthly file: /oco2/product/Version1/co2/202310/co2_smo_monthly_202310_B11008_231110175330.txt (SHA1 = 977c4e83a948358f13d4882634e529f8f1662569)
+#        - New hourly file: /oco2/ingest/co2/Version1/202311/co2_smo_surface-insitu_1_ccgg_hour_202311_20231210010007N.txt (SHA1 = b71ae472a30cd09352df6166a5059a46cffbadc6)
+#    Added 2023-12 to 2023-12 using mlo_smo_prep version 1.0.1:
+#        - Previous monthly file: /oco2/product/Version1/co2/202311/co2_smo_monthly_202311_B11008_231213211329.txt (SHA1 = 6b2eee3b284b34b6cf9f487cdeb21a4278cd71b4)
+#        - New hourly file: /oco2/ingest/co2/Version1/202312/co2_smo_surface-insitu_1_ccgg_hour_202312_20240110010011N.txt (SHA1 = 3d038efb942f04875806d33701bd4be28e6af16b)
+#    Added 2024-01 to 2024-01 using mlo_smo_prep version 1.0.1:
+#        - Previous monthly file: /oco2/product/Version1/co2/202312/co2_smo_monthly_202312_B11008_240110195136.txt (SHA1 = 09a19c6250cf708610e3636c59bc1fb4383e00b6)
+#        - New hourly file: /oco2/ingest/co2/Version1/202401/co2_smo_surface-insitu_1_ccgg_hour_202401_20240210010007N.txt (SHA1 = 4df735322ea2d9bb7224018ac2609d57e931ca0d)
+#    Added 2024-02 to 2024-02 using mlo_smo_prep version 1.0.1:
+#        - Previous monthly file: /oco2/product/Version1/co2/202401/co2_smo_monthly_202401_B11008_240213235345.txt (SHA1 = 3b8b7c04e250dcacfeee8cffd5011cb8aac5219c)
+#        - New hourly file: /oco2/ingest/co2/Version1/202402/co2_smo_surface-insitu_1_ccgg_hour_202402_20240310010007N.txt (SHA1 = d4bab870e860cb3a4a5efbb155928d5a83023de7)
+#    Added 2024-03 to 2024-03 using mlo_smo_prep version 1.1.0:
+#        - Previous monthly file: /oco2/product/Version1/co2/202402/co2_smo_monthly_202402_B11008_240312193946.txt (SHA1 = ae3906153a0313d1ca18ac7825291b7faf40ae48)
+#        - New hourly file: /oco2/ingest/co2/Version1/202403/co2_smo_surface-insitu_1_ccgg_hour_202403_20240418123638N.txt (SHA1 = 73bc51568aa7cdf4c1dfd55a62883301d6831004)
+#    Added 2024-04 to 2024-04 using mlo_smo_prep version 1.1.0:
+#        - Previous monthly file: /oco2/product/Version1/co2/202403/co2_smo_monthly_202403_B11205_240418225025.txt (SHA1 = 0eb77186c9c2c4536dafeb50adc0b21c0c3036bd)
+#        - New hourly file: /oco2/ingest/co2/Version1/202404/co2_smo_surface-insitu_1_ccgg_hour_202404_20240510010013N.txt (SHA1 = 5493abe55e76431a700e135e81291140682475ee)
+#    Added 2024-05 to 2024-05 using mlo_smo_prep version 1.1.0:
+#        - Previous monthly file: /oco2/product/Version1/co2/202404/co2_smo_monthly_202404_B11205_240510162113.txt (SHA1 = e545ac2b9d069992b32847115c53fa1a392caf37)
+#        - New hourly file: /oco2/ingest/co2/Version1/202405/co2_smo_surface-insitu_1_ccgg_hour_202405_20240610010020N.txt (SHA1 = 73b6854052723768f5fa87c12a867df04d19b3e1)
+#    Added 2024-06 to 2024-06 using mlo_smo_prep version 1.1.1:
+#        - Previous monthly file: /scf_archive/oco2/scf/pcs/repo/product/Version1/co2/202405/co2_smo_monthly_202405_B11205_240612172937.txt (SHA1 = cdb05b7c6144acc4da1ade051c8859c081ab1f22)
+#        - New hourly file: /scf_archive/oco2/scf/pcs/repo/ingest/co2/Version1/202406/co2_smo_surface-insitu_1_ccgg_hour_202406_20240710010015N.txt (SHA1 = b8989c858f9e8617013d68e147292a198b8cfd0a)
+#    Added 2024-07 to 2024-07 using mlo_smo_prep version 1.1.1:
+#        - Previous monthly file: /scf_archive/oco2/scf/pcs/repo/product/Version1/co2/202406/co2_smo_monthly_202406_B11207_240716164151s.txt (SHA1 = 287f6dce67781d9a02c999f4dcc3c9c769929147)
+#        - New hourly file: /scf_archive/oco2/scf/pcs/repo/ingest/co2/Version1/202407/co2_smo_surface-insitu_1_ccgg_hour_202407_20240810010013N.txt (SHA1 = ad9b4a88846174f64d9225ec429c178dd1880400)
+#    Added 2024-08 to 2024-08 using mlo_smo_prep version 1.1.1:
+#        - Previous monthly file: /scf_archive/oco2/scf/pcs/repo/product/Version1/co2/202407/co2_smo_monthly_202407_B11207_240903170048s.txt (SHA1 = 2cbadf73b055e6713fb4f037a8a180c2520b1eba)
+#        - New hourly file: /scf_archive/oco2/scf/pcs/repo/ingest/co2/Version1/202408/co2_smo_surface-insitu_1_ccgg_hour_202408_20240910010013N.txt (SHA1 = 63963fbae6b5a40ab118ecec3587eb73ee22e499)
+#    Added 2024-09 to 2024-09 using mlo_smo_prep version 1.1.1:
+#        - Previous monthly file: /scf_archive/oco2/scf/pcs/repo/product/Version1/co2/202408/co2_smo_monthly_202408_B11207_240913224901s.txt (SHA1 = ab0635aa51faa0c394506f18c04931384d5277aa)
+#        - New hourly file: /scf_archive/oco2/scf/pcs/repo/ingest/co2/Version1/202409/co2_smo_surface-insitu_1_ccgg_hour_202409_20241010010015N.txt (SHA1 = 6a58572a85abd033380c677c9912a06b21b650f4)
+#    Added 2024-10 to 2024-10 using mlo_smo_prep version 1.1.1:
+#        - Previous monthly file: /oco2/product/Version1/co2/202409/co2_smo_monthly_202409_B11207_241011183106s.txt (SHA1 = 740ac054fa67b9eb9560adf69b41d584120820f8)
+#        - New hourly file: /oco2/ingest/co2/Version1/202410/co2_smo_surface-insitu_1_ccgg_hour_202410_20241110010014N.txt (SHA1 = 26e1de40135af690e67b2decb74d8691450d6a92)
+#    Added 2024-11 to 2024-11 using mlo_smo_prep version 1.1.1:
+#        - Previous monthly file: /oco2/product/Version1/co2/202410/co2_smo_monthly_202410_B11213_241112192657.txt (SHA1 = 945a6a7e25ac92242c98d84fa16c487c64282019)
+#        - New hourly file: /oco2/ingest/co2/Version1/202411/co2_smo_surface-insitu_1_ccgg_hour_202411_20241210010014N.txt (SHA1 = e7a2c3cae9620638f11949f3244fd83e5a2bcecc)
+#    Added 2024-12 to 2024-12 using mlo_smo_prep version 1.1.1:
+#        - Previous monthly file: /oco2/product/Version1/co2/202411/co2_smo_monthly_202411_B11213_241210182650.txt (SHA1 = 1d9db9582a60580945711d7a5447806d16685cc1)
+#        - New hourly file: /oco2/ingest/co2/Version1/202412/co2_smo_surface-insitu_1_ccgg_hour_202412_20250110010014N.txt (SHA1 = 01615c5da99aad085fc6c626841c239b6cbd0429)
+#    Added 2025-01 to 2025-01 using mlo_smo_prep version 1.1.1:
+#        - Previous monthly file: /oco2/product/Version1/co2/202412/co2_smo_monthly_202412_B11213_250113210926.txt (SHA1 = 435a72673b5fb6683ad520981df37664ed622097)
+#        - New hourly file: /oco2/ingest/co2/Version1/202501/co2_smo_surface-insitu_1_ccgg_hour_202501_20250210010014a.txt (SHA1 = 194ce5b45358cce38c636466f8da6dbf31d1bcdc)
+#    Added 2025-02 to 2025-02 using mlo_smo_prep version 1.1.1:
+#        - Previous monthly file: /oco2/product/Version1/co2/202501/co2_smo_monthly_202501_B11213_250228184106.txt (SHA1 = 97f66cb588fab4c4df01b02a029721bfc329cda2)
+#        - New hourly file: /oco2/ingest/co2/Version1/202502/co2_smo_surface-insitu_1_ccgg_hour_202502_20250310010015N.txt (SHA1 = bb7aa385196180ff0450e79e70bb524416789348)
+#    Added 2025-03 to 2025-03 using mlo_smo_prep version 1.1.1:
+#        - Previous monthly file: /oco2/product/Version1/co2/202502/co2_smo_monthly_202502_B11213_250310204119.txt (SHA1 = bc8124c810aa0ab3d542072746d12c41bab64be2)
+#        - New hourly file: /oco2/ingest/co2/Version1/202503/co2_smo_surface-insitu_1_ccgg_hour_202503_20250415112342N.txt (SHA1 = 1b7b7454e164bcb333c15c4a81704123278707f4)
+#    Added 2025-04 to 2025-04 using mlo_smo_prep version 1.1.1:
+#        - Previous monthly file: /oco2/product/Version1/co2/202503/co2_smo_monthly_202503_B11213_250416221037.txt (SHA1 = 9decf87af35688ccd82b460452bb0d00297eb603)
+#        - New hourly file: /oco2/ingest/co2/Version1/202504/co2_smo_surface-insitu_1_ccgg_hour_202504_250522135701a.txt (SHA1 = 1504722dff8689e06b91a4856073e7ac845d02e1)
+#    Added 2025-05 to 2025-05 using mlo_smo_prep version 1.1.1:
+#        - Previous monthly file: /oco2/product/Version1/co2/202504/co2_smo_monthly_202504_B11213_250522222955.txt (SHA1 = c54290601f0a6cb3e6999d3a0dfa55d174645290)
+#        - New hourly file: /oco2/ingest/co2/Version1/202505/co2_smo_surface-insitu_1_ccgg_hour_202505_20250611205858a.txt (SHA1 = 869ef7076f5f6f924fb6e3fef0057f813994170b)
+#    Added 2025-06 to 2025-06 using mlo_smo_prep version 1.1.1:
+#        - Previous monthly file: /oco2/product/Version1/co2/202505/co2_smo_monthly_202505_B11213_250611211221.txt (SHA1 = d9e44c183f15ef411951112c626056abf7c1a832)
+#        - New hourly file: /oco2/ingest/co2/Version1/202506/co2_smo_surface-insitu_1_ccgg_hour_202506_20250710010013a.txt (SHA1 = 686bea6622cc24a12f9ada29d81bb52892f4b8a8)
+#    Added 2025-07 to 2025-07 using mlo_smo_prep version 1.1.1:
+#        - Previous monthly file: /oco2/product/Version1/co2/202506/co2_smo_monthly_202506_B11213_250710172641.txt (SHA1 = f351dab7172fe0023a8900fae6175fba66858a31)
+#        - New hourly file: /oco2/ingest/co2/Version1/202507/co2_smo_surface-insitu_1_ccgg_hour_202507_20250810010019a.txt (SHA1 = e268811099dfb0748bc0fa4c2d6aecafc3557cc8)
+#    Added 2025-08 to 2025-08 using mlo_smo_prep version 1.1.1:
+#        - Previous monthly file: /oco2/product/Version1/co2/202507/co2_smo_monthly_202507_B11213_250811223452.txt (SHA1 = 923faf193bc6f504f1eaab5a2d69c5321bfc1b32)
+#        - New hourly file: /oco2/ingest/co2/Version1/202508/co2_smo_surface-insitu_1_ccgg_hour_202508_20250910010017a.txt (SHA1 = adfd50612eb458e74873b612618b3e2936266106)
+#    Added 2025-09 to 2025-09 using mlo_smo_prep version 1.1.1:
+#        - Previous monthly file: /oco2/product/Version1/co2/202508/co2_smo_monthly_202508_B11213_250912175223.txt (SHA1 = 0321aa225b49a478bb2b11b6d330d65f7ffedece)
+#        - New hourly file: /oco2/ingest/co2/Version1/202509/co2_smo_surface-insitu_1_ccgg_hour_202509_20251010202200a.txt (SHA1 = 80b2d8fb3a9b5d67a27317b1bcce1b4f25519ac7)
+#    Added 2025-10 to 2025-10 using mlo_smo_prep version 1.1.1:
+#        - Previous monthly file: /oco2/product/Version1/co2/202509/co2_smo_monthly_202509_B11213_251010202530.txt (SHA1 = 1a16b4c2cfce89248e287ea58c6d616843721ec9)
+#        - New hourly file: /oco2/ingest/co2/Version1/202510/co2_smo_surface-insitu_1_ccgg_hour_202510_20251110233830a.txt (SHA1 = 5281c358a15f2caf3ffa2106ac6bfecead8a71db)
+# END HISTORY
+#
+# data_fields: site year month value
+ SMO  1976   1  332.470000
+ SMO  1976   2  331.890000
+ SMO  1976   3  331.350000
+ SMO  1976   4  331.120000
+ SMO  1976   5  330.930000
+ SMO  1976   6  331.100000
+ SMO  1976   7  330.970000
+ SMO  1976   8  331.130000
+ SMO  1976   9  331.260000
+ SMO  1976  10  331.520000
+ SMO  1976  11  331.990000
+ SMO  1976  12  331.690000
+ SMO  1977   1  331.740000
+ SMO  1977   2  331.980000
+ SMO  1977   3  332.080000
+ SMO  1977   4  332.140000
+ SMO  1977   5  333.040000
+ SMO  1977   6  333.660000
+ SMO  1977   7  333.210000
+ SMO  1977   8  333.030000
+ SMO  1977   9  332.820000
+ SMO  1977  10  332.950000
+ SMO  1978   2  334.520000
+ SMO  1978   3  335.130000
+ SMO  1978   4  335.300000
+ SMO  1978   5  335.090000
+ SMO  1978   6  335.230000
+ SMO  1978   7  334.930000
+ SMO  1978   8  335.560000
+ SMO  1978   9  335.480000
+ SMO  1979   2  336.110000
+ SMO  1979   3  335.910000
+ SMO  1979   4  336.460000
+ SMO  1979   5  335.920000
+ SMO  1979   6  336.030000
+ SMO  1979   7  336.290000
+ SMO  1979   8  336.370000
+ SMO  1979   9  336.320000
+ SMO  1979  10  336.610000
+ SMO  1979  11  336.670000
+ SMO  1979  12  336.880000
+ SMO  1980   1  337.470000
+ SMO  1980   2  337.540000
+ SMO  1980   3  337.910000
+ SMO  1980   4  337.360000
+ SMO  1980   5  337.830000
+ SMO  1980   6  337.980000
+ SMO  1980   7  338.390000
+ SMO  1980   8  338.300000
+ SMO  1980   9  338.180000
+ SMO  1980  10  338.100000
+ SMO  1980  11  338.530000
+ SMO  1980  12  338.740000
+ SMO  1981   1  338.860000
+ SMO  1981   2  339.230000
+ SMO  1981   3  338.710000
+ SMO  1981   4  339.300000
+ SMO  1981   5  338.720000
+ SMO  1981   6  339.300000
+ SMO  1981   7  339.040000
+ SMO  1981   8  339.140000
+ SMO  1981   9  339.190000
+ SMO  1981  10  339.000000
+ SMO  1981  11  339.430000
+ SMO  1981  12  339.820000
+ SMO  1982   1  340.340000
+ SMO  1982   2  340.390000
+ SMO  1982   3  340.310000
+ SMO  1982   4  340.280000
+ SMO  1982   5  340.060000
+ SMO  1982   6  340.000000
+ SMO  1982   7  340.690000
+ SMO  1982   8  340.660000
+ SMO  1982   9  340.340000
+ SMO  1982  10  340.160000
+ SMO  1982  11  340.290000
+ SMO  1982  12  340.340000
+ SMO  1983   1  340.490000
+ SMO  1983   2  340.640000
+ SMO  1983   3  340.940000
+ SMO  1983   4  340.700000
+ SMO  1983   5  341.220000
+ SMO  1983   6  341.890000
+ SMO  1983   7  342.300000
+ SMO  1983   8  342.390000
+ SMO  1983   9  342.420000
+ SMO  1983  10  342.450000
+ SMO  1983  11  342.800000
+ SMO  1983  12  342.990000
+ SMO  1984   1  343.540000
+ SMO  1984   2  343.800000
+ SMO  1984   3  343.820000
+ SMO  1984   4  343.950000
+ SMO  1984   5  343.080000
+ SMO  1984   6  343.410000
+ SMO  1984   7  343.780000
+ SMO  1984   8  343.870000
+ SMO  1984   9  343.780000
+ SMO  1984  10  343.760000
+ SMO  1984  11  343.860000
+ SMO  1984  12  344.420000
+ SMO  1985   1  344.500000
+ SMO  1985   2  344.790000
+ SMO  1985   3  344.900000
+ SMO  1985   4  344.730000
+ SMO  1985   5  345.080000
+ SMO  1985   6  344.640000
+ SMO  1985   7  345.330000
+ SMO  1985   8  344.960000
+ SMO  1985   9  344.720000
+ SMO  1985  10  344.700000
+ SMO  1985  11  345.000000
+ SMO  1985  12  345.490000
+ SMO  1986   1  346.030000
+ SMO  1986   2  346.280000
+ SMO  1986   3  346.040000
+ SMO  1986   4  346.240000
+ SMO  1986   5  345.990000
+ SMO  1986   6  346.680000
+ SMO  1986   7  346.640000
+ SMO  1986   8  346.230000
+ SMO  1986   9  346.410000
+ SMO  1986  10  346.460000
+ SMO  1986  11  346.410000
+ SMO  1986  12  346.530000
+ SMO  1987   1  347.000000
+ SMO  1987   2  347.250000
+ SMO  1987   3  347.200000
+ SMO  1987   4  346.860000
+ SMO  1987   5  348.130000
+ SMO  1987   6  348.330000
+ SMO  1987   7  348.930000
+ SMO  1987   8  348.200000
+ SMO  1987   9  348.370000
+ SMO  1987  10  348.540000
+ SMO  1987  11  348.730000
+ SMO  1987  12  349.210000
+ SMO  1988   1  349.670000
+ SMO  1988   2  350.020000
+ SMO  1988   3  350.100000
+ SMO  1988   4  351.470000
+ SMO  1988   5  350.090000
+ SMO  1988   6  350.080000
+ SMO  1988   7  350.360000
+ SMO  1988   8  350.420000
+ SMO  1988   9  349.970000
+ SMO  1988  10  350.320000
+ SMO  1988  11  350.790000
+ SMO  1988  12  351.300000
+ SMO  1989   1  351.630000
+ SMO  1989   2  351.930000
+ SMO  1989   3  351.720000
+ SMO  1989   4  351.720000
+ SMO  1989   5  352.030000
+ SMO  1989   6  351.260000
+ SMO  1989   7  351.640000
+ SMO  1989   8  351.590000
+ SMO  1989   9  351.460000
+ SMO  1989  10  351.540000
+ SMO  1989  11  351.940000
+ SMO  1989  12  352.160000
+ SMO  1990   1  352.550000
+ SMO  1990   2  353.400000
+ SMO  1990   5  352.380000
+ SMO  1990   6  353.140000
+ SMO  1990   7  352.940000
+ SMO  1990   8  352.990000
+ SMO  1990   9  353.060000
+ SMO  1990  10  352.900000
+ SMO  1990  11  353.050000
+ SMO  1990  12  353.610000
+ SMO  1991   1  354.190000
+ SMO  1991   2  354.590000
+ SMO  1991   3  354.540000
+ SMO  1991   4  354.020000
+ SMO  1991   5  353.980000
+ SMO  1991   6  354.230000
+ SMO  1991   7  354.410000
+ SMO  1991   8  354.000000
+ SMO  1991   9  353.840000
+ SMO  1991  10  353.930000
+ SMO  1991  11  354.520000
+ SMO  1991  12  354.980000
+ SMO  1992   1  354.750000
+ SMO  1992   2  354.740000
+ SMO  1992   3  355.150000
+ SMO  1992   4  354.840000
+ SMO  1992   5  354.960000
+ SMO  1992   6  355.080000
+ SMO  1992   7  355.620000
+ SMO  1992   8  355.580000
+ SMO  1992   9  355.240000
+ SMO  1992  10  355.390000
+ SMO  1992  11  355.090000
+ SMO  1992  12  355.540000
+ SMO  1993   1  355.640000
+ SMO  1993   2  355.690000
+ SMO  1993   3  356.180000
+ SMO  1993   4  355.920000
+ SMO  1993   5  354.970000
+ SMO  1993   6  355.670000
+ SMO  1993   7  355.800000
+ SMO  1993   8  356.370000
+ SMO  1993   9  356.060000
+ SMO  1993  10  356.090000
+ SMO  1993  11  356.430000
+ SMO  1993  12  356.900000
+ SMO  1994   1  357.260000
+ SMO  1994   2  357.630000
+ SMO  1994   3  357.350000
+ SMO  1994   4  357.540000
+ SMO  1994   5  357.180000
+ SMO  1994   6  357.440000
+ SMO  1994   7  357.830000
+ SMO  1994   8  357.600000
+ SMO  1994   9  357.610000
+ SMO  1994  10  357.900000
+ SMO  1994  11  358.440000
+ SMO  1994  12  358.860000
+ SMO  1995   1  358.840000
+ SMO  1995   2  359.660000
+ SMO  1995   3  359.620000
+ SMO  1995   4  359.450000
+ SMO  1995   5  359.820000
+ SMO  1995   6  359.670000
+ SMO  1995   7  359.860000
+ SMO  1995   8  359.690000
+ SMO  1995   9  359.560000
+ SMO  1995  10  359.840000
+ SMO  1995  11  360.250000
+ SMO  1995  12  360.420000
+ SMO  1996   1  361.400000
+ SMO  1996   2  361.550000
+ SMO  1996   3  361.510000
+ SMO  1996   4  360.470000
+ SMO  1996   5  361.090000
+ SMO  1996   6  361.240000
+ SMO  1996   7  360.980000
+ SMO  1996   8  361.160000
+ SMO  1996   9  360.960000
+ SMO  1996  10  361.070000
+ SMO  1996  11  361.490000
+ SMO  1996  12  361.950000
+ SMO  1997   1  362.230000
+ SMO  1997   2  362.410000
+ SMO  1997   3  362.730000
+ SMO  1997   4  362.020000
+ SMO  1997   5  361.600000
+ SMO  1997   6  361.590000
+ SMO  1997   7  362.300000
+ SMO  1997   8  362.270000
+ SMO  1997   9  362.240000
+ SMO  1997  11  363.490000
+ SMO  1997  12  363.610000
+ SMO  1998   1  363.940000
+ SMO  1998   2  363.520000
+ SMO  1998   3  363.810000
+ SMO  1998   4  363.310000
+ SMO  1998   7  365.260000
+ SMO  1998   8  365.270000
+ SMO  1998   9  365.420000
+ SMO  1998  10  365.780000
+ SMO  1998  11  366.140000
+ SMO  1998  12  366.570000
+ SMO  1999   1  367.020000
+ SMO  1999   2  367.460000
+ SMO  1999   3  366.650000
+ SMO  1999   4  367.080000
+ SMO  1999   5  367.130000
+ SMO  1999   6  368.100000
+ SMO  1999   7  367.430000
+ SMO  1999   8  367.500000
+ SMO  1999   9  366.920000
+ SMO  1999  10  367.170000
+ SMO  1999  11  367.510000
+ SMO  1999  12  367.870000
+ SMO  2000   1  368.610000
+ SMO  2000   2  368.420000
+ SMO  2000   3  368.770000
+ SMO  2000   4  368.300000
+ SMO  2000   5  367.830000
+ SMO  2000   6  367.660000
+ SMO  2000   7  368.490000
+ SMO  2000   8  368.700000
+ SMO  2000   9  368.560000
+ SMO  2000  10  369.210000
+ SMO  2000  11  369.610000
+ SMO  2000  12  369.370000
+ SMO  2001   1  369.630000
+ SMO  2001   2  369.970000
+ SMO  2001   3  370.150000
+ SMO  2001   4  369.430000
+ SMO  2001   5  368.890000
+ SMO  2001   6  370.040000
+ SMO  2001   7  370.470000
+ SMO  2001   8  370.140000
+ SMO  2001   9  369.990000
+ SMO  2001  10  370.080000
+ SMO  2001  11  370.390000
+ SMO  2001  12  370.730000
+ SMO  2002   1  371.190000
+ SMO  2002   2  371.680000
+ SMO  2002   3  372.960000
+ SMO  2002   4  372.250000
+ SMO  2002   5  371.310000
+ SMO  2002   6  371.430000
+ SMO  2002   7  372.170000
+ SMO  2002   8  372.330000
+ SMO  2002   9  372.210000
+ SMO  2002  10  372.490000
+ SMO  2002  11  373.190000
+ SMO  2002  12  373.310000
+ SMO  2003   1  373.990000
+ SMO  2003   2  373.540000
+ SMO  2003   3  374.530000
+ SMO  2003   4  374.060000
+ SMO  2003   5  373.730000
+ SMO  2003   6  373.550000
+ SMO  2003   7  374.330000
+ SMO  2003   8  374.730000
+ SMO  2003   9  374.450000
+ SMO  2003  10  374.550000
+ SMO  2003  11  374.850000
+ SMO  2003  12  375.410000
+ SMO  2004   1  375.530000
+ SMO  2004   2  376.150000
+ SMO  2004   3  376.430000
+ SMO  2004   4  376.300000
+ SMO  2004   5  375.730000
+ SMO  2004   6  376.220000
+ SMO  2004   7  376.370000
+ SMO  2004   8  376.770000
+ SMO  2004   9  376.220000
+ SMO  2004  10  376.300000
+ SMO  2004  11  376.650000
+ SMO  2004  12  377.050000
+ SMO  2005   1  377.690000
+ SMO  2005   2  376.950000
+ SMO  2005   3  378.170000
+ SMO  2005   4  377.910000
+ SMO  2005   5  377.370000
+ SMO  2005   6  378.220000
+ SMO  2005   7  378.400000
+ SMO  2005   8  378.460000
+ SMO  2005   9  378.400000
+ SMO  2005  10  378.540000
+ SMO  2005  11  378.990000
+ SMO  2005  12  379.480000
+ SMO  2006   1  380.120000
+ SMO  2006   2  380.930000
+ SMO  2006   3  380.020000
+ SMO  2006   4  379.950000
+ SMO  2006   5  380.100000
+ SMO  2006   6  379.790000
+ SMO  2006   7  380.160000
+ SMO  2006   8  379.880000
+ SMO  2006   9  379.900000
+ SMO  2006  10  379.950000
+ SMO  2006  11  380.500000
+ SMO  2006  12  380.960000
+ SMO  2007   1  381.070000
+ SMO  2007   2  382.150000
+ SMO  2007   3  382.320000
+ SMO  2007   4  382.160000
+ SMO  2007   5  382.350000
+ SMO  2007   6  382.100000
+ SMO  2007   7  382.370000
+ SMO  2007   8  382.220000
+ SMO  2007   9  382.120000
+ SMO  2007  10  382.400000
+ SMO  2007  11  382.870000
+ SMO  2007  12  383.220000
+ SMO  2008   1  384.090000
+ SMO  2008   2  383.880000
+ SMO  2008   3  383.790000
+ SMO  2008   4  383.420000
+ SMO  2008   5  384.040000
+ SMO  2008   6  384.150000
+ SMO  2008   7  383.690000
+ SMO  2008   8  383.850000
+ SMO  2008   9  383.820000
+ SMO  2008  10  384.110000
+ SMO  2008  11  384.550000
+ SMO  2008  12  385.280000
+ SMO  2009   1  385.830000
+ SMO  2009   2  385.640000
+ SMO  2009   3  386.060000
+ SMO  2009   4  385.640000
+ SMO  2009   5  385.240000
+ SMO  2009   6  385.070000
+ SMO  2009   7  385.810000
+ SMO  2009   8  385.820000
+ SMO  2009   9  385.800000
+ SMO  2009  10  385.890000
+ SMO  2009  11  386.170000
+ SMO  2009  12  386.470000
+ SMO  2010   1  387.190726
+ SMO  2010   2  386.649442
+ SMO  2010   3  387.116587
+ SMO  2010   4  387.632529
+ SMO  2010   5         NaN
+ SMO  2010   6  387.403864
+ SMO  2010   7  387.746151
+ SMO  2010   8  387.852859
+ SMO  2010   9  387.694318
+ SMO  2010  10  387.985302
+ SMO  2010  11  388.546147
+ SMO  2010  12  388.995070
+ SMO  2011   1  389.703718
+ SMO  2011   2  389.392835
+ SMO  2011   3  389.490357
+ SMO  2011   4         NaN
+ SMO  2011   5  388.785915
+ SMO  2011   6  389.059011
+ SMO  2011   7  389.525971
+ SMO  2011   8  389.883683
+ SMO  2011   9  389.961342
+ SMO  2011  10  390.082091
+ SMO  2011  11  390.562814
+ SMO  2011  12  390.876570
+ SMO  2012   1  391.527405
+ SMO  2012   2  391.928410
+ SMO  2012   3  391.712103
+ SMO  2012   4  391.568746
+ SMO  2012   5  391.625882
+ SMO  2012   6  391.329890
+ SMO  2012   7  391.494908
+ SMO  2012   8  391.708472
+ SMO  2012   9  391.617848
+ SMO  2012  10  392.036296
+ SMO  2012  11  392.887019
+ SMO  2012  12  393.328299
+ SMO  2013   1  393.885673
+ SMO  2013   2  394.260096
+ SMO  2013   3  394.450364
+ SMO  2013   4  394.256349
+ SMO  2013   5  394.099563
+ SMO  2013   6  394.134303
+ SMO  2013   7  394.460610
+ SMO  2013   8  394.726369
+ SMO  2013   9  394.499910
+ SMO  2013  10  394.626319
+ SMO  2013  11  394.961605
+ SMO  2013  12  395.547429
+ SMO  2014   1  396.531046
+ SMO  2014   2  396.546420
+ SMO  2014   3  396.700889
+ SMO  2014   4  395.533465
+ SMO  2014   5  395.526211
+ SMO  2014   6  395.885332
+ SMO  2014   7  397.085000
+ SMO  2014   8  396.649211
+ SMO  2014   9  396.247911
+ SMO  2014  10  396.505678
+ SMO  2014  11  396.887432
+ SMO  2014  12  397.105957
+ SMO  2015   1  398.600741
+ SMO  2015   2  398.433807
+ SMO  2015   3  398.910932
+ SMO  2015   4  398.258825
+ SMO  2015   5  397.688599
+ SMO  2015   6  397.976421
+ SMO  2015   7  398.224390
+ SMO  2015   8  398.537857
+ SMO  2015   9  398.745696
+ SMO  2015  10  398.892493
+ SMO  2015  11  399.445879
+ SMO  2015  12  400.312500
+ SMO  2016   1  400.445129
+ SMO  2016   2  400.919793
+ SMO  2016   3  401.692910
+ SMO  2016   4  401.500037
+ SMO  2016   5  401.919610
+ SMO  2016   6  401.728000
+ SMO  2016   7  402.290112
+ SMO  2016   8  402.529419
+ SMO  2016   9  402.383577
+ SMO  2016  10  402.351378
+ SMO  2016  11  402.675633
+ SMO  2016  12  403.536457
+ SMO  2017   1  403.905777
+ SMO  2017   2  404.723691
+ SMO  2017   3  403.929058
+ SMO  2017   4  404.155392
+ SMO  2017   5  403.581113
+ SMO  2017   6  403.287552
+ SMO  2017   7  404.206112
+ SMO  2017   8  403.922975
+ SMO  2017   9  404.141777
+ SMO  2017  10  404.344135
+ SMO  2017  11  405.001368
+ SMO  2017  12  405.671822
+ SMO  2018   1  406.189322
+ SMO  2018   2  406.203229
+ SMO  2018   3  406.862494
+ SMO  2018   4  406.774309
+ SMO  2018   5  405.888556
+ SMO  2018   6  406.098371
+ SMO  2018   7  406.453524
+ SMO  2018   8  406.757166
+ SMO  2018   9  406.324787
+ SMO  2018  10  406.555158
+ SMO  2018  11  407.140301
+ SMO  2018  12  407.864613
+ SMO  2019   1  408.730111
+ SMO  2019   2  408.890613
+ SMO  2019   3  408.780822
+ SMO  2019   4  408.746110
+ SMO  2019   5  408.884730
+ SMO  2019   6  408.755730
+ SMO  2019   7  408.997981
+ SMO  2019   8  409.741965
+ SMO  2019   9  409.144451
+ SMO  2019  10  409.530624
+ SMO  2019  11  410.168835
+ SMO  2019  12  410.621436
+ SMO  2020   1         NaN
+ SMO  2020   2         NaN
+ SMO  2020   3         NaN
+ SMO  2020   4         NaN
+ SMO  2020   5  411.403295
+ SMO  2020   6  410.875375
+ SMO  2020   7  411.615738
+ SMO  2020   8  411.743773
+ SMO  2020   9  411.693814
+ SMO  2020  10  411.796017
+ SMO  2020  11  412.458291
+ SMO  2020  12  413.256071
+ SMO  2021   1  413.392931
+ SMO  2021   2  414.140717
+ SMO  2021   3  413.596992
+ SMO  2021   4  412.866806
+ SMO  2021   5  413.409002
+ SMO  2021   6  413.007841
+ SMO  2021   7  413.303667
+ SMO  2021   8  413.550589
+ SMO  2021   9  413.623674
+ SMO  2021  10  413.823110
+ SMO  2021  11  414.425171
+ SMO  2021  12         NaN
+ SMO  2022   1  415.708952
+ SMO  2022   2  416.452065
+ SMO  2022   3  416.233512
+ SMO  2022   4  415.209878
+ SMO  2022   5  415.512615
+ SMO  2022   6  415.690394
+ SMO  2022   7  415.496705
+ SMO  2022   8  415.767279
+ SMO  2022   9  415.764661
+ SMO  2022  10  415.803863
+ SMO  2022  11  416.231328
+ SMO  2022  12  417.038168
+ SMO  2023   1  417.630485
+ SMO  2023   2  417.609115
+ SMO  2023   3  418.177829
+ SMO  2023   4  417.145517
+ SMO  2023   5  417.157295
+ SMO  2023   6  417.878690
+ SMO  2023   7  417.758388
+ SMO  2023   8  418.518254
+ SMO  2023   9  417.956702
+ SMO  2023  10  418.233319
+ SMO  2023  11  419.030064
+ SMO  2023  12  420.104090
+ SMO  2024   1  420.923169
+ SMO  2024   2  421.739211
+ SMO  2024   3  421.288596
+ SMO  2024   4  420.020519
+ SMO  2024   5         NaN
+ SMO  2024   6         NaN
+ SMO  2024   7         NaN
+ SMO  2024   8         NaN
+ SMO  2024   9         NaN
+ SMO  2024  10         NaN
+ SMO  2024  11         NaN
+ SMO  2024  12         NaN
+ SMO  2025   1         NaN
+ SMO  2025   2  425.285398
+ SMO  2025   3         NaN
+ SMO  2025   4         NaN
+ SMO  2025   5         NaN
+ SMO  2025   6         NaN
+ SMO  2025   7         NaN
+ SMO  2025   8         NaN
+ SMO  2025   9         NaN
+ SMO  2025  10         NaN

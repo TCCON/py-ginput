@@ -32,6 +32,11 @@ $ ./run_ginput mod \
     GEOS_MET_DIR
 ```
 
+```{note}
+Remember, if you installed with conda or pip, you probably want to use `ginput_cli`
+instead of `./run_ginput.py`. 
+```
+
 This will take a few minutes to run.
 Once complete, you will see a directory tree in your `GEOS_MET_DIR` like so:
 

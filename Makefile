@@ -14,11 +14,14 @@ install-man:
 run_ginput.py: .run_ginput_template.py
 	./install-runscript.sh
 
-test:
+fulltest:
 	pytest -v tests/
 
+test:
+	pytest -v -m 'not glacial' tests/
+
 quicktest:
-	pytest -v -m 'not slow' tests/
+	pytest -v -m 'not slow and not glacial' tests/
 
 get-test-data:
 	python -m ginput.testing.test_utils get
