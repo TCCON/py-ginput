@@ -7,13 +7,10 @@ import os
 from datetime import datetime, timedelta 
 
 
+from ..common_utils import mod_utils
 
-sys.path.append('/home/lmillan/work/tccon/ginput/py-ginput-devel/')
-
-from ginput.common_utils import mod_utils
-
-from ginput.gph2alt import convert_gph_to_alt, auto_broadcast
-from ginput.tropopause_routines import computetropopauses
+from ..common_utils.gph2alt import convert_gph_to_alt, auto_broadcast
+from ..common_utils.tropopause_routines import computetropopauses
 
 
 ##Q    I   specific humidity g kg-1
