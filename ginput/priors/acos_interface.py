@@ -132,8 +132,8 @@ _def_errh = ErrorHandler(suppress_error=False)
 
 def acos_interface_main(instrument, met_resampled_file, geos_files, output_file, mlo_co2_file=None, smo_co2_file=None,
                         use_trop_eqlat=False, cache_strat_lut=False, truncate_mlo_smo_by=0, nprocs=0, interp_pickle_dir='.',
-                        fo2_file=fo2_prep.DEFAULT_FO2_FILE, auto_update_fo2_file=False, pre_1p6_interp: bool = False,
-                        error_handler=_def_errh):
+                        fo2_file=fo2_prep.DEFAULT_FO2_FILE, auto_update_fo2_file=False, include_o2: bool = True,
+                        pre_1p6_interp: bool = False, error_handler=_def_errh):
     """
     The primary interface to create CO2 priors for the ACOS algorithm
 
@@ -178,6 +178,9 @@ def acos_interface_main(instrument, met_resampled_file, geos_files, output_file,
      not exist, the outputs are downloaded and created. Note that outputs will always be downloaded to the default directory.
      using this option. If you want more control, please use the "update_fo2" subcommand of ``run_ginput.py``.
 
+    :param include_o2: set to ``False`` to skip including O2 DMFs in the output file. Useful if you need to backport
+     more recent versions of ginput to systems that are not set up to provide the O2 input files.
+
     :param pre_1p6_interp: set to ``True`` to revert how MLO/SMO data are interpolated and extrapolated to the
      pre-1.6 approach. Note that this approach does not handle large gaps in either site well, and therefore
      should only be used if you truly need backwards compatibility with ginput version 1.5.x and earlier.
@@ -202,6 +205,8 @@ def acos_interface_main(instrument, met_resampled_file, geos_files, output_file,
         raise IOError('Given path for mlo_co2_file ({}) does not exist'.format(mlo_co2_file))
     if smo_co2_file is not None and not os.path.exists(smo_co2_file):
         raise IOError('Given path for smo_co2_file ({}) does not exist'.format(smo_co2_file))
+    if not include_o2:
+        logger.info('Will not compute or include O2 DMFs, as requested')
 
     if instrument == 'oco':
         met_data, prior_flags = read_oco_resampled_met(met_resampled_file, error_handler=error_handler)
@@ -265,7 +270,6 @@ def acos_interface_main(instrument, met_resampled_file, geos_files, output_file,
 
     met_data['el'] = eqlat_array.reshape(orig_shape)
     prior_flags = prior_flags.reshape(flags_orig_shape)
-    o2_dmfs = _make_o2_dmf_array(met_data['dates'], fo2_file=fo2_file, auto_update_fo2_file=auto_update_fo2_file)
 
     # Create the priors
     if cache_strat_lut:
@@ -313,14 +317,16 @@ def acos_interface_main(instrument, met_resampled_file, geos_files, output_file,
         # shape get replaced with the corresponding value from orig_shape.
         var_type_info = {'gas_record_date': (orig_shape, None)}
 
+        # We can pass fo2_file=None here because we don't use this part of the code to calculate the O2 DMF, that is
+        # handled separately by _make_o2_dmf_array
         if nprocs == 0:
             profiles, units = _prior_serial(orig_shape=orig_shape, var_mapping=var_mapping, var_type_info=var_type_info,
                                             met_data=met_data, gas_record=gas_record, prior_flags=gas_prior_flags,
-                                            use_trop_eqlat=use_trop_eqlat, fo2_file=fo2_file, error_handler=error_handler)
+                                            use_trop_eqlat=use_trop_eqlat, fo2_file=None, error_handler=error_handler)
         else:
             profiles, units = _prior_parallel(orig_shape=orig_shape, var_mapping=var_mapping, var_type_info=var_type_info,
                                               met_data=met_data, gas_record=gas_record, prior_flags=gas_prior_flags, nprocs=nprocs,
-                                              use_trop_eqlat=use_trop_eqlat, fo2_file=fo2_file, error_handler=error_handler)
+                                              use_trop_eqlat=use_trop_eqlat, fo2_file=None, error_handler=error_handler)
 
         # Add latitude, longitude, and flags to the priors file
         profiles['sounding_longitude'] = met_data['longitude']
@@ -357,7 +363,11 @@ def acos_interface_main(instrument, met_resampled_file, geos_files, output_file,
                 logger.debug('GOSAT array "{}" squeezed from {} to {}'.format(key, value.shape, profiles[key].shape))
 
         # Write the priors to the file requested.
-        write_o2_h5(output_file, o2_dmfs)
+        if include_o2:
+            o2_dmfs = _make_o2_dmf_array(met_data['dates'], fo2_file=fo2_file, auto_update_fo2_file=auto_update_fo2_file)
+            write_o2_h5(output_file, o2_dmfs)
+        else:
+            logger.info('O2 DMFs omitted from the output file, as requested')
         write_prior_h5(output_file, profiles, units, prior_group=prior_group.format(gas))
         if gas != 'co':
             insitu_record_to_h5_group(output_file, gas_record.conc_seasonal, gas, record_group=record_group.format(gas))
@@ -1391,6 +1401,9 @@ def parse_args(parser=None, instrument=None):
                              'this will download Scripps and NOAA data to the "data" subdirectory within the ginput package '
                              'and create or update the O2 file if needed. If you need more control over where the data is '
                              'downloaded, you will need to use the "update_fo2" subcommand of run_ginput.py')
+    parser.add_argument('--no-include-o2', action='store_false', dest='include_o2',
+                        help='Set this flag to omit the O2 DMFs from the output file. Useful if you need to run this version '
+                             'of ginput within a pipeline not yet configured to provide the O2 input files.')
     parser.add_argument('-v', '--verbose', dest='log_level', default=0, action='count',
                         help='Increase logging verbosity')
     parser.add_argument('-q', '--quiet', dest='log_level', const=-1, action='store_const',

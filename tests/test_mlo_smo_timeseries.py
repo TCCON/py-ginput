@@ -163,6 +163,7 @@ def test_mlo_and_smo_gap_filling(
     compare_dataframes(expected_df, rec.conc_seasonal)
 
 
+@pytest.mark.glacial
 @pytest.mark.slow
 def test_mlo_smo_interp_cutoff(
     mlo_gap_test_file,
