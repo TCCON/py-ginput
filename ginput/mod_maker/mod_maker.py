@@ -111,6 +111,9 @@ from .tccon_sites import site_dict, tccon_site_info, tccon_site_info_for_date
 
 import matplotlib.pyplot as plt
 
+from . import era5_routines as e5r 
+
+import pickle
 
 ####################
 # Module constants #
@@ -118,7 +121,7 @@ import matplotlib.pyplot as plt
 
 _old_modmaker_modes = ('ncep','merradap42','merradap72','merraglob','fpglob','fpitglob')
 _new_fixedp_modes = ('fpit', 'fp')
-_new_native_modes = ('fpit-eta', 'fp-eta', 'it-eta','merra2')
+_new_native_modes = ('fpit-eta', 'fp-eta', 'it-eta','merra2','era5')
 _new_modmaker_modes = _new_fixedp_modes + _new_native_modes
 _default_mode = 'fpit-eta'
 
@@ -354,6 +357,7 @@ def write_mod(mod_path, version, site_lat, data=0, surf_data=0, func=None, muted
         mod_content.append(constants_fmt.format(*mod_constants))
         # surface variables
         mod_content.append('Pressure  Temperature     Height     MMW        H2O      RH         SLP        TROPPB        TROPPV      TROPPT       TROPT       SZA\n')
+        
         mod_content.append(surface_fmt.format(*[safe_format(surf_data[key]) for key in surf_var_order]))
         # version info
         mod_content.append(version+'\n')
@@ -645,7 +649,7 @@ def querry_indices(dataset,site_lat,site_lon_180,box_lat_half_width,box_lon_half
         merra_lon = dataset['lon'][:].data
         merra_lat = dataset['lat'][:].data
 
-
+    
     nearest_lat_ID = nearest(merra_lat,site_lat)
     if (site_lat-merra_lat[nearest_lat_ID])>0: # if exact same latitude, the second latitude for the grid square will be south
         min_lat_ID = nearest_lat_ID
@@ -1150,23 +1154,23 @@ def GEOS_files(GEOS_path, start_date, end_date, chm=False):
     # all GEOS5-FPIT Np/Nx files and their dates. Use 'glob' to avoid listing other files (e.g. the download link list)
     # in the directory. Whether glob.glob() and os.listdif() returns a sorted list is platform dependendent. Since the
     # main mod_maker logic depends on the profile and surface file lists being in the same order, we need to sort them.
+    if 'merra2' in  GEOS_path.lower() == False:
+        ncdf_list = sorted(glob.glob(os.path.join(GEOS_path, 'GEOS*.nc4')))
+        if chm:
+            ncdf_list = np.array([f for f in ncdf_list if 'chm' in os.path.basename(f)])
+        else:
+            ncdf_list = np.array([f for f in ncdf_list if 'chm' not in os.path.basename(f)])
+        ncdf_basenames = [os.path.basename(f) for f in ncdf_list]
+        ncdf_dates = np.array([mod_utils.datetime_from_geos_filename(elem) for elem in ncdf_basenames])
     
-    ncdf_list = sorted(glob.glob(os.path.join(GEOS_path, 'GEOS*.nc4')))
-    if chm:
-        ncdf_list = np.array([f for f in ncdf_list if 'chm' in os.path.basename(f)])
-    else:
-        ncdf_list = np.array([f for f in ncdf_list if 'chm' not in os.path.basename(f)])
-    ncdf_basenames = [os.path.basename(f) for f in ncdf_list]
-    ncdf_dates = np.array([mod_utils.datetime_from_geos_filename(elem) for elem in ncdf_basenames])
-
-    # just the one between the 'start_date' and 'end_date' dates
-    select_files = ncdf_list[(ncdf_dates>=start_date) & (ncdf_dates<end_date)]
-    select_dates = ncdf_dates[(ncdf_dates>=start_date) & (ncdf_dates<end_date)]
+        # just the one between the 'start_date' and 'end_date' dates
+        select_files = ncdf_list[(ncdf_dates>=start_date) & (ncdf_dates<end_date)]
+        select_dates = ncdf_dates[(ncdf_dates>=start_date) & (ncdf_dates<end_date)]
     
     
     
-    if 'merra2' in GEOS_path:
-        #this needs to be updated for multple dates.
+    if 'merra2' in GEOS_path.lower():
+        #this needs to be updated for multiple dates.
         yyyymmdd = start_date.strftime('%Y%m%d')
         merra2file = sorted(glob.glob(os.path.join(GEOS_path, 'MERRA2*'+yyyymmdd+'.nc4'))) 
         select_dates = []
@@ -1178,10 +1182,12 @@ def GEOS_files(GEOS_path, start_date, end_date, chm=False):
             for ss in syntimes:
                 select_dates.append(start_date+ timedelta(hours=ss))
                 select_files.append(merra2file[0])
-                
-        select_dates = np.asarray(select_dates)
-        select_files = np.asarray(select_files)
-        
+
+    
+    
+    select_dates = np.asarray(select_dates)
+    select_files = np.asarray(select_files)
+  
     if len(select_dates) == 0:
         raise IOError('No GEOS files between {} and {}'.format(start_date,end_date))
 
@@ -1745,7 +1751,212 @@ def extrapolate_to_surface(var_to_interp, INTERP_DATA, SLANT_DATA=None):
                     elem[var][:np.where(level_pres==first_p)[0][0]] = elem[var][np.where(level_pres==first_p)][0]
 
 
-def mod_maker_new(start_date=None, end_date=None, func_dict=None, GEOS_path=None, chem_path=None, locations=site_dict,
+def interpdata2mod_dicts(INTERP_DATA, site_dict, UTC_date, file_is_native, mod_dicts, 
+                         save_in_utc, flat_outdir, mod_path, product, keep_latlon_prec, func_dict, do_load_chem,
+                         slant, muted, date_ID, select_dates, start_it, geos_versions):
+
+
+    # add a mask for temperature = 0 K
+    for site in site_dict:
+        for var in INTERP_DATA[site]['prof']:
+            if var not in ['T','lev']:
+                INTERP_DATA[site]['prof'][var] = ma.masked_where(INTERP_DATA[site]['prof']['T']==0,INTERP_DATA[site]['prof'][var])
+        INTERP_DATA[site]['prof']['T'] = ma.masked_where(INTERP_DATA[site]['prof']['T']==0,INTERP_DATA[site]['prof']['T'])
+
+        INTERP_DATA[site]['surf']['SZA'] = rad2deg(sun_angles(UTC_date,deg2rad(site_dict[site]['lat']),deg2rad(site_dict[site]['lon_180']),site_dict[site]['alt'],INTERP_DATA[site]['surf']['PS'],INTERP_DATA[site]['surf']['T2M'])[0])
+
+    if not slant:
+        SLANT_DATA = None
+    else:
+        # get slant path coordinates corresponding to the altitude levels above each site
+        if not muted:
+            print('\t-Slantify:')
+        for i,site in enumerate(site_dict.keys()): # loops over sites
+            if not muted:
+                sys.stdout.write('\r\t\t site {:3d} / {}  {:>20}'.format(i+1,nsite,site_dict[site]['name']))
+                sys.stdout.flush()
+
+            site_alt = site_dict[site]['alt']
+            site_lat = site_dict[site]['lat']
+            site_lon = site_dict[site]['lon_180']
+
+            # vertical grid above site
+            H = INTERP_DATA[site]['prof']['H']*1000.0
+            pres = INTERP_DATA[site]['surf']['PS'] # surface pressure (hPa)
+            temp = INTERP_DATA[site]['surf']['T2M']-273.15 # surface temperature (celsius)
+
+
+            # get the (lat,lon,alt) of points on sunray correspondings to the vertical altitudes
+            site_dict[site]['slant_coords'] = slantify(UTC_date,site_lat,site_lon,site_alt,H,pres=pres,temp=temp)
+            for var in ['lat','lon','alt','vertical','slant']:
+                site_dict[site]['slant_coords'][var] = ma.masked_where(H.mask,site_dict[site]['slant_coords'][var])
+        if not muted:
+            print('\r\t\t{:<40s}'.format('DONE'))
+
+        # Set two lists with all the latitudes and longitudes of all sites at all slant levels
+        slant_lat = []
+        slant_lon = []
+        slat_slon = []
+        for site in site_dict:
+            if site_dict[site]['slant_coords']['sza']<90: # only make profiles where sun is above the horizon
+                slat = site_dict[site]['slant_coords']['lat']
+                slon = site_dict[site]['slant_coords']['lon']
+                slant_lat.extend(slat)
+                slant_lon.extend(slon)
+                for i in range(len(slat)):
+                    if slat[i] is ma.masked:
+                        continue
+                    if (slat[i],slon[i]) not in slat_slon:
+                        slat_slon.append((slat[i],slon[i]))
+
+        IDs_list = np.array([querry_indices([lat,lon],slat,slon,box_lat_half_width,box_lon_half_width) for slat,slon in slat_slon])
+
+        slant_lat = np.array([slat for slat,slon in slat_slon])
+        slant_lon = np.array([slon for slat,slon in slat_slon])
+
+        # Interpolate to each slant level (lat,lon)
+        # This will give a vertical profile at every (lat,lon) of all the slant levels
+        if not muted:
+            print('\t-Interpolate to each slant level (lat,lon) ...')
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            NEW_INTERP_DATA = {}
+            for var in varlist:
+                if not muted:
+                    sys.stdout.write('\r\t\tNow doing : {:<10s}'.format(var))
+                    sys.stdout.flush()
+                if DATA[var].ndim==2:
+                    NEW_INTERP_DATA[var] = lat_lon_interp(DATA[var],lat,lon,slant_lat,slant_lon,IDs_list)
+                    continue
+
+                NEW_INTERP_DATA[var] = np.zeros([nlev,len(IDs_list)])
+                for ilev,level_data in enumerate(DATA[var]):
+                    NEW_INTERP_DATA[var][ilev] = lat_lon_interp(level_data,lat,lon,slant_lat,slant_lon,IDs_list)
+            if not muted:
+                print('\r\t\t{:<40s}'.format('DONE'))
+        # setup masks
+        for var in set(varlist)-set(['PHIS']):
+            NEW_INTERP_DATA[var] = ma.masked_where(np.isnan(NEW_INTERP_DATA[var]),NEW_INTERP_DATA[var])
+
+        # Now just get the data along the slant paths
+        if not muted:
+            print('\t-Get data along slant paths ...')
+        SLANT_DATA = {}
+        for site in site_dict: # for each site
+            if site_dict[site]['slant_coords']['sza']<90:
+                SLANT_DATA[site] = site_dict[site]['slant_coords']
+                SLANT_DATA[site]['H'] = SLANT_DATA[site]['alt']
+                SLANT_DATA[site]['lev'] = INTERP_DATA[site]['prof']['lev']
+                for var in set(varlist)-set(['H','PHIS']): # for each variable
+                    SLANT_DATA[site][var] = np.array([])
+                    for i in range(len(SLANT_DATA[site]['H'])): # for each slant point
+                        slat,slon = SLANT_DATA[site]['lat'][i] , SLANT_DATA[site]['lon'][i]
+                        try:
+                            ID = slat_slon.index((slat,slon))
+                        except ValueError:
+                            SLANT_DATA[site][var] = np.append(SLANT_DATA[site][var],np.nan)
+                        else:
+                            SLANT_DATA[site][var] = np.append(SLANT_DATA[site][var],NEW_INTERP_DATA[var][i,ID])
+
+                    SLANT_DATA[site][var] = ma.masked_where(np.isnan(SLANT_DATA[site][var]),SLANT_DATA[site][var])
+    # end of 'if slant'
+
+    if not muted:
+        print('\t-Patch fill values ...')
+
+    if not file_is_native:
+        # Fixed pressure level files will result in NaNs for pressure levels below the surface. We want to fill
+        # those in. Native files are terrain following so this should not be an issue.
+        extrap_vars = {'RH': 'RH', 'QV': 'QV2M', 'T': 'T2M', 'H': 'H', 'EPV': None, 'O3': None}
+        extrap_vars.update({k: None for k in chem_variables})
+        extrapolate_to_surface(extrap_vars, INTERP_DATA, SLANT_DATA=SLANT_DATA)
+
+    for site in site_dict:
+        if slant:
+            all_data = [SLANT_DATA[site],INTERP_DATA[site]['prof']]
+        else:
+            all_data = [INTERP_DATA[site]['prof']]
+
+        # Needed this to be a fraction for the extrapolation so that it is in the same units as the profile. Now
+        # convert back to percent. Can't convert the profile RH here, it's used for certain calculations throughout
+        # that assume it is a fraction. It will get scaled in the write_mod function.
+        INTERP_DATA[site]['surf']['RH'] *= 100
+
+        for elem in all_data:
+            # Convert specific humidity, a wet mass mixing ratio, to dry mole fraction
+            elem['H2O_DMF'] = compute_h2o_dmf(elem['QV'], rmm)
+
+    if not muted:
+        if slant:
+            print('\t\t {:3d} / {} sites with SZA<90'.format(len(SLANT_DATA.keys()),nsite))
+        print('\t-Write mod files ...')
+
+    # write the .mod files
+    version = 'mod_maker.py   2019-06-20   SR/JL'
+
+    for site in INTERP_DATA:
+        mod_dicts[UTC_date][site] = dict()
+        site_lat = site_dict[site]['lat']
+        site_lon_180 = site_dict[site]['lon_180']
+
+        utc_offset = timedelta(hours=site_dict[site]['lon_180']/15.0) if not save_in_utc else timedelta(hours=0)
+        local_date = UTC_date + utc_offset
+
+        vertical_mod_path = mod_path if flat_outdir else os.path.join(mod_path,site,'vertical')
+        if not os.path.exists(vertical_mod_path):
+            os.makedirs(vertical_mod_path)
+
+        if slant:
+            # We already check at the beginning of this function that flat_outdir = False if slant = True
+            # so we don't need to handle the flat_outdir = True case here.
+            slant_mod_path =  os.path.join(mod_path,site,'slant')
+            if not os.path.exists(slant_mod_path):
+                os.makedirs(slant_mod_path)
+
+        # directions for .mod file name
+        if site_lat >= 0:
+            ns = 'N'
+        else:
+            ns = 'S'
+
+        if site_lon_180 >= 0:
+            ew = 'E'
+        else:
+            ew = 'W'
+
+        mod_name = mod_utils.mod_file_name(product.upper(), local_date, timedelta(hours=3), site_lat, site_lon_180, ew, ns, mod_path, round_latlon=not keep_latlon_prec, in_utc=save_in_utc)
+        if not muted:
+            print('\t\t\t{:<20s} : {}'.format(site_dict[site]['name'], mod_name))
+
+        
+        # write vertical mod file
+        mod_file_path = os.path.join(vertical_mod_path,mod_name)
+        vertical_mod_dict = write_mod(mod_file_path,version,site_lat,data=INTERP_DATA[site]['prof']
+                                      ,surf_data=INTERP_DATA[site]['surf'],func=func_dict[UTC_date],
+                                      muted=muted,slant=slant,chem_vars=do_load_chem,geos_versions=geos_versions)
+
+        if slant:
+            # write slant mod_file
+            if site in SLANT_DATA.keys():
+                if not muted:
+                    print('\t\t\t{:>20s} + slant'.format(''))
+                mod_file_path = os.path.join(slant_mod_path,mod_name)
+                slant_mod_dict = write_mod(mod_file_path,version,site_lat,data=SLANT_DATA[site],surf_data=INTERP_DATA[site]['surf'],func=func_dict[UTC_date],muted=muted,slant=slant)
+        else:
+            slant_mod_dict = dict()
+
+        mod_dicts[UTC_date][site]['vertical'] = vertical_mod_dict
+        mod_dicts[UTC_date][site]['slant'] = slant_mod_dict
+    if not muted:
+        print('\ndate {:4d} / {} DONE in {:.0f} seconds'.format(date_ID+1,len(select_dates),time.time()-start_it))
+
+
+    return mod_dicts
+
+
+
+
+def mod_maker_new(start_date=None, end_date=None, func_dict=None, GEOS_path=None, chem_path=None, locations=site_dict, mode=None,
                   slant=False, muted=False, lat=None, lon=None, alt=None, site_abbrv=None, save_path=None, product='fpit',
                   keep_latlon_prec=False, save_in_utc=True, native_files=False, chem_variables=tuple(), flat_outdir=False, **kwargs):
     """
@@ -1774,7 +1985,11 @@ def mod_maker_new(start_date=None, end_date=None, func_dict=None, GEOS_path=None
     
     
     merra2flag = False
-    if 'MERRA2' in GEOS_path: merra2flag = True
+    if mode.upper() == 'MERRA2': merra2flag = True
+
+    e5flag = False
+    if mode.upper() == 'ERA5': e5flag = True
+    
     
     if lat is not None: # a custom location was given
         site_abbrv = 'xx' if site_abbrv is None else site_abbrv
@@ -1808,378 +2023,316 @@ def mod_maker_new(start_date=None, end_date=None, func_dict=None, GEOS_path=None
         os.makedirs(mod_path)
 
     do_load_chem = len(chem_variables) > 0
+    
     if slant and do_load_chem:
         raise NotImplementedError('Slant path chemistry variables have not yet been implemented')
+
 
     varlist = ['T','QV','RH','H','EPV','O3','PHIS', 'lev']
     surf_varlist = ['T2M','QV2M','PS','SLP','TROPPB','TROPPV','TROPPT','TROPT']
 
-    profile_subdir = 'Nv' if native_files else 'Np'
-    select_files, select_dates = GEOS_files(os.path.join(GEOS_path, profile_subdir),start_date,end_date)
-    select_surf_files, select_surf_dates = GEOS_files(os.path.join(GEOS_path,'Nx'),start_date,end_date)
-    if do_load_chem:
-        # Assumes that chemistry files are the only ones in the Nv directory
-        select_chem_files, select_chem_dates = GEOS_files(os.path.join(chem_path, 'Nv'), start_date, end_date, chm=True)
-        if len(select_chem_dates) != len(select_dates) or any(d1 != d2 for d1, d2 in zip(select_chem_dates, select_dates)):
-            raise RuntimeError('Dates for the chemistry files do not match the dates for the met file. Something '
-                               'went wrong when looking for these files.')
 
-            
-    ##I need to fix the chemical field section (and the EqL)
-    nsite = len(locations)
 
-    start = time.time()
-    mod_dicts = dict()
-
-    for date_ID, UTC_date in enumerate(select_dates):
-        site_dict = tccon_site_info_for_date(UTC_date, site_dict_in=locations)
-        mod_dicts[UTC_date] = dict()
-        start_it = time.time()
+    if e5flag == False:
+        profile_subdir = 'Nv' if native_files else 'Np'
+        select_files, select_dates = GEOS_files(os.path.join(GEOS_path, profile_subdir),start_date,end_date)
+        select_surf_files, select_surf_dates = GEOS_files(os.path.join(GEOS_path,'Nx'),start_date,end_date)
+    
         
-        geos_versions = {
-            'Met3d': GeosVersion.from_nc_file(select_files[date_ID]),
-            'Met2d': GeosVersion.from_nc_file(select_surf_files[date_ID])
-        }
+        
         if do_load_chem:
-            geos_versions['Chm3d'] = GeosVersion.from_nc_file(select_chem_files[date_ID])
-           
-        
-        print(geos_versions['Met3d'].source)
-        print(geos_versions['Met3d'].source)     
-        print(geos_versions['Chm3d'].source) 
-        
-        DATA = {}
-        if not muted:
-            print('\nNOW DOING date {:4d} / {} :'.format(date_ID+1,len(select_dates)),UTC_date.strftime("%Y-%m-%d %H:%M"),' UTC')
-            print('\t-Read global data ...')
-
-        file_is_native = mod_utils.is_geos_on_native_grid(select_files[date_ID])
-        
-        if file_is_native != native_files:
-            raise RuntimeError('Loaded a native level GEOS file but expected a fixed pressure file, or vice versa')
-        
-        idx2r = 0 
-        if merra2flag: 
-            hour = UTC_date.hour
-            syntimes = np.asarray([0,3,6,9,12,15,18,21])
-            idx2r = np.argmin(np.abs(syntimes - hour))
-            if syntimes[idx2r] - hour > 0.001:
-                raise RuntimeError('The hour is not part of the synoptic times')
+            # Assumes that chemistry files are the only ones in the Nv directory
+            select_chem_files, select_chem_dates = GEOS_files(os.path.join(chem_path, 'Nv'), start_date, end_date, chm=True)
+            if len(select_chem_dates) != len(select_dates) or any(d1 != d2 for d1, d2 in zip(select_chem_dates, select_dates)):
+                raise RuntimeError('Dates for the chemistry files do not match the dates for the met file. Something '
+                                   'went wrong when looking for these files.')
                 
-        with netCDF4.Dataset(select_files[date_ID],'r') as dataset:
-            for var in varlist:
-                if var == 'lev':
-                    # 'lev' needs handle specially because we want it to always be pressure, but in the native files
-                    # it is eta.
-                    continue
-
-                # Taking dataset[var][0] is equivalent to dataset[var][0,:,:,:], which since there's only one time per
-                # file just cuts the data from 4D to 3D
-                
-                DATA[var] = dataset[var][idx2r]
-                if file_is_native and DATA[var].shape[0] == 72:
-                    # The native 72 eta level files are organized space-to-surface vertically; the 42 fixed pressure
-                    # level files are surface-to-space. We want the latter so we need to flip the vertical dimension
-                    # if it is a native file. The vertical dimension, if present, should be first and have 72 levels.
-                    DATA[var] = np.flipud(DATA[var])
-
-            if file_is_native:
-                pres_levels = mod_utils.convert_geos_eta_coord(dataset['DELP'][idx2r])
-                pres_levels = np.flipud(pres_levels)
-            else:
-                pres_levels = dataset['lev'][:]
-                pres_levels = np.broadcast_to(pres_levels.reshape(-1, 1, 1), DATA[varlist[0]].shape)
-            DATA['lev'] = pres_levels
-
-            lat = dataset['lat'][:]
-            lon = dataset['lon'][:]
-            nlev = dataset.dimensions['lev'].size
-            if date_ID == 0:
-                box_lat_half_width = 0.5*float(dataset.LatitudeResolution)
-                box_lon_half_width = 0.5*float(dataset.LongitudeResolution)
-
-        for site in site_dict:
-            if 'time_spans' in site_dict[site].keys(): # instruments with different locations for different time periods
-                for time_span in site_dict[site]['time_spans']:
-                    if time_span[0]<=UTC_date<time_span[1]:
-                        site_dict[site]['IDs'] = querry_indices([lat,lon],site_dict[site]['time_spans'][time_span]['lat'],site_dict[site]['time_spans'][time_span]['lon_180'],box_lat_half_width,box_lon_half_width)
-                        site_dict[site]['lat'] = site_dict[site]['time_spans'][time_span]['lat']
-                        site_dict[site]['lon'] = site_dict[site]['time_spans'][time_span]['lon']
-                        site_dict[site]['lon_180'] = site_dict[site]['time_spans'][time_span]['lon_180']
-                        site_dict[site]['alt'] = site_dict[site]['time_spans'][time_span]['alt']
-                        break
-            else:
-                site_dict[site]['IDs'] = querry_indices([lat,lon],site_dict[site]['lat'],site_dict[site]['lon_180'],box_lat_half_width,box_lon_half_width)
-
-        SURF_DATA = {}
-        with netCDF4.Dataset(select_surf_files[date_ID],'r') as dataset:
-            for var in surf_varlist:
-                SURF_DATA[var] = dataset[var][idx2r]
-                
-                
-        
-        if not muted:
-            print('\t-Interpolate to (lat,lon) of sites ...')
-
-        # interpolate pressure levels along with the rest of the 3D variables. If we're using a native file, we're not
-        # on fixed pressure levels, and need to interpolate anyway. If using a fixed pressure level file, we've
-        # broadcast the pressure levels to be the same size as the rest of the 3D variables.
-        INTERP_DATA = interp_geos_data_to_sites(DATA, lat=lat, lon=lon, site_dict=site_dict, varlist=varlist,
-                                                muted=muted)
-
-        INTERP_SURF_DATA = interp_geos_data_to_sites(SURF_DATA, lat=lat, lon=lon, site_dict=site_dict,
-                                                     varlist=surf_varlist, muted=muted)
-
-        ##############################################################################
-        # Handle some variable conversions/custom calculations for the met variables #
-        ##############################################################################
-
-        # Ensure that the surface variables are 1D
-        for var in surf_varlist:
-            INTERP_SURF_DATA[var] = INTERP_SURF_DATA[var].reshape(nsite)
-
-        # Convert pressure fields to hPa. 'lev' is already in hPa.
-        for varname in ['PS','SLP','TROPPB','TROPPV','TROPPT']:
-            INTERP_SURF_DATA[varname] = INTERP_SURF_DATA[varname] / 100.0  # convert Pa to hPa
-
-        # Convert specific humidity, a wet mass mixing ratio, to dry mole fraction
-        INTERP_DATA['H2O_DMF'] = rmm*INTERP_DATA['QV']/(1-INTERP_DATA['QV'])
-        INTERP_DATA['H'] = INTERP_DATA['H']/1000.0  # Convert m to km
-        INTERP_DATA['PHIS'] = INTERP_DATA['PHIS'] / 1000.0
-
-        INTERP_SURF_DATA['H2O_DMF'] = compute_h2o_dmf(INTERP_SURF_DATA['QV2M'],rmm)
-
-        # compute surface relative humidity
-        svp = svp_wv_over_ice(INTERP_SURF_DATA['T2M'])
-        INTERP_SURF_DATA['H2O_WMF'] = compute_h2o_wmf(INTERP_SURF_DATA['H2O_DMF'])  # wet mole fraction of h2o
-        INTERP_SURF_DATA['RH'] = compute_rh(INTERP_SURF_DATA['T2M'],INTERP_SURF_DATA['H2O_WMF'],INTERP_SURF_DATA['PS'])/100 # Fractional relative humidity
-        INTERP_SURF_DATA['MMW'] = compute_mmw(INTERP_SURF_DATA['H2O_WMF'])
-        INTERP_SURF_DATA['H'] = INTERP_DATA['PHIS']
-
-        # Combine the profile and surface data into a new dictionary organized by site/levels/variable.
-        INTERP_DATA = combine_profile_surface_data(INTERP_DATA, INTERP_SURF_DATA, site_dict)
-
-        # If requested, load the chemistry data and incorporate it into the existing dictionaries.
-        if do_load_chem:
-            if native_files and geos_versions['Met3d'] == geos_versions['Chm3d']:
-                # Using the eta levels and both 3D files are from the same version of GEOS, so we 
-                # can assume that the lat/lon interpolation will result in chem data on the same levels.
-                chem_plevs = None
-                chem_extrap = 'no'
-            elif native_files:
-                # Otherwise, with different versions of GEOS, the level pressures might change slightly,
-                # so we do need to interpolate. As elsewhere, use constant value extrapolation to ensure
-                # that all levels receive a value, but we won't get runaway interpolation.
-                chem_plevs = INTERP_DATA
-                chem_extrap = 'const'
-            else:
-                # This is a carry-over from earlier versions of mod maker that used fixed pressure levels.
-                # I think we did not want to extrapolate b/c levels outside the native pressure levels should
-                # get fill values (i.e. they are below the terrain, usually).
-                chem_plevs = mod_utils._std_model_pres_levels
-                chem_extrap = 'no'
+        nsite = len(locations)
+    
+        start = time.time()
+        mod_dicts = dict()
+    
+        for date_ID, UTC_date in enumerate(select_dates):
+            site_dict = tccon_site_info_for_date(UTC_date, site_dict_in=locations)
+            mod_dicts[UTC_date] = dict()
+            start_it = time.time()
             
-            CHEM_DATA = load_chem_variables(select_chem_files[date_ID], chem_variables, site_dict, idx2r, pres_levels=chem_plevs, extrapolate=chem_extrap)
-            for site in INTERP_DATA.keys():
-                INTERP_DATA[site]['prof'].update(CHEM_DATA[site]['prof'])
-
-        # add a mask for temperature = 0 K
-        for site in site_dict:
-            for var in INTERP_DATA[site]['prof']:
-                if var not in ['T','lev']:
-                    INTERP_DATA[site]['prof'][var] = ma.masked_where(INTERP_DATA[site]['prof']['T']==0,INTERP_DATA[site]['prof'][var])
-            INTERP_DATA[site]['prof']['T'] = ma.masked_where(INTERP_DATA[site]['prof']['T']==0,INTERP_DATA[site]['prof']['T'])
-
-            INTERP_DATA[site]['surf']['SZA'] = rad2deg(sun_angles(UTC_date,deg2rad(site_dict[site]['lat']),deg2rad(site_dict[site]['lon_180']),site_dict[site]['alt'],INTERP_DATA[site]['surf']['PS'],INTERP_DATA[site]['surf']['T2M'])[0])
-
-        if not slant:
-            SLANT_DATA = None
-        else:
-            # get slant path coordinates corresponding to the altitude levels above each site
+            geos_versions = {
+                'Met3d': GeosVersion.from_nc_file(select_files[date_ID]),
+                'Met2d': GeosVersion.from_nc_file(select_surf_files[date_ID])
+            }
+            if do_load_chem:
+                geos_versions['Chm3d'] = GeosVersion.from_nc_file(select_chem_files[date_ID])
+               
+            
+            print(geos_versions['Met3d'].source)
+            print(geos_versions['Met3d'].source)     
+            print(geos_versions['Chm3d'].source) 
+            
+            DATA = {}
             if not muted:
-                print('\t-Slantify:')
-            for i,site in enumerate(site_dict.keys()): # loops over sites
-                if not muted:
-                    sys.stdout.write('\r\t\t site {:3d} / {}  {:>20}'.format(i+1,nsite,site_dict[site]['name']))
-                    sys.stdout.flush()
-
-                site_alt = site_dict[site]['alt']
-                site_lat = site_dict[site]['lat']
-                site_lon = site_dict[site]['lon_180']
-
-                # vertical grid above site
-                H = INTERP_DATA[site]['prof']['H']*1000.0
-                pres = INTERP_DATA[site]['surf']['PS'] # surface pressure (hPa)
-                temp = INTERP_DATA[site]['surf']['T2M']-273.15 # surface temperature (celsius)
-
-
-                # get the (lat,lon,alt) of points on sunray correspondings to the vertical altitudes
-                site_dict[site]['slant_coords'] = slantify(UTC_date,site_lat,site_lon,site_alt,H,pres=pres,temp=temp)
-                for var in ['lat','lon','alt','vertical','slant']:
-                    site_dict[site]['slant_coords'][var] = ma.masked_where(H.mask,site_dict[site]['slant_coords'][var])
-            if not muted:
-                print('\r\t\t{:<40s}'.format('DONE'))
-
-            # Set two lists with all the latitudes and longitudes of all sites at all slant levels
-            slant_lat = []
-            slant_lon = []
-            slat_slon = []
-            for site in site_dict:
-                if site_dict[site]['slant_coords']['sza']<90: # only make profiles where sun is above the horizon
-                    slat = site_dict[site]['slant_coords']['lat']
-                    slon = site_dict[site]['slant_coords']['lon']
-                    slant_lat.extend(slat)
-                    slant_lon.extend(slon)
-                    for i in range(len(slat)):
-                        if slat[i] is ma.masked:
-                            continue
-                        if (slat[i],slon[i]) not in slat_slon:
-                            slat_slon.append((slat[i],slon[i]))
-
-            IDs_list = np.array([querry_indices([lat,lon],slat,slon,box_lat_half_width,box_lon_half_width) for slat,slon in slat_slon])
-
-            slant_lat = np.array([slat for slat,slon in slat_slon])
-            slant_lon = np.array([slon for slat,slon in slat_slon])
-
-            # Interpolate to each slant level (lat,lon)
-            # This will give a vertical profile at every (lat,lon) of all the slant levels
-            if not muted:
-                print('\t-Interpolate to each slant level (lat,lon) ...')
-            with warnings.catch_warnings():
-                warnings.simplefilter("ignore")
-                NEW_INTERP_DATA = {}
+                print('\nNOW DOING date {:4d} / {} :'.format(date_ID+1,len(select_dates)),UTC_date.strftime("%Y-%m-%d %H:%M"),' UTC')
+                print('\t-Read global data ...')
+    
+            file_is_native = mod_utils.is_geos_on_native_grid(select_files[date_ID])
+            
+            if file_is_native != native_files:
+                raise RuntimeError('Loaded a native level GEOS file but expected a fixed pressure file, or vice versa')
+            
+            idx2r = 0 
+            if merra2flag: 
+                hour = UTC_date.hour
+                syntimes = np.asarray([0,3,6,9,12,15,18,21])
+                idx2r = np.argmin(np.abs(syntimes - hour))
+                if syntimes[idx2r] - hour > 0.001:
+                    raise RuntimeError('The hour is not part of the synoptic times')
+                    
+            with netCDF4.Dataset(select_files[date_ID],'r') as dataset:
                 for var in varlist:
-                    if not muted:
-                        sys.stdout.write('\r\t\tNow doing : {:<10s}'.format(var))
-                        sys.stdout.flush()
-                    if DATA[var].ndim==2:
-                        NEW_INTERP_DATA[var] = lat_lon_interp(DATA[var],lat,lon,slant_lat,slant_lon,IDs_list)
+                    if var == 'lev':
+                        # 'lev' needs handle specially because we want it to always be pressure, but in the native files
+                        # it is eta.
                         continue
-
-                    NEW_INTERP_DATA[var] = np.zeros([nlev,len(IDs_list)])
-                    for ilev,level_data in enumerate(DATA[var]):
-                        NEW_INTERP_DATA[var][ilev] = lat_lon_interp(level_data,lat,lon,slant_lat,slant_lon,IDs_list)
-                if not muted:
-                    print('\r\t\t{:<40s}'.format('DONE'))
-            # setup masks
-            for var in set(varlist)-set(['PHIS']):
-                NEW_INTERP_DATA[var] = ma.masked_where(np.isnan(NEW_INTERP_DATA[var]),NEW_INTERP_DATA[var])
-
-            # Now just get the data along the slant paths
+    
+                    # Taking dataset[var][0] is equivalent to dataset[var][0,:,:,:], which since there's only one time per
+                    # file just cuts the data from 4D to 3D
+                    
+                    DATA[var] = dataset[var][idx2r]
+                    if file_is_native and DATA[var].shape[0] == 72:
+                        # The native 72 eta level files are organized space-to-surface vertically; the 42 fixed pressure
+                        # level files are surface-to-space. We want the latter so we need to flip the vertical dimension
+                        # if it is a native file. The vertical dimension, if present, should be first and have 72 levels.
+                        DATA[var] = np.flipud(DATA[var])
+    
+                if file_is_native:
+                    pres_levels = mod_utils.convert_geos_eta_coord(dataset['DELP'][idx2r])
+                    pres_levels = np.flipud(pres_levels)
+                else:
+                    pres_levels = dataset['lev'][:]
+                    pres_levels = np.broadcast_to(pres_levels.reshape(-1, 1, 1), DATA[varlist[0]].shape)
+                DATA['lev'] = pres_levels
+    
+                lat = dataset['lat'][:]
+                lon = dataset['lon'][:]
+                nlev = dataset.dimensions['lev'].size
+                if date_ID == 0:
+                    box_lat_half_width = 0.5*float(dataset.LatitudeResolution)
+                    box_lon_half_width = 0.5*float(dataset.LongitudeResolution)
+    
+            for site in site_dict:
+                if 'time_spans' in site_dict[site].keys(): # instruments with different locations for different time periods
+                    for time_span in site_dict[site]['time_spans']:
+                        if time_span[0]<=UTC_date<time_span[1]:
+                            site_dict[site]['IDs'] = querry_indices([lat,lon],site_dict[site]['time_spans'][time_span]['lat'],site_dict[site]['time_spans'][time_span]['lon_180'],box_lat_half_width,box_lon_half_width)
+                            site_dict[site]['lat'] = site_dict[site]['time_spans'][time_span]['lat']
+                            site_dict[site]['lon'] = site_dict[site]['time_spans'][time_span]['lon']
+                            site_dict[site]['lon_180'] = site_dict[site]['time_spans'][time_span]['lon_180']
+                            site_dict[site]['alt'] = site_dict[site]['time_spans'][time_span]['alt']
+                            break
+                else:
+                    site_dict[site]['IDs'] = querry_indices([lat,lon],site_dict[site]['lat'],site_dict[site]['lon_180'],box_lat_half_width,box_lon_half_width)
+    
+            SURF_DATA = {}
+            with netCDF4.Dataset(select_surf_files[date_ID],'r') as dataset:
+                for var in surf_varlist:
+                    SURF_DATA[var] = dataset[var][idx2r]
+                    
+            
             if not muted:
-                print('\t-Get data along slant paths ...')
-            SLANT_DATA = {}
-            for site in site_dict: # for each site
-                if site_dict[site]['slant_coords']['sza']<90:
-                    SLANT_DATA[site] = site_dict[site]['slant_coords']
-                    SLANT_DATA[site]['H'] = SLANT_DATA[site]['alt']
-                    SLANT_DATA[site]['lev'] = INTERP_DATA[site]['prof']['lev']
-                    for var in set(varlist)-set(['H','PHIS']): # for each variable
-                        SLANT_DATA[site][var] = np.array([])
-                        for i in range(len(SLANT_DATA[site]['H'])): # for each slant point
-                            slat,slon = SLANT_DATA[site]['lat'][i] , SLANT_DATA[site]['lon'][i]
-                            try:
-                                ID = slat_slon.index((slat,slon))
-                            except ValueError:
-                                SLANT_DATA[site][var] = np.append(SLANT_DATA[site][var],np.nan)
-                            else:
-                                SLANT_DATA[site][var] = np.append(SLANT_DATA[site][var],NEW_INTERP_DATA[var][i,ID])
+                print('\t-Interpolate to (lat,lon) of sites ...')
+    
+            # interpolate pressure levels along with the rest of the 3D variables. If we're using a native file, we're not
+            # on fixed pressure levels, and need to interpolate anyway. If using a fixed pressure level file, we've
+            # broadcast the pressure levels to be the same size as the rest of the 3D variables.
+            INTERP_DATA = interp_geos_data_to_sites(DATA, lat=lat, lon=lon, site_dict=site_dict, varlist=varlist,
+                                                    muted=muted)
+    
+            INTERP_SURF_DATA = interp_geos_data_to_sites(SURF_DATA, lat=lat, lon=lon, site_dict=site_dict,
+                                                         varlist=surf_varlist, muted=muted)
+    
+    
+            if INTERP_SURF_DATA['TROPPV'].mask == True:
+                print('-------changing the TROPPV value to the TROPPB value to avoid nan')
+                INTERP_SURF_DATA['TROPPV'] = INTERP_SURF_DATA['TROPPB']
+    
+            
+            ##############################################################################
+            # Handle some variable conversions/custom calculations for the met variables #
+            ##############################################################################
+    
+            # Ensure that the surface variables are 1D
+            for var in surf_varlist:
+                INTERP_SURF_DATA[var] = INTERP_SURF_DATA[var].reshape(nsite)
+    
+            # Convert pressure fields to hPa. 'lev' is already in hPa.
+            for varname in ['PS','SLP','TROPPB','TROPPV','TROPPT']:
+                INTERP_SURF_DATA[varname] = INTERP_SURF_DATA[varname] / 100.0  # convert Pa to hPa
+    
+            # Convert specific humidity, a wet mass mixing ratio, to dry mole fraction
+            INTERP_DATA['H2O_DMF'] = rmm*INTERP_DATA['QV']/(1-INTERP_DATA['QV'])
+            INTERP_DATA['H'] = INTERP_DATA['H']/1000.0  # Convert m to km
+            INTERP_DATA['PHIS'] = INTERP_DATA['PHIS'] / 1000.0
+    
+            INTERP_SURF_DATA['H2O_DMF'] = compute_h2o_dmf(INTERP_SURF_DATA['QV2M'],rmm)
+    
+            # compute surface relative humidity
+            svp = svp_wv_over_ice(INTERP_SURF_DATA['T2M'])
+            INTERP_SURF_DATA['H2O_WMF'] = compute_h2o_wmf(INTERP_SURF_DATA['H2O_DMF'])  # wet mole fraction of h2o
+            INTERP_SURF_DATA['RH'] = compute_rh(INTERP_SURF_DATA['T2M'],INTERP_SURF_DATA['H2O_WMF'],INTERP_SURF_DATA['PS'])/100 # Fractional relative humidity
+            INTERP_SURF_DATA['MMW'] = compute_mmw(INTERP_SURF_DATA['H2O_WMF'])
+            INTERP_SURF_DATA['H'] = INTERP_DATA['PHIS']
+    
+            # Combine the profile and surface data into a new dictionary organized by site/levels/variable.
+            INTERP_DATA = combine_profile_surface_data(INTERP_DATA, INTERP_SURF_DATA, site_dict)
+    
+            # If requested, load the chemistry data and incorporate it into the existing dictionaries.
+            if do_load_chem:
+                if native_files and geos_versions['Met3d'] == geos_versions['Chm3d']:
+                    # Using the eta levels and both 3D files are from the same version of GEOS, so we 
+                    # can assume that the lat/lon interpolation will result in chem data on the same levels.
+                    chem_plevs = None
+                    chem_extrap = 'no'
+                elif native_files:
+                    # Otherwise, with different versions of GEOS, the level pressures might change slightly,
+                    # so we do need to interpolate. As elsewhere, use constant value extrapolation to ensure
+                    # that all levels receive a value, but we won't get runaway interpolation.
+                    chem_plevs = INTERP_DATA
+                    chem_extrap = 'const'
+                else:
+                    # This is a carry-over from earlier versions of mod maker that used fixed pressure levels.
+                    # I think we did not want to extrapolate b/c levels outside the native pressure levels should
+                    # get fill values (i.e. they are below the terrain, usually).
+                    chem_plevs = mod_utils._std_model_pres_levels
+                    chem_extrap = 'no'
+                
+                CHEM_DATA = load_chem_variables(select_chem_files[date_ID], chem_variables, site_dict, idx2r, pres_levels=chem_plevs, extrapolate=chem_extrap)
+                for site in INTERP_DATA.keys():
+                    INTERP_DATA[site]['prof'].update(CHEM_DATA[site]['prof'])
 
-                        SLANT_DATA[site][var] = ma.masked_where(np.isnan(SLANT_DATA[site][var]),SLANT_DATA[site][var])
-        # end of 'if slant'
+            mod_dicts = interpdata2mod_dicts(INTERP_DATA, site_dict, UTC_date, file_is_native, 
+                                         mod_dicts, save_in_utc, flat_outdir, mod_path, product, 
+                                         keep_latlon_prec, func_dict, do_load_chem, slant, muted, 
+                                         date_ID, select_dates, start_it, geos_versions)
 
-        if not muted:
-            print('\t-Patch fill values ...')
+    else:  ##era5 
 
-        if not file_is_native:
-            # Fixed pressure level files will result in NaNs for pressure levels below the surface. We want to fill
-            # those in. Native files are terrain following so this should not be an issue.
-            extrap_vars = {'RH': 'RH', 'QV': 'QV2M', 'T': 'T2M', 'H': 'H', 'EPV': None, 'O3': None}
-            extrap_vars.update({k: None for k in chem_variables})
-            extrapolate_to_surface(extrap_vars, INTERP_DATA, SLANT_DATA=SLANT_DATA)
+        fls = e5r.getera5files(start_date, end_date, path = GEOS_path)
+        
+        select_dates = fls['dates']
+        
+        mod_dicts = dict()
+        for date_ID, UTC_date in enumerate(select_dates):
+            
+            ee = e5r.getera5data(fls['files3d'][date_ID], fls['files2d'][date_ID])
 
-        for site in site_dict:
-            if slant:
-                all_data = [SLANT_DATA[site],INTERP_DATA[site]['prof']]
-            else:
-                all_data = [INTERP_DATA[site]['prof']]
+            site_dict = tccon_site_info_for_date(UTC_date, site_dict_in=locations)
+            mod_dicts[UTC_date] = dict()
+            
+            start_it = time.time()
+            
+            geos_versions = {
+                'Met3d': 'era5',
+                'Met2d': 'era5',
+                'Chm3d': 'era5'
+            }
 
-            # Needed this to be a fraction for the extrapolation so that it is in the same units as the profile. Now
-            # convert back to percent. Can't convert the profile RH here, it's used for certain calculations throughout
-            # that assume it is a fraction. It will get scaled in the write_mod function.
-            INTERP_DATA[site]['surf']['RH'] *= 100
+            if do_load_chem:
+                print('---No chemistry info in ERA5')
+                print('---include_chem needs to be set to False')
+                sys.exit(0)    
+                        
 
-            for elem in all_data:
-                # Convert specific humidity, a wet mass mixing ratio, to dry mole fraction
-                elem['H2O_DMF'] = compute_h2o_dmf(elem['QV'], rmm)
-
-        if not muted:
-            if slant:
-                print('\t\t {:3d} / {} sites with SZA<90'.format(len(SLANT_DATA.keys()),nsite))
-            print('\t-Write mod files ...')
-
-        # write the .mod files
-        version = 'mod_maker.py   2019-06-20   SR/JL'
-
-        for site in INTERP_DATA:
-            mod_dicts[UTC_date][site] = dict()
-            site_lat = site_dict[site]['lat']
-            site_lon_180 = site_dict[site]['lon_180']
-
-            utc_offset = timedelta(hours=site_dict[site]['lon_180']/15.0) if not save_in_utc else timedelta(hours=0)
-            local_date = UTC_date + utc_offset
-
-            vertical_mod_path = mod_path if flat_outdir else os.path.join(mod_path,site,'vertical')
-            if not os.path.exists(vertical_mod_path):
-                os.makedirs(vertical_mod_path)
-
-            if slant:
-                # We already check at the beginning of this function that flat_outdir = False if slant = True
-                # so we don't need to handle the flat_outdir = True case here.
-                slant_mod_path =  os.path.join(mod_path,site,'slant')
-                if not os.path.exists(slant_mod_path):
-                    os.makedirs(slant_mod_path)
-
-            # directions for .mod file name
-            if site_lat >= 0:
-                ns = 'N'
-            else:
-                ns = 'S'
-
-            if site_lon_180 >= 0:
-                ew = 'E'
-            else:
-                ew = 'W'
-
-            mod_name = mod_utils.mod_file_name(product.upper(), local_date, timedelta(hours=3), site_lat, site_lon_180, ew, ns, mod_path, round_latlon=not keep_latlon_prec, in_utc=save_in_utc)
+            
+            DATA = {}
             if not muted:
-                print('\t\t\t{:<20s} : {}'.format(site_dict[site]['name'], mod_name))
+                print('\nNOW DOING date {:4d} / {} :'.format(date_ID+1,len(select_dates)),UTC_date.strftime("%Y-%m-%d %H:%M"),' UTC')
+                print('\t-Read global data ...')
 
-            # write vertical mod file
-            mod_file_path = os.path.join(vertical_mod_path,mod_name)
-            vertical_mod_dict = write_mod(mod_file_path,version,site_lat,data=INTERP_DATA[site]['prof']
-                                          ,surf_data=INTERP_DATA[site]['surf'],func=func_dict[UTC_date],
-                                          muted=muted,slant=slant,chem_vars=do_load_chem,geos_versions=geos_versions)
+        
+            box_lat_half_width = 0.5*float(ee['lat_res'])
+            box_lon_half_width = 0.5*float(ee['lon_res'])
+            lat = ee['lat'][:]
+            lon = ee['lon'][:]
+            
+            
+            
+            for site in site_dict:
+                if 'time_spans' in site_dict[site].keys(): # instruments with different locations for different time periods
+                    for time_span in site_dict[site]['time_spans']:
+                        if time_span[0]<=UTC_date<time_span[1]:
+                            site_dict[site]['IDs'] = querry_indices([lat,lon],site_dict[site]['time_spans'][time_span]['lat'],              
+                                                                    site_dict[site]['time_spans'][time_span]['lon_180'], box_lat_half_width,
+                                                                    box_lon_half_width)
+                            site_dict[site]['lat'] = site_dict[site]['time_spans'][time_span]['lat']
+                            site_dict[site]['lon'] = site_dict[site]['time_spans'][time_span]['lon']
+                            site_dict[site]['lon_180'] = site_dict[site]['time_spans'][time_span]['lon_180']
+                            site_dict[site]['alt'] = site_dict[site]['time_spans'][time_span]['alt']
+                            break
+                else:
+                    site_dict[site]['IDs'] = querry_indices([lat,lon],site_dict[site]['lat'],
+                                                            site_dict[site]['lon_180'],box_lat_half_width,box_lon_half_width)
+            
+            DATA = ee
+            SURF_DATA = ee['surf']    
+            
+            INTERP_DATA = interp_geos_data_to_sites(DATA, lat=lat, lon=lon, site_dict=site_dict, varlist=varlist,
+                                        muted=muted)
+            
+            INTERP_SURF_DATA = interp_geos_data_to_sites(SURF_DATA, lat=lat, lon=lon, site_dict=site_dict,
+                                             varlist=surf_varlist, muted=muted)
 
-            if slant:
-                # write slant mod_file
-                if site in SLANT_DATA.keys():
-                    if not muted:
-                        print('\t\t\t{:>20s} + slant'.format(''))
-                    mod_file_path = os.path.join(slant_mod_path,mod_name)
-                    slant_mod_dict = write_mod(mod_file_path,version,site_lat,data=SLANT_DATA[site],surf_data=INTERP_DATA[site]['surf'],func=func_dict[UTC_date],muted=muted,slant=slant)
-            else:
-                slant_mod_dict = dict()
 
-            mod_dicts[UTC_date][site]['vertical'] = vertical_mod_dict
-            mod_dicts[UTC_date][site]['slant'] = slant_mod_dict
-        if not muted:
-            print('\ndate {:4d} / {} DONE in {:.0f} seconds'.format(date_ID+1,len(select_dates),time.time()-start_it))
+                        
+            nsite = len(site_dict)
+            ##############################################################################
+            # Handle some variable conversions/custom calculations for the met variables #
+            ##############################################################################
+            
+            # Ensure that the surface variables are 1D
+            for var in surf_varlist:
+                INTERP_SURF_DATA[var] = INTERP_SURF_DATA[var].reshape(nsite)
+            
+            # Convert pressure fields to hPa. 'lev' is already in hPa.
+            for varname in ['PS','SLP','TROPPB','TROPPV','TROPPT']:
+                INTERP_SURF_DATA[varname] = INTERP_SURF_DATA[varname] / 100.0  # convert Pa to hPa
+            
+            # Convert specific humidity, a wet mass mixing ratio, to dry mole fraction
+            
+            INTERP_DATA['H2O_DMF'] = rmm*INTERP_DATA['QV']/(1-INTERP_DATA['QV'])
+            INTERP_DATA['H']       = INTERP_DATA['H']/1000.0  # Convert m to km
+            INTERP_DATA['PHIS']    = INTERP_DATA['PHIS'] / 1000.0
+            
+            INTERP_SURF_DATA['H2O_DMF'] = compute_h2o_dmf(INTERP_SURF_DATA['QV2M'],rmm)
+            
+            # compute surface relative humidity
+            svp = svp_wv_over_ice(INTERP_SURF_DATA['T2M'])
+            INTERP_SURF_DATA['H2O_WMF'] = compute_h2o_wmf(INTERP_SURF_DATA['H2O_DMF'])  # wet mole fraction of h2o
+            INTERP_SURF_DATA['RH'] = compute_rh(INTERP_SURF_DATA['T2M'],INTERP_SURF_DATA['H2O_WMF'],INTERP_SURF_DATA['PS'])/100 # Fractional relative humidity
+            INTERP_SURF_DATA['MMW'] = compute_mmw(INTERP_SURF_DATA['H2O_WMF'])
+            INTERP_SURF_DATA['H'] = INTERP_DATA['PHIS']
+            
+
+            # Combine the profile and surface data into a new dictionary organized by site/levels/variable.
+            INTERP_DATA = combine_profile_surface_data(INTERP_DATA, INTERP_SURF_DATA, site_dict)
+    
+            # If requested, load the chemistry data and incorporate it into the existing dictionaries.
+            if do_load_chem:
+                print('---No chemistry info in ERA5')
+                print('---include_chem needs to be set to False')
+                sys.exit(0)    
+                
+            file_is_native = True
+            mod_dicts = interpdata2mod_dicts(INTERP_DATA, site_dict, UTC_date, file_is_native, 
+                                         mod_dicts, save_in_utc, flat_outdir, mod_path, product, 
+                                         keep_latlon_prec, func_dict, do_load_chem, slant, muted, 
+                                         date_ID, select_dates, start_it, geos_versions)
+
+
+        
     if not muted:
         print('It took {:.1f} minutes to generate .mod files for {} dates'.format((time.time()-start)/60.0,len(select_dates)))
 
     return mod_dicts
-
 
 def mod_maker(site_abbrv=None,start_date=None,end_date=None,mode=None,locations=site_dict,HH=12,MM=0,time_step=24,muted=False,lat=None,lon=None,alt=None,save_path=None,ncdf_path=None,keep_latlon_prec=False,**kwargs):
     """
@@ -2399,6 +2552,7 @@ def mod_maker(site_abbrv=None,start_date=None,end_date=None,mode=None,locations=
 
 def runlog_driver(runlog, site_abbrv=None, first_date='2000-01-01', **kwargs):
     total_geos_files = 0
+
     for drange, abbrv, lon, lat, alt in run_utils.iter_runlog_args(runlog, first_date=first_date, site_abbrv=site_abbrv):
         total_geos_files += (drange[1]-drange[0])/timedelta(hours=3)
     print("Equivalent latitude functions will be calculated for a total of {} GEOS files".format(int(total_geos_files)))
@@ -2519,6 +2673,8 @@ def driver(date_range, met_path, chem_path=None, save_path=None, keep_latlon_pre
             native_files = False
         elif mode in _new_native_modes:
             eqlat_fxn = equivalent_latitude_functions_native_geos
+            
+            if mode == 'era5': eqlat_fxn = e5r.equivalent_latitude_functions_native_era5
             native_files = True
         else:
             raise NotImplementedError('No equivalent latitude function defined for mode == "{}"'.format(mode))
@@ -2527,9 +2683,22 @@ def driver(date_range, met_path, chem_path=None, save_path=None, keep_latlon_pre
         product = mod_utils.mode_to_product(mode)
         
         func_dict = eqlat_fxn(GEOS_path=met_path, start_date=start_date, end_date=end_date, muted=muted)
+
+        # with open('era5test.pkl','wb') as f:
+        #     pickle.dump(func_dict, f)
+        
+        # with open('era5test.pkl','rb') as f:
+        #     func_dict = pickle.load(f)
+
+        # with open('m2test.pkl','wb') as f:
+        #     pickle.dump(func_dict, f)
+        
+        # with open('m2test.pkl','rb') as f:
+        #     func_dict = pickle.load(f)
+            
         
         for this_abbrv, this_lat, this_lon, this_alt in zip(site_abbrv, lat, lon, alt):
-            mod_maker_new(start_date=start_date, end_date=end_date, func_dict=func_dict, GEOS_path=met_path,
+            mod_maker_new(start_date=start_date, end_date=end_date, func_dict=func_dict, GEOS_path=met_path, mode=mode,
                           chem_path=chem_path, chem_variables=chem_vars, slant=slant, locations=site_dict, muted=muted,
                           lat=this_lat, lon=this_lon, alt=this_alt, site_abbrv=this_abbrv, save_path=save_path, product=product,
                           keep_latlon_prec=keep_latlon_prec, save_in_utc=save_in_utc, native_files=native_files, flat_outdir=flat_outdir)
