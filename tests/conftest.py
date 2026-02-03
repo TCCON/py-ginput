@@ -1,10 +1,12 @@
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
-from hashlib import sha1
+from hashlib import md5, sha1
 import os
 from pathlib import Path
 import pytest
 import re
+import requests
+import tarfile as tf
 
 
 def pytest_configure(config):
@@ -16,6 +18,7 @@ def pytest_configure(config):
     )
 
 
+LARGE_FILES_DOI='10.22002/4rgh7-zss31'
 _mydir = Path(__file__).parent.resolve()
 input_data_dir = _mydir / 'test_input_data'
 output_data_dir = _mydir / 'test_output_data'
@@ -288,7 +291,7 @@ def test_site():
 
 @pytest.fixture(scope='session')
 def large_files_dir():
-    # TODO: download the DOIed tarball if not present
+    _download_large_files()
     return _large_file_dir
 
 @pytest.fixture(scope='session')
@@ -349,9 +352,9 @@ def _read_hash_list(hash_filename, input_data_dir):
     return hash_dict
 
 
-def _hash_file(filename):
+def _hash_file(filename, hash_class=sha1):
     block_size = 2**16
-    hash_obj = sha1()
+    hash_obj = hash_class()
     with open(filename, 'rb') as fobj:
         buf = fobj.read(block_size)
         while len(buf) > 0:
@@ -476,3 +479,50 @@ class GapTestResultFile:
             return tgt_dir / f'{gas}_{df_type}_{version}.nc'
         else:
             return tgt_dir / f'{gas}_{df_type}_{n_months_missing}months.nc'
+
+
+def _download_large_files():
+    skip_check = os.getenv('GINPUT_TEST_SKIP_LARGE_FILE_CHECK', '0')
+    if skip_check == '1':
+        return
+
+    _download_from_large_file_record('ginput-large-files.md5')
+    to_extract = _check_large_files()
+    if len(to_extract) == 0:
+        return
+
+    _download_from_large_file_record('ginput-large-files.tgz')
+    tarball_file = _large_file_dir / 'ginput-large.files.tgz'
+    with tf.open(tarball_file) as tgz:
+        for item in to_extract:
+            member = tgz.getmember(item)
+            tgz.extract(member, path=_large_file_dir, set_attrs=False)
+
+    tarball_file.unlink()
+
+
+def _check_large_files(md5_file = _large_file_dir / 'ginput-large-files.md5'):
+    """Get the current .md5 file from the CaltechData repo and see if any input files need downloaded"""
+    to_extract = []
+    with open(md5_file) as f:
+        for line in f:
+            expected_checksum, relpath = line.strip().split()
+            abspath = _large_file_dir / relpath
+            if not abspath.exists():
+                must_extract = True
+            else:
+                curr_checksum = _hash_file(abspath, hash_class=md5)
+                must_extract = curr_checksum != expected_checksum
+            if must_extract:
+                to_extract.append(relpath)
+    return to_extract
+
+
+def _download_from_large_file_record(filename: str):
+    record_id = LARGE_FILES_DOI.split('/')[-1]
+    url = f'https://data.caltech.edu/api/records/{record_id}/files/{filename}/content'
+    with requests.get(url, stream=True) as r, open(_large_file_dir / filename, 'wb') as f:
+        r.raise_for_status()
+        for chunk in r.iter_content(chunk_size=8192):
+            if chunk:  # do not write empty, keep-alive chunks
+                f.write(chunk)
