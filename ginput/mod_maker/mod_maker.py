@@ -216,6 +216,11 @@ def safe_format(val):
     """
     If the object is an array of 1 value, just return the value
     """
+    try:
+        val = val.filled(np.nan)
+    except AttributeError:
+        pass
+
     if hasattr(val, "__len__") and len(val) == 1:
         return val[0]
     else:
