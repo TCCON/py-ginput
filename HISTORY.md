@@ -62,6 +62,13 @@ The `main()` function is also now found in `ginput.__main__` and can accept
 a list of command line arguments. This means that you can mimic CLI calls
 from within Python more easily.
 
+### Prototype netCDF tool
+
+This version adds a prototype subcommand (`tar2nc`) that converts standard
+site tarballs of `.mod` and `.vmr` files to a single netCDF file. It is
+still being developed, and may not work for all versions of `.mod` and
+`.vmr` files.
+
 ## 1.5.1
 
 This release aims to fix cases where the `git` or `hg` commands are not available,
