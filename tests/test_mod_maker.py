@@ -429,6 +429,13 @@ def compare_two_files(subtests, check_file, new_file, plots_dir, variable_mappin
                 elif variable_name.lower() == 'ginput_version':
                     print('Ignoring GINPUT_VERSION in header for sake of testing')
                     continue
+                elif variable_name.lower() == 'co2_mlo_smo_files':
+                    # These get written as absolute paths, so comparing across different
+                    # instances of ginput would fail. We could make them smart enough to
+                    # be relative to the ginput directory, but we really care about the
+                    # VMR data.
+                    print('Ignoring CO2_MLO_SMO_FILES in header for sake of testing')
+                    continue
 
                 new_var = variable_mapping[category_name][variable_name]
                 this_new_data = new_data[category_name][new_var]
