@@ -124,13 +124,13 @@ def fo2_v2025_csv():
 
 
 @pytest.fixture(scope='session')
-def fo2_pre2025_pkl():
-    return fo2_dir / 'monthly_o2_ljo.pre2025.pkl'
+def fo2_pre2025_expected():
+    return fo2_dir / 'monthly_o2_ljo.pre2025.expected.csv'
 
 
 @pytest.fixture(scope='session')
-def fo2_v2025_pkl():
-    return fo2_dir / 'monthly_o2_ljo.v2025.pkl'
+def fo2_v2025_expected():
+    return fo2_dir / 'monthly_o2_ljo.v2025.expected.csv'
 
 
 @pytest.fixture(scope='session')
