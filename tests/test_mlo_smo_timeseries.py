@@ -122,6 +122,7 @@ def test_real_smo_gap_filling(
         compare_dataframes(expected_df, rec.conc_trend)
 
 
+@pytest.mark.slow
 def test_mlo_and_smo_gap_filling(
     mlo_gap_test_file,
     smo_gap_test_file,

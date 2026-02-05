@@ -879,30 +879,31 @@ class MloSmoTraceGasRecord(TraceGasRecord):
         :param smo_file: path to the SMO (American Samoa) monthly average file.
 
         :param first_date: the earliest date required in the timeseries. If the monthly mean file does not
-         extend back to this date, it will be extrapolated. Should be a date on the first of a month.
+            extend back to this date, it will be extrapolated. Should be a date on the first of a month.
 
         :param last_date: the latest date required in the timeseries. If the monthly mean file does not
-         extend forward to this date, it will be extrapolated. Should be a date on the first of a month.
+            extend forward to this date, it will be extrapolated. Should be a date on the first of a month.
 
         :param truncate_date: the last date of real data to use in the timeseries. If the input file does not
-         include this date, a :class:`GasRecordDateError` will be raised. Otherwise, the data from the
-         file will be cut off at this date and extrapolated from there to ``last_date``. This allows you
-         to ensure reproducibility even if you update the input file with additional data.
+            include this date, a :class:`GasRecordDateError` will be raised. Otherwise, the data from the
+            file will be cut off at this date and extrapolated from there to ``last_date``. This allows you
+            to ensure reproducibility even if you update the input file with additional data.
 
         :param allow_negative_values: set to ``True`` to allow the in situ file to contain negative
-         values. Because we are reading file for gases like CO2, N2O, and CH4 (which have large background
-         concentrations), negative values usually mean a fill value exists in the file. Fill values
-         should be replaced with NaNs. If your file actually has negative values, then you will need
-         to set this to ``True``.
+            values. Because we are reading file for gases like CO2, N2O, and CH4 (which have large background
+            concentrations), negative values usually mean a fill value exists in the file. Fill values
+            should be replaced with NaNs. If your file actually has negative values, then you will need
+            to set this to ``True``.
 
-        :return: a dataframe with columns:
-         - "dmf_mean": the mean mole fraction between MLO and SMO
-         - "latency": the mean extrapolation latency between the two sites.
-         - "interp_flag": a flag that will be 0 if both sites had real data, 1 if both sites were interpolated,
-           2 if both sites were extrapolated, and 3 if the two sites differed in how that month's value was obtained.
-         - "mlo_interp_detail_flag": the detailed interpolation flag for MLO, see :func:`read_and_fill_insitu_gas` for
-           the bit meanings.
-         - "smo_interp_detail_flag": same, but for SMO.
+        :return: a dataframe with columns,
+
+            * "dmf_mean": the mean mole fraction between MLO and SMO
+            * "latency": the mean extrapolation latency between the two sites.
+            * "interp_flag": a flag that will be 0 if both sites had real data, 1 if both sites were interpolated,
+              2 if both sites were extrapolated, and 3 if the two sites differed in how that month's value was obtained.
+            * "mlo_interp_detail_flag": the detailed interpolation flag for MLO, see :func:`read_and_fill_insitu_gas` for
+              the bit meanings.
+            * "smo_interp_detail_flag": same, but for SMO.
         """
         # Changed in v1.6: before we just read in both sites and averaged together months where both sites reported
         # data. (get_mlo_smo_mean_joint_fill) However, this gave poor results when SMO was offline for 9 months.

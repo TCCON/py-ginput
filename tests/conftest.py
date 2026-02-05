@@ -486,6 +486,7 @@ def _download_large_files(pytestconfig):
     if skip_check == '1':
         return
 
+    clobber = os.getenv('GINPUT_TEST_CLOBBER_LARGE_FILES', '0') == '1'
     # In order to show that we're downloading and checksumming big files,
     # we disable the stdout capturing for the duration of the download
     # function.
@@ -493,7 +494,7 @@ def _download_large_files(pytestconfig):
     with capmanager.global_and_fixture_disabled():
         print('\n--> Checking if large input files need downloaded')
         _download_from_large_file_record('ginput-large-files.md5')
-        to_extract = _check_large_files()
+        to_extract = _check_large_files(clobber=clobber)
         if len(to_extract) == 0:
             return
 
@@ -509,7 +510,7 @@ def _download_large_files(pytestconfig):
         print(f'--> Removing tarball downloaded from CaltechData ({tarball_file})')
 
 
-def _check_large_files(md5_file = _large_file_dir / 'ginput-large-files.md5'):
+def _check_large_files(md5_file = _large_file_dir / 'ginput-large-files.md5', clobber=False):
     """Get the current .md5 file from the CaltechData repo and see if any input files need downloaded"""
     to_extract = []
     with open(md5_file) as f:
@@ -522,9 +523,12 @@ def _check_large_files(md5_file = _large_file_dir / 'ginput-large-files.md5'):
                 must_extract = True
             else:
                 curr_checksum = _hash_file(abspath, hash_class=md5)
-                must_extract = curr_checksum != expected_checksum
+                file_differs = curr_checksum != expected_checksum
+                must_extract = clobber and file_differs
                 if must_extract:
                     print(f'      * {relpath} must be downloaded (remote file has a different checksum)')
+                elif file_differs:
+                    print(f'WARNING: {relpath} has a different checksum than expected. ')
             if must_extract:
                 to_extract.append(relpath)
     return to_extract

@@ -18,6 +18,7 @@ Welcome to ginput's documentation!
    ginput_usage/making_vmr_files.md
    ginput_usage/making_map_files.md
    ginput_usage/updating_noaa.md
+   ginput_usage/running_tests.md
 
 
 .. toctree::

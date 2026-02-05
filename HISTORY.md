@@ -36,7 +36,7 @@ interpolation means that a gap of more than a few months will fail to capture
 a seasonal cycle, biasing the overall trend high or low depending on where the
 gap starts and ends in the cycle. 1.6.0 introduces a new approach by default,
 where MLO and SMO are filled in and extended separately _and_ use the trend +
-seasonal cycle logic to interpolate gaps more than 3 months long.
+seasonal cycle logic to interpolate all gaps.
 
 Because the sites are now gap filled and extended separately, this will result
 in changes even when using MLO and SMO data that do not have gaps. All of the
