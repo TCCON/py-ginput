@@ -19,6 +19,12 @@ improvements to improve the scientific capabilities of this code sometimes requi
 an update to the API because the new best default behavior requires additional
 user input.
 
+## 1.6.1
+
+This release fixes a bug that causes non-editable installs to fail due to a
+missing `__init__.py` file in `ginput/tools`. It also ensures that numpy 1.y.z
+is install when using the Python 3.12 environment file.
+
 ## 1.6.0
 
 This release includes the following changes:
