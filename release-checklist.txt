@@ -1,3 +1,23 @@
+# Release checklist
+
+## Manual tests
+
+- Pip dependencies:
+    - Create a clean virtualenv (e.g., `uv venv`)
+    - Install ginput in the environment, in non-editable mode (e.g., `source .venv/bin/activate; uv pip install GINPUT_DIR`)
+    - Verify `__main__` imports (e.g., `python -c 'from ginput import __main__'`) and the CLI help prints (`ginput_cli --help`)
+- Conda dependencies:
+    - Cross check the feedstock against dependencies specified here
+    - Optional, recommended: use `conda build` to build a local channel and install from that:
+        - Create a copy of the feedstock `meta.yaml` that has `path` under `source` point to the ginput directory
+        - In the directory with the `meta.yaml`, do `mkdir -p local-channel && conda build . --output-folder ./local-channel`
+        - Try installing with pixi: in an empty directory, do `pixi init`, edit `pixi.toml` to include "local-channel" as the first channel, then `pixi add ginput`
+            - Verify `__main__` imports (e.g., `pixi run python -c 'from ginput import __main__'`) and the CLI help prints (`pixi run ginput_cli --help`)
+        - Try installing with (micro)mamba: in an empty directory, do `micromamba create -p ./testenv && micromamba activate ./testenv && micromamba install -c ../local-channel -c conda-forge ginput`
+            - Verify `__main__` imports (e.g., with the testenv active, do `python -c 'from ginput import __main__'`) and the CLI help prints (`ginput_cli --help`)
+
+## Metadata
+
 - Update HISTORY.md file
 - Update version number in setup.py, CITATION.cff, and ginput/__init__.py
 - Tag the commit with the version as "vX.Y.Z"

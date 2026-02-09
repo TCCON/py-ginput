@@ -19,6 +19,16 @@ improvements to improve the scientific capabilities of this code sometimes requi
 an update to the API because the new best default behavior requires additional
 user input.
 
+## 1.6.2
+
+After the 1.6.1 release, we found that `pytz` is not automatically installed
+as a dependency with `pip` or `conda/mamba`. This is most likely due to it
+being dropped as a dependency of the other direct dependencies. The 1.6.2
+release adds `pytz` and `cftime` as explicit dependencies. It also pins
+`pandas` to `<3.0.0`, since we have not done any testing with the latest
+major versions of `pandas` and cannot say if `ginput` is compatible with
+them.
+
 ## 1.6.1
 
 This release fixes a bug that causes non-editable installs to fail due to a
