@@ -95,6 +95,7 @@ class AutomationArgs:
 
         self.base_vmr_file = json_dict['base_vmr_file']
         self.zgrid_file = json_dict['zgrid_file']
+        self.o2_dmf_file = json_dict['o2_dmf_file']
 
         self.map_file_format = json_dict['map_file_format'].lower()
 
@@ -154,7 +155,8 @@ def _make_vmr_files(all_args: AutomationArgs):
         site_abbrevs=mod_sites,
         flat_outdir=False,
         std_vmr_file=all_args.base_vmr_file,
-        zgrid=all_args.zgrid_file
+        zgrid=all_args.zgrid_file,
+        o2_mole_fraction_file=all_args.o2_dmf_file
     )
 
 def _make_map_files(all_args: AutomationArgs):
