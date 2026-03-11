@@ -2803,7 +2803,8 @@ def calculate_meso_co(alt_profile, eqlat_profile, pres_profile, temp_profile, pr
 
 
 def generate_single_tccon_prior(mod_file_data, utc_offset, concentration_record, zgrid=None,
-                                use_eqlat_trop=True, use_eqlat_strat=True):
+                                use_eqlat_trop=True, use_eqlat_strat=True,
+                                o2_mole_fraction_file=fo2_prep.DEFAULT_FO2_FILE):
     """
     Driver function to generate the TCCON prior profiles for a single observation.
 
@@ -2856,7 +2857,7 @@ def generate_single_tccon_prior(mod_file_data, utc_offset, concentration_record,
         raise NotImplementedError('ginput v1.0.6 does not handle GEOS IT files')
 
     # We only need the datetime to get the O2 mole fraction
-    o2_record = O2MeanMoleFractionRecord()
+    o2_record = O2MeanMoleFractionRecord(o2_mole_fraction_file=o2_mole_fraction_file)
     o2_dmf = o2_record.get_o2_mole_fraction(pd.Timestamp(file_date))
 
     # Make the UTC date a datetime object that is rounded to a date (hour/minute/etc = 0)
@@ -2983,7 +2984,8 @@ def _get_std_vmr_file(std_vmr_file):
 
 
 def generate_full_tccon_vmr_file(mod_data, utc_offsets, save_dir, std_vmr_file=None, site_abbrevs='xx',
-                                 keep_latlon_prec=False, use_existing_luts=False, **kwargs):
+                                 keep_latlon_prec=False, use_existing_luts=False,
+                                 o2_mole_fraction_file=fo2_prep.DEFAULT_FO2_FILE, **kwargs):
     """
     Generate a .vmr file with all the gases required by TCCON (both retrieved and secondary).
 
@@ -3051,7 +3053,7 @@ def generate_full_tccon_vmr_file(mod_data, utc_offsets, save_dir, std_vmr_file=N
 
     generate_tccon_priors_driver(mod_data=mod_data, utc_offsets=utc_offsets, species=species, site_abbrevs=site_abbrevs,
                                  write_vmrs=save_dir, keep_latlon_prec=keep_latlon_prec, gas_name_order=std_vmr_gases,
-                                 **kwargs)
+                                 o2_mole_fraction_file=o2_mole_fraction_file, **kwargs)
 
 
 def generate_tccon_priors_driver(mod_data, utc_offsets, species, site_abbrevs='xx', write_vmrs=False,
