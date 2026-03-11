@@ -20,6 +20,9 @@
 
 - Update HISTORY.md file
 - Update version number in setup.py, CITATION.cff, and ginput/__init__.py
+- Ensure that the latest large test files are uploaded to CaltechData
 - Tag the commit with the version as "vX.Y.Z"
 - Push to public github and create release
 - Confirm that the PyPI publishing action ran
+- Update the conda-forge feedstock
+- Make the CaltechData repo refer to the ginput CaltechData release as well as a related identifier
