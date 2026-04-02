@@ -165,9 +165,8 @@ def getera5data(file3d, file2d, quickPV = True):
         vor = np.squeeze(ds['vo'].to_numpy())   #relative vorticity s^-1
         q   = np.squeeze(ds['q'].to_numpy())  ##kg kg-1 specific humidity 
         o3  = np.squeeze(ds['o3'].to_numpy())  ##kg kg-1 ozone mass mixing ratio
-        
-    lat[np.abs(lat) < 0.001] = 0.0
 
+    lat[np.abs(lat) < 0.001] = 0.0
 
     
     #### constants
@@ -199,16 +198,8 @@ def getera5data(file3d, file2d, quickPV = True):
     
     pre = pre*100. #pressure in pascals
     
-    
-    if quickPV == False:
-        pv    = np.zeros((nlev, nlat, nlon))
-        pv[:] = np.nan
-        for ilon in np.arange(nlon):
-            for ilat in np.arange(nlat):
-              pv[:,ilat,ilon] = -g * (vor[:,ilat,ilon] + pvort3[:,ilat,ilon]) * np.gradient(theta[:,ilat,ilon], pre[:,ilat,ilon], edge_order=2)   #dTheta/dp 
-        
-    
-    if quickPV == True:
+ 
+    if quickPV:
         #The code below vectorize the loops but it provides slightly different values
         #This method is around ten times faster
         dtheta_dp = np.full_like(theta, np.nan, dtype=np.double)
@@ -244,7 +235,15 @@ def getera5data(file3d, file2d, quickPV = True):
                            +  hm1        / (hm2*(hm1 + hm2)) * theta[-3] )
         
         pv = -g * (vor + pvort3) * dtheta_dp
-
+        
+    else:
+        pv    = np.zeros((nlev, nlat, nlon))
+        pv[:] = np.nan
+        for ilon in np.arange(nlon):
+            for ilat in np.arange(nlat):
+              pv[:,ilat,ilon] = -g * (vor[:,ilat,ilon] + pvort3[:,ilat,ilon]) * np.gradient(theta[:,ilat,ilon], pre[:,ilat,ilon], edge_order=2)   #dTheta/dp 
+        
+   
     
     lat_res = np.abs(np.nanmean(np.gradient(lat)))
     lon_res = np.abs(np.nanmean(np.gradient(lon)))
@@ -252,7 +251,6 @@ def getera5data(file3d, file2d, quickPV = True):
 
     
     # --------  GPH
-    
     # Virtual temperature
     tVirt = tem * (q + e) / (e * (1.0 + q))
 
@@ -268,11 +266,7 @@ def getera5data(file3d, file2d, quickPV = True):
 
     
     f = np.empty_like(lpHalf, dtype=float)
-
-    # IDL: f[*, *, 0:-2] = rDry * tVirt * diff
-
     f[:-1, :, :] = rDry * tVirt * diff
-
     f[-1, :, :] = z
 
     # phiHalf2 = Reverse(Total(Reverse(f, 3), 3, /CUMULATIVE, /NAN), 3)
@@ -296,7 +290,7 @@ def getera5data(file3d, file2d, quickPV = True):
     
         
     pre = pre/100 ##hPa
-    pv = pv * 1e6 ##to match units on MERRA2
+    
 
 
 
@@ -343,7 +337,7 @@ def getera5data(file3d, file2d, quickPV = True):
    
     # eql = mod_utils.calculate_eq_lat(np.flip(pv, axis = 0), np.flip(theta, axis = 0), area) 
 
-    eql = mod_utils.calculate_eq_lat(pv, theta, area) 
+    eql = mod_utils.calculate_eq_lat(pv*1e6, theta, area) 
 
     
     t2m    = np.copy(ps)
@@ -366,7 +360,7 @@ def getera5data(file3d, file2d, quickPV = True):
     alt = alt*1000. ##changing to meters
     gph = gph*1000. ##changing to meters    
 
-
+    
     
     mixr = qv2mixr(q*1000.)
     
@@ -396,7 +390,8 @@ def getera5files_perdate(date2use, path = 'era5/'):
     for ss in syntimes:
         fls3d = sorted(glob.glob(os.path.join(path, 'era5*'+yyyymmdd+'_'+str(ss).zfill(2)+'00_3d.nc4'))) 
         fls2d = sorted(glob.glob(os.path.join(path, 'era5*'+yyyymmdd+'_'+str(ss).zfill(2)+'00_2d.nc4'))) 
-
+        fls3d = sorted(glob.glob(os.path.join(path, 'era5*'+yyyymmdd+'_'+str(ss).zfill(2)+'00_3d.grib'))) 
+        fls2d = sorted(glob.glob(os.path.join(path, 'era5*'+yyyymmdd+'_'+str(ss).zfill(2)+'00_2d.grib'))) 
 
             
         if len(fls3d) ==1 & len(fls2d) ==1:
@@ -404,7 +399,6 @@ def getera5files_perdate(date2use, path = 'era5/'):
             files3d.append(fls3d[0])
             files2d.append(fls2d[0])
         else:
-            breakpoint()
             print('ERA5 files are missing')
             sys.exit(0)
             

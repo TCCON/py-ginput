@@ -108,12 +108,15 @@ from ..common_utils.ggg_logging import logger
 from .slantify import * # code to make slant paths
 from .tccon_sites import site_dict, tccon_site_info, tccon_site_info_for_date
 
+from ..common_utils.mod_utils import compute_file_checksum
+
 
 import matplotlib.pyplot as plt
 
 from . import era5_routines as e5r 
 
 import pickle
+from matplotlib.colors import SymLogNorm
 
 ####################
 # Module constants #
@@ -1154,7 +1157,7 @@ def GEOS_files(GEOS_path, start_date, end_date, chm=False):
     # all GEOS5-FPIT Np/Nx files and their dates. Use 'glob' to avoid listing other files (e.g. the download link list)
     # in the directory. Whether glob.glob() and os.listdif() returns a sorted list is platform dependendent. Since the
     # main mod_maker logic depends on the profile and surface file lists being in the same order, we need to sort them.
-    if 'merra2' in  GEOS_path.lower() == False:
+    if 'merra2' not in  GEOS_path.lower():
         ncdf_list = sorted(glob.glob(os.path.join(GEOS_path, 'GEOS*.nc4')))
         if chm:
             ncdf_list = np.array([f for f in ncdf_list if 'chm' in os.path.basename(f)])
@@ -1166,10 +1169,7 @@ def GEOS_files(GEOS_path, start_date, end_date, chm=False):
         # just the one between the 'start_date' and 'end_date' dates
         select_files = ncdf_list[(ncdf_dates>=start_date) & (ncdf_dates<end_date)]
         select_dates = ncdf_dates[(ncdf_dates>=start_date) & (ncdf_dates<end_date)]
-    
-    
-    
-    if 'merra2' in GEOS_path.lower():
+    else:
         #this needs to be updated for multiple dates.
         yyyymmdd = start_date.strftime('%Y%m%d')
         merra2file = sorted(glob.glob(os.path.join(GEOS_path, 'MERRA2*'+yyyymmdd+'.nc4'))) 
@@ -2140,7 +2140,43 @@ def mod_maker_new(start_date=None, end_date=None, func_dict=None, GEOS_path=None
             
             if not muted:
                 print('\t-Interpolate to (lat,lon) of sites ...')
-    
+
+            
+            # fig, ax = plt.subplots(1, figsize = (12,4))
+            # plt.subplots_adjust(bottom = 0.25, hspace = 0.05)
+            
+            # pre = DATA['lev']
+            # nlev = pre.shape[0]
+            # nlat = pre.shape[1]
+            # nlon = pre.shape[2]
+            
+            # levels = np.asarray([-10000, -5000, -1000, -200, -100, -50, -10,-5,-1, 0, 1, 5,10, 50, 100, 200, 1000, 5000, 10000])
+            
+            # norm=SymLogNorm(linthresh=1, linscale=1, vmin=min(levels), vmax=max(levels))
+            
+            # cmap='PRGn'
+            
+            
+            # lon2p = 0
+            # ixlon = np.argmin(np.abs(lon - lon2p))
+            # print(ixlon, lon[ixlon])
+            # lat2d = np.broadcast_to(lat.reshape(1, nlat), (nlev, nlat) )
+            
+            
+            # cb = ax.contourf(lat2d, DATA['lev'][:,:,ixlon], DATA['EPV'][:,:,ixlon]*1e6, levels = levels, cmap=cmap, norm = norm )
+            # ax.set_yscale('log')
+            # ax.set_ylim((1000,1))
+
+
+            # p0 = ax.get_position()
+            # cbar_ax = fig.add_axes([p0.x0, 0.15, p0.x1 - p0.x0, 0.025])
+            
+            # cbar = fig.colorbar(cb, cax=cbar_ax, label='PV', ticks = levels, extend = 'both', orientation = 'horizontal')
+
+
+            # plt.savefig('modmaker_merra2.png')
+            # plt.close()
+            # breakpoint()
             # interpolate pressure levels along with the rest of the 3D variables. If we're using a native file, we're not
             # on fixed pressure levels, and need to interpolate anyway. If using a fixed pressure level file, we've
             # broadcast the pressure levels to be the same size as the rest of the 3D variables.
@@ -2219,23 +2255,27 @@ def mod_maker_new(start_date=None, end_date=None, func_dict=None, GEOS_path=None
         fls = e5r.getera5files(start_date, end_date, path = GEOS_path)
         
         select_dates = fls['dates']
-        
+        start = time.time()
         mod_dicts = dict()
         for date_ID, UTC_date in enumerate(select_dates):
             
-            ee = e5r.getera5data(fls['files3d'][date_ID], fls['files2d'][date_ID])
+            ee = e5r.getera5data(fls['files3d'][date_ID], fls['files2d'][date_ID], quickPV = True)
 
             site_dict = tccon_site_info_for_date(UTC_date, site_dict_in=locations)
             mod_dicts[UTC_date] = dict()
             
             start_it = time.time()
+
+            # 'merra2 (GEOS v5.12.4) : MERRA2_400.inst3_3d_asm_Nv.20180101.nc4 : 5e842c4a79f84f617d9b92378ae1c018'
+            # dmy = cls(vstr, source_str, file_name, file_hash)
+
             
             geos_versions = {
-                'Met3d': 'era5',
-                'Met2d': 'era5',
-                'Chm3d': 'era5'
+                'Met3d': 'era5 (era5) : '+fls['files3d'][date_ID]+ ' : ' +compute_file_checksum(fls['files3d'][date_ID]),
+                'Met2d': 'era5 (era5) : '+fls['files2d'][date_ID]+ ' : ' +compute_file_checksum(fls['files2d'][date_ID])
             }
 
+            
             if do_load_chem:
                 print('---No chemistry info in ERA5')
                 print('---include_chem needs to be set to False')
@@ -2274,6 +2314,46 @@ def mod_maker_new(start_date=None, end_date=None, func_dict=None, GEOS_path=None
             
             DATA = ee
             SURF_DATA = ee['surf']    
+
+
+
+            # fig, ax = plt.subplots(1, figsize = (12,4))
+            # plt.subplots_adjust(bottom = 0.25, hspace = 0.05)
+            
+            # pre = DATA['lev']
+            # nlev = pre.shape[0]
+            # nlat = pre.shape[1]
+            # nlon = pre.shape[2]
+            
+            # levels = np.asarray([-10000, -5000, -1000, -200, -100, -50, -10,-5,-1, 0, 1, 5,10, 50, 100, 200, 1000, 5000, 10000])
+            
+            # norm=SymLogNorm(linthresh=1, linscale=1, vmin=min(levels), vmax=max(levels))
+            
+            # cmap='PRGn'
+            
+            
+            # lon2p = 0
+            # ixlon = np.argmin(np.abs(lon - lon2p))
+            # print(ixlon, lon[ixlon])
+            # lat2d = np.broadcast_to(lat.reshape(1, nlat), (nlev, nlat) )
+            
+            
+            # cb = ax.contourf(lat2d, DATA['lev'][:,:,ixlon], DATA['EPV'][:,:,ixlon]*1e6, levels = levels, cmap=cmap, norm = norm )
+            # ax.set_yscale('log')
+            # ax.set_ylim((1000,1))
+
+
+            # p0 = ax.get_position()
+            # cbar_ax = fig.add_axes([p0.x0, 0.15, p0.x1 - p0.x0, 0.025])
+            
+            # cbar = fig.colorbar(cb, cax=cbar_ax, label='PV', ticks = levels, extend = 'both', orientation = 'horizontal')
+
+
+            # plt.savefig('modmaker_era5.png')
+            # plt.close()
+            # breakpoint()
+
+            
             
             INTERP_DATA = interp_geos_data_to_sites(DATA, lat=lat, lon=lon, site_dict=site_dict, varlist=varlist,
                                         muted=muted)
