@@ -2269,10 +2269,10 @@ def mod_maker_new(start_date=None, end_date=None, func_dict=None, GEOS_path=None
             # 'merra2 (GEOS v5.12.4) : MERRA2_400.inst3_3d_asm_Nv.20180101.nc4 : 5e842c4a79f84f617d9b92378ae1c018'
             # dmy = cls(vstr, source_str, file_name, file_hash)
 
-            
+            #fake version for ERA5
             geos_versions = {
-                'Met3d': 'era5 (era5) : '+fls['files3d'][date_ID]+ ' : ' +compute_file_checksum(fls['files3d'][date_ID]),
-                'Met2d': 'era5 (era5) : '+fls['files2d'][date_ID]+ ' : ' +compute_file_checksum(fls['files2d'][date_ID])
+                'Met3d': 'era5 (GEOS v0.0.0) : '+fls['files3d'][date_ID]+ ' : ' +compute_file_checksum(fls['files3d'][date_ID]),
+                'Met2d': 'era5 (GEOS v0.0.0): '+fls['files2d'][date_ID]+ ' : ' +compute_file_checksum(fls['files2d'][date_ID])
             }
 
             

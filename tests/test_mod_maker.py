@@ -20,10 +20,9 @@ MAP_UNIT_SCALES = {'mol/mol': 1.0, 'parts': 1.0, 'ppm': 1e-6, 'ppb': 1e-9, 'ppt'
 DATE_RANGE_2018 = [datetime(2018, 1, 1), datetime(2018, 1, 2)]
 DATE_RANGE_2025 = [datetime(2025, 3, 2, 15), datetime(2025, 3, 3)]
 
-
 # pytest -m merra2 -v
 @pytest.mark.merra2
-def test_mod_files_merra2(subtests, mod_input_dir, mod_output_dir, test_plots_dir):
+def test_mod_files_merra2(subtests, mod_input_dir, mod_output_dir, test_plots_dir, merra2_dir):
     """This test confirms that .mod files for Ny on 1 Jan 2018 are the same as previously produced.
     """
     date_range = [datetime(2018, 1, 1), datetime(2018, 1, 2)]
@@ -31,15 +30,18 @@ def test_mod_files_merra2(subtests, mod_input_dir, mod_output_dir, test_plots_di
     
     met_path = '/oco2-data/tccon-nobak/met/merra2/'
     chem_path = '/oco2-data/tccon-nobak/chm/merra2/'
+
+    met_path = merra2_dir / 'met/'
+    chem_path = merra2_dir / 'chm/'
     include_chm = True
 
 
     save_path = mod_output_dir
     mode = 'merra2'
-    # mmdriver(date_range, met_path, chem_path=chem_path, save_path=save_path, \
-    #           keep_latlon_prec=False, save_in_utc=True, muted=False, \
-    #           slant=False, alt=None, lon=None, lat=None, site_abbrv=site_abbrv, \
-    #           mode=mode, include_chm=include_chm, flat_outdir=False)
+    mmdriver(date_range, met_path, chem_path=chem_path, save_path=save_path, \
+              keep_latlon_prec=False, save_in_utc=True, muted=False, \
+              slant=False, alt=None, lon=None, lat=None, site_abbrv=site_abbrv, \
+              mode=mode, include_chm=include_chm, flat_outdir=False)
     
     
     comparison_helper(
@@ -52,7 +54,7 @@ def test_mod_files_merra2(subtests, mod_input_dir, mod_output_dir, test_plots_di
 
 #pytest -m era5 -v
 @pytest.mark.era5
-def test_mod_files_era5(subtests, mod_input_dir, mod_output_dir, test_plots_dir):
+def test_mod_files_era5(subtests, mod_input_dir, mod_output_dir, test_plots_dir, era5_dir):
     """This test confirms that .mod files for Ny on 1 Jan 2018 are the same as previously produced.
     """
     date_range = [datetime(2018, 1, 1), datetime(2018, 1, 2)]
@@ -60,6 +62,7 @@ def test_mod_files_era5(subtests, mod_input_dir, mod_output_dir, test_plots_dir)
     
 
     met_path = '/home/lmillan/work/tccon/era5/'
+    met_path = era5_dir 
     chem_path = None
     include_chm = False
 

@@ -53,6 +53,14 @@ def fo2_pre2025_csv():
 def geos_dir(large_files_dir):
     return large_files_dir / 'geos'
 
+@pytest.fixture(scope='session')
+def merra2_dir(large_files_dir):
+    return large_files_dir / 'merra2'
+
+@pytest.fixture(scope='session')
+def era5_dir(large_files_dir):
+    return large_files_dir / 'era5'
+    
 
 @pytest.fixture(scope='session')
 def geos_3d_met_files_by_datetime(large_files_dir):

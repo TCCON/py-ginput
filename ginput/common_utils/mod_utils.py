@@ -1633,6 +1633,7 @@ def interp_tropopause_height_from_pressure(p_trop_met, p_met, z_met):
     # theta 0 or >1 times) so we just use pressure now.
     z_trop_met = mod_interpolation_new(p_trop_met, p_met, z_met, 'log-lin')
     if z_trop_met < np.nanmin(z_met):
+        stop
         raise RuntimeError('Tropopause altitude calculated to be below the bottom of the profile. Something has '
                            'gone horribly wrong.')
     return z_trop_met

@@ -343,18 +343,23 @@ def getera5data(file3d, file2d, quickPV = True):
     t2m    = np.copy(ps)
     qv2m   = np.copy(ps)
     slp    = np.copy(ps)
+
+    #generic values to fill the header
+    t2m[:]  = 250
+    slp[:]  = 1040
+    qv2m[:] = 0.002 
     
-    troppb = np.copy(ps)
-    troppv = np.copy(ps)
-    troppt = np.copy(ps)
-    tropt  = np.copy(ps)
+    # troppb = np.copy(ps)
+    # troppv = np.copy(ps)
+    # troppt = np.copy(ps)
+    # tropt  = np.copy(ps)
 
-    # tt = computetropopauses(tem, alt, pre, pv, 0)
+    tt = computetropopauses(tem, alt, pre, pv, 0)
 
-    # troppb = tt['blnpre']
-    # troppv = tt['dynpre']
-    # troppt = tt['wmopre']
-    # tropt  = tt['blntem']
+    troppb = tt['blnpre']
+    troppv = tt['dynpre']
+    troppt = tt['wmopre']
+    tropt  = tt['blntem']
 
 
     alt = alt*1000. ##changing to meters

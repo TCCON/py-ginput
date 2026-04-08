@@ -28,7 +28,7 @@ def static_stability(dtdz, tprf):
 
 
 def wmo_tropopauses(tprof, zprof, pprof, pvprof = None, thprof = None,
-    plow=500.0, phigh=10.0, zlow=3.5, dttest=-2.0, verbose = True):
+    plow=500.0, phigh=10.0, zlow=3.5, dttest=-2.0, verbose = False):
 
 
     # ---- Basic argument checks ----
