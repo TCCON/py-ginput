@@ -14,6 +14,9 @@ def pytest_configure(config):
     config.addinivalue_line(
         "markers", "glacial: mark test as extremely long running (deselect with `-m 'not glacial'`)"
     )
+    config.addinivalue_line(
+        "markers", "altmet: mark test as testing an alternate meteorology (deselect with `-m 'not altmet'`)"
+    )
 
 
 _mydir = Path(__file__).parent.resolve()
@@ -60,7 +63,7 @@ def merra2_dir(large_files_dir):
 @pytest.fixture(scope='session')
 def era5_dir(large_files_dir):
     return large_files_dir / 'era5'
-    
+
 
 @pytest.fixture(scope='session')
 def geos_3d_met_files_by_datetime(large_files_dir):
