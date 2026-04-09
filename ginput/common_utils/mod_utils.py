@@ -282,6 +282,18 @@ def vmr_file_name_from_mod(mod_file_name: str) -> str:
     return 'JL{}_{}.vmr'.format(_get_priors_major_version(), date_loc)
 
 
+def datetime_from_mod_name(mod_file_name: str) -> dt.datetime:
+    # Assume a name like FPIT_2021111800Z_49N_008E.mod
+    dstr = mod_file_name.split('_')[1]
+    return dt.datetime.strptime(dstr, '%Y%m%d%HZ')
+
+
+def datetime_from_vmr_name(vmr_file_name: str) -> dt.datetime:
+    # Assume a name like JL1_2021111803Z_49N_008E.vmr
+    dstr = vmr_file_name.split('_')[1]
+    return dt.datetime.strptime(dstr, '%Y%m%d%HZ')
+
+
 def _get_priors_major_version():
     return const.priors_version.split('.')[0]
 

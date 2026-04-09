@@ -1,10 +1,12 @@
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
-from hashlib import sha1
+from hashlib import md5, sha1
 import os
 from pathlib import Path
 import pytest
 import re
+import requests
+import tarfile as tf
 
 
 def pytest_configure(config):
@@ -19,6 +21,7 @@ def pytest_configure(config):
     )
 
 
+LARGE_FILES_DOI='10.22002/4rgh7-zss31'
 _mydir = Path(__file__).parent.resolve()
 input_data_dir = _mydir / 'test_input_data'
 output_data_dir = _mydir / 'test_output_data'
@@ -132,13 +135,13 @@ def fo2_v2025_csv():
 
 
 @pytest.fixture(scope='session')
-def fo2_pre2025_pkl():
-    return fo2_dir / 'monthly_o2_ljo.pre2025.pkl'
+def fo2_pre2025_expected():
+    return fo2_dir / 'monthly_o2_ljo.pre2025.expected.csv'
 
 
 @pytest.fixture(scope='session')
-def fo2_v2025_pkl():
-    return fo2_dir / 'monthly_o2_ljo.v2025.pkl'
+def fo2_v2025_expected():
+    return fo2_dir / 'monthly_o2_ljo.v2025.expected.csv'
 
 
 @pytest.fixture(scope='session')
@@ -298,8 +301,8 @@ def test_site():
 
 
 @pytest.fixture(scope='session')
-def large_files_dir():
-    # TODO: download the DOIed tarball if not present
+def large_files_dir(pytestconfig):
+    _download_large_files(pytestconfig)
     return _large_file_dir
 
 @pytest.fixture(scope='session')
@@ -360,9 +363,9 @@ def _read_hash_list(hash_filename, input_data_dir):
     return hash_dict
 
 
-def _hash_file(filename):
+def _hash_file(filename, hash_class=sha1):
     block_size = 2**16
-    hash_obj = sha1()
+    hash_obj = hash_class()
     with open(filename, 'rb') as fobj:
         buf = fobj.read(block_size)
         while len(buf) > 0:
@@ -487,3 +490,132 @@ class GapTestResultFile:
             return tgt_dir / f'{gas}_{df_type}_{version}.nc'
         else:
             return tgt_dir / f'{gas}_{df_type}_{n_months_missing}months.nc'
+
+
+def _download_large_files(pytestconfig):
+    skip_check = os.getenv('GINPUT_TEST_SKIP_LARGE_FILE_CHECK', '0')
+    if skip_check == '1':
+        return
+
+    clobber = os.getenv('GINPUT_TEST_CLOBBER_LARGE_FILES', '0') == '1'
+    # In order to show that we're downloading and checksumming big files,
+    # we disable the stdout capturing for the duration of the download
+    # function.
+    capmanager = pytestconfig.pluginmanager.getplugin("capturemanager")
+    with capmanager.global_and_fixture_disabled():
+        print('\n--> Checking if large input files need downloaded')
+        _download_from_large_file_record('ginput-large-files.md5')
+        to_extract = _check_large_files(clobber=clobber)
+        if len(to_extract) == 0:
+            return
+
+        print(f'--> {len(to_extract)} large files need downloaded... this will take a few minutes')
+        _download_from_large_file_record('ginput-large-files.tgz')
+        tarball_file = _large_file_dir / 'ginput-large-files.tgz'
+        with tf.open(tarball_file) as tgz:
+            for item in to_extract:
+                member = tgz.getmember(item)
+                tgz.extract(member, path=_large_file_dir, set_attrs=False)
+
+        tarball_file.unlink()
+        print(f'--> Removing tarball downloaded from CaltechData ({tarball_file})')
+
+
+def _check_large_files(md5_file = _large_file_dir / 'ginput-large-files.md5', clobber=False):
+    """Get the current .md5 file from the CaltechData repo and see if any input files need downloaded"""
+    to_extract = []
+    with open(md5_file) as f:
+        for line in f:
+            expected_checksum, relpath = line.strip().split()
+            print(f'--> Checking if large file {relpath} needs downloading')
+            abspath = _large_file_dir / relpath
+            if not abspath.exists():
+                print(f'      * {relpath} must be downloaded (does not exist locally)')
+                must_extract = True
+            else:
+                curr_checksum = _hash_file(abspath, hash_class=md5)
+                file_differs = curr_checksum != expected_checksum
+                must_extract = clobber and file_differs
+                if must_extract:
+                    print(f'      * {relpath} must be downloaded (remote file has a different checksum)')
+                elif file_differs:
+                    print(f'WARNING: {relpath} has a different checksum than expected. ')
+            if must_extract:
+                to_extract.append(relpath)
+    return to_extract
+
+
+def _download_from_large_file_record(filename: str, max_redirects=10):
+    record_id = LARGE_FILES_DOI.split('/')[-1]
+    metadata_url = f'https://data.caltech.edu/api/records/{record_id}/files'
+    with requests.get(metadata_url) as r:
+        r.raise_for_status()
+        metadata = r.json()
+
+    url = f'https://data.caltech.edu/api/records/{record_id}/files/{filename}/content'
+    record_url = url
+    for _ in range(max_redirects):
+        with requests.get(url, stream=True) as r:
+            r.raise_for_status()
+            if 'Location' in r.headers:
+                url = r.headers['Location']
+            else:
+                progress = ContentProgress(r.headers.get('content-length', None))
+                output_file = _large_file_dir / filename
+                print(f'--> Downloading {output_file}')
+                with open(output_file, 'wb') as f:
+                    for chunk in r.iter_content(chunk_size=8192):
+                        if chunk:  # do not write empty, keep-alive chunks
+                            progress.update(len(chunk))
+                            f.write(chunk)
+                print(f'--> Verifying checksum of {output_file}')
+                _verify_caltechdata_checksum(metadata, output_file)
+                print('--> Download complete')
+                return
+    raise RuntimeError(f'Exceeded {max_redirects} redirects trying to access {record_url}')
+
+
+def _verify_caltechdata_checksum(metadata, output_file):
+    expected_md5 = [entry['checksum'].split(':')[1] for entry in metadata.get('entries', []) if entry['key'] == output_file.name]
+    if len(expected_md5) != 1:
+        raise RuntimeError(f'Found {len(expected_md5)} entries for {output_file.name} in the CaltechData metadata, expected 1')
+    expected_md5 = expected_md5[0]
+    actual_md5 = _hash_file(output_file, hash_class=md5)
+    if expected_md5 != actual_md5:
+        raise RuntimeError(f'MD5 checksum for {output_file} did not match: expected {expected_md5} from CaltechData, current value checksum is {actual_md5}')
+
+
+class ContentProgress:
+    def __init__(self, content_length, size_step=50):
+        # Not all requests will provide a content length, so if
+        # it was None, we'll have to just print the size downloaded.
+        if content_length is not None:
+            content_length = int(content_length)
+            if content_length > 10 * 1024**3:
+                self.size_divisor = 1024**3
+                self.size_unit = 'GB'
+            if content_length > 10 * 1024**2:
+                self.size_divisor = 1024**2
+                self.size_unit = 'MB'
+            elif content_length > 10 * 1024:
+                self.size_divisor = 1024
+                self.size_unit = 'kB'
+            else:
+                self.size_divisor = 1
+                self.size_unit = 'B'
+            self.content_length = int(content_length) / self.size_divisor
+        else:
+            self.content_length = None
+        self.step = size_step
+        self.next_size = 0
+        self.curr_size = 0
+
+    def update(self, chunk_len: int):
+        self.curr_size += chunk_len / self.size_divisor
+        if self.curr_size > self.next_size:
+            if self.content_length is None:
+                print(f'{self.curr_size} {self.size_unit} downloaded')
+            else:
+                frac = self.curr_size / self.content_length
+                print(f'      * {self.curr_size:.1f} of {self.content_length:.1f} {self.size_unit} downloaded ({frac:.1%})')
+            self.next_size = (self.curr_size // self.step + 1) * self.step

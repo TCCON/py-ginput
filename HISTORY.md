@@ -19,6 +19,22 @@ improvements to improve the scientific capabilities of this code sometimes requi
 an update to the API because the new best default behavior requires additional
 user input.
 
+## 1.6.2
+
+After the 1.6.1 release, we found that `pytz` is not automatically installed
+as a dependency with `pip` or `conda/mamba`. This is most likely due to it
+being dropped as a dependency of the other direct dependencies. The 1.6.2
+release adds `pytz` and `cftime` as explicit dependencies. It also pins
+`pandas` to `<3.0.0`, since we have not done any testing with the latest
+major versions of `pandas` and cannot say if `ginput` is compatible with
+them.
+
+## 1.6.1
+
+This release fixes a bug that causes non-editable installs to fail due to a
+missing `__init__.py` file in `ginput/tools`. It also ensures that numpy 1.y.z
+is install when using the Python 3.12 environment file.
+
 ## 1.6.0
 
 This release includes the following changes:
@@ -36,7 +52,7 @@ interpolation means that a gap of more than a few months will fail to capture
 a seasonal cycle, biasing the overall trend high or low depending on where the
 gap starts and ends in the cycle. 1.6.0 introduces a new approach by default,
 where MLO and SMO are filled in and extended separately _and_ use the trend +
-seasonal cycle logic to interpolate gaps more than 3 months long.
+seasonal cycle logic to interpolate all gaps.
 
 Because the sites are now gap filled and extended separately, this will result
 in changes even when using MLO and SMO data that do not have gaps. All of the
@@ -61,6 +77,13 @@ well. This simplifies the install process.
 The `main()` function is also now found in `ginput.__main__` and can accept
 a list of command line arguments. This means that you can mimic CLI calls
 from within Python more easily.
+
+### Prototype netCDF tool
+
+This version adds a prototype subcommand (`tar2nc`) that converts standard
+site tarballs of `.mod` and `.vmr` files to a single netCDF file. It is
+still being developed, and may not work for all versions of `.mod` and
+`.vmr` files.
 
 ## 1.5.1
 

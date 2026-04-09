@@ -9,6 +9,7 @@ dependencies:
   - jplephem==2.23
   - matplotlib==3.10.5
   - netcdf4==1.7.2
+  - numpy>=1.23.0,<2.0.0
   - pandas==2.3.1
   - pydap==3.5.5
   - python==3.12.11

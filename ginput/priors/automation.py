@@ -38,7 +38,7 @@ class MKLThreads(object):
         if cls._thread_rt is None:
             raise OSError('Could not load any of the expected multithreading libraries')
         return cls._thread_rt, cls._thread_type
-    
+
     @classmethod
     def get_num_threads(cls):
         rt, tt = cls._threads()
@@ -78,7 +78,7 @@ class MKLThreads(object):
     def __exit__(self, type, value, traceback):
         if self._n > 0:
             self.set_num_threads(self._saved_n)
-    
+
 
 class AutomationArgs:
     def __init__(self, **json_dict):
@@ -95,6 +95,7 @@ class AutomationArgs:
 
         self.base_vmr_file = json_dict['base_vmr_file']
         self.zgrid_file = json_dict['zgrid_file']
+        self.o2_dmf_file = json_dict['o2_dmf_file']
 
         self.map_file_format = json_dict['map_file_format'].lower()
 
@@ -154,7 +155,8 @@ def _make_vmr_files(all_args: AutomationArgs):
         site_abbrevs=mod_sites,
         flat_outdir=False,
         std_vmr_file=all_args.base_vmr_file,
-        zgrid=all_args.zgrid_file
+        zgrid=all_args.zgrid_file,
+        o2_mole_fraction_file=all_args.o2_dmf_file
     )
 
 def _make_map_files(all_args: AutomationArgs):
@@ -167,7 +169,7 @@ def _make_map_files(all_args: AutomationArgs):
             latstr = mod_utils.find_lat_substring(fbase)
             dict_out['{}_{}_{}'.format(timestr, lonstr, latstr)] = f
         return dict_out
-    
+
     job_dir = all_args.save_path
     map_fmt = all_args.map_file_format
 
@@ -211,7 +213,7 @@ def _make_map_files(all_args: AutomationArgs):
                     vmr_file=vmrf, mod_file=modf, map_output_dir=map_dir, 
                     fmt=map_fmt, site_abbrev=site_abbrev, no_cfunits=True
                 )
-            
+
 def _make_simulated_files(all_args: AutomationArgs, delay_time: float):
     time.sleep(delay_time)
     curr_time = all_args.start_date
@@ -241,7 +243,7 @@ def _make_simulated_files(all_args: AutomationArgs, delay_time: float):
                 map_dir = os.path.join(all_args.save_path, subdir, site_id, 'maps-vertical')
                 if not os.path.exists(map_dir):
                     os.makedirs(map_dir)
-                    
+
                 if all_args.map_file_format == 'txtandnc':
                     map_file_name = mod_utils.map_file_name_from_mod_vmr_files(
                         site_id, mod_file_name, vmr_file_name, 'txt'
@@ -260,8 +262,8 @@ def _make_simulated_files(all_args: AutomationArgs, delay_time: float):
                     )
                     with open(os.path.join(map_dir, map_file_name), 'w') as f:
                         f.write(f'Simulated .map file for {curr_time}')
-                
-            
+
+
         curr_time += timedelta(hours=3)
 
 def job_driver(json_file, simulate_with_delay=None):
@@ -280,16 +282,16 @@ def job_driver(json_file, simulate_with_delay=None):
             _make_vmr_files(all_args)
             _make_map_files(all_args)
 
-    
-def lut_regen_driver():
-    # Update the O2 dry mole fraction table first - the LUTs shouldn't depend on this,
-    # but it's quick, so may as well do it first.
-    fo2_prep.fo2_update_driver()
 
+def lut_regen_driver():
     # Have each trace gas record use its internal logic to decide if it needs
     # regenerated
     for record in tccon_priors.gas_records.values():
         record()
+    # We no longer update the O2 input file; that should be done via a separate
+    # call so that the automation can manage LUT regen vs. file updates, since
+    # the O2 file (and eventually the CO2, N2O, and CH4 files) all need to update
+    # on a different cadence.
 
 
 def parse_cl_args(p=None):
