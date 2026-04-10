@@ -21,7 +21,7 @@ def pytest_configure(config):
     )
 
 
-LARGE_FILES_DOI='10.22002/4rgh7-zss31'
+LARGE_FILES_DOI='10.22002/skck2-dfz91'
 _mydir = Path(__file__).parent.resolve()
 input_data_dir = _mydir / 'test_input_data'
 output_data_dir = _mydir / 'test_output_data'
