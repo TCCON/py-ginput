@@ -1,17 +1,4 @@
-
-# import sys 
 import numpy as np
-# import matplotlib.pyplot as plt
-
-# from tqdm import tqdm
-# import pickle
-
-# from scipy.io import readsav
-# from scipy.interpolate import interp1d
-
-# from scipy.interpolate import UnivariateSpline
-
-from tqdm import tqdm 
 
 
 def static_stability(dtdz, tprf):
@@ -28,7 +15,7 @@ def static_stability(dtdz, tprf):
 
 
 def wmo_tropopauses(tprof, zprof, pprof, pvprof = None, thprof = None,
-    plow=500.0, phigh=10.0, zlow=3.5, dttest=-2.0, verbose = False):
+                    plow=500.0, phigh=10.0, zlow=3.5, dttest=-2.0, verbose = False):
 
 
     # ---- Basic argument checks ----
@@ -65,7 +52,7 @@ def wmo_tropopauses(tprof, zprof, pprof, pvprof = None, thprof = None,
 
 
 
-	#the profiles need to be from the surface to space
+        #the profiles need to be from the surface to space
     if zprof[0] > zprof[-1]:
         tprof  = np.flip(tprof)
         zprof  = np.flip(zprof)
@@ -87,8 +74,8 @@ def wmo_tropopauses(tprof, zprof, pprof, pvprof = None, thprof = None,
     numwmo   = 0
 
     out = {'wmosurf':wmosurf, 'wmoalt':wmoalt, 'wmotemp':wmotemp, 
-        'wmopres':wmopres, 'wmopv':wmopv, 'wmotheta':wmotheta, 'wmoss':wmoss, 
-        'numwmo':numwmo, 'plow':plow, 'phigh':phigh, 'zlow':zlow, 'dttest':dttest, 'baddata':baddata}
+           'wmopres':wmopres, 'wmopv':wmopv, 'wmotheta':wmotheta, 'wmoss':wmoss, 
+           'numwmo':numwmo, 'plow':plow, 'phigh':phigh, 'zlow':zlow, 'dttest':dttest, 'baddata':baddata}
 
     # ---- Mask out bad data ----
 
@@ -98,7 +85,7 @@ def wmo_tropopauses(tprof, zprof, pprof, pvprof = None, thprof = None,
 
     good_mask = np.isfinite(tprof) & np.isfinite(zprof) & np.isfinite(pprof) & np.isfinite(thprof)
     if have_pv:
-    	good_mask = np.isfinite(tprof) & np.isfinite(zprof) & np.isfinite(pprof) & np.isfinite(thprof) & np.isfinite(pvprof)
+        good_mask = np.isfinite(tprof) & np.isfinite(zprof) & np.isfinite(pprof) & np.isfinite(thprof) & np.isfinite(pvprof)
 
 
     gprof = np.where(good_mask)[0]
@@ -133,7 +120,7 @@ def wmo_tropopauses(tprof, zprof, pprof, pvprof = None, thprof = None,
 
     # Apply  limits
     profu_mask = ((zgprof > zlow) & (pgprof > phigh) & (pgprof < plow))
-    
+
     profu = np.where(profu_mask)[0]
     nprofu = profu.size
 
@@ -177,7 +164,7 @@ def wmo_tropopauses(tprof, zprof, pprof, pvprof = None, thprof = None,
         ndtg2 = dtgt2.size
         if (ndtg2 > 0 and
             zgprof[dtgt2[0]] < 18.0 and
-            (zgprof[dtgt2[0]] - zgprof[dtlt2_first]) <= 2.5):
+                (zgprof[dtgt2[0]] - zgprof[dtlt2_first]) <= 2.5):
 
             start = dtgt2[0]
             tmp = np.where(dgprof[start:] > dttest)[0]
@@ -205,10 +192,10 @@ def wmo_tropopauses(tprof, zprof, pprof, pvprof = None, thprof = None,
                     else:
                         ind2kt = dtlt2[ndtl2 - 1]
 
-		            ##  ;;Actual WMO criteria -- if dT/dz GT -2K/km AND the average between that level and 
-		            ##  ;;any higher level within 2 km remains GT -2K/km
+                        ##  ;;Actual WMO criteria -- if dT/dz GT -2K/km AND the average between that level and 
+                        ##  ;;any higher level within 2 km remains GT -2K/km
                     if ((zgprof[ind2kt] - zgprof[index]) > 2.0 or
-                        0.5 * (dgprof[index] + dgprof[ind2kt]) > dttest):
+                            0.5 * (dgprof[index] + dgprof[ind2kt]) > dttest):
 
                         xint  = dgprof[index:index + 2]
                         yint  = zgprof[index:index + 2]
@@ -255,8 +242,8 @@ def wmo_tropopauses(tprof, zprof, pprof, pvprof = None, thprof = None,
             numwmo = 1
 
         out = {'wmosurf':wmosurf, 'wmoalt':wmoalt, 'wmotemp':wmotemp, 
-        'wmopres':wmopres, 'wmopv':wmopv, 'wmotheta':wmotheta, 'wmoss':wmoss, 
-        'numwmo':numwmo, 'plow':plow, 'phigh':phigh, 'zlow':zlow, 'dttest':dttest, 'baddata':baddata}
+               'wmopres':wmopres, 'wmopv':wmopv, 'wmotheta':wmotheta, 'wmoss':wmoss, 
+               'numwmo':numwmo, 'plow':plow, 'phigh':phigh, 'zlow':zlow, 'dttest':dttest, 'baddata':baddata}
 
     else:
         if verbose:
@@ -322,9 +309,9 @@ def interp_prfs(index, xprof, xtarget, yprofs):
 
 
 def dyn_tropopauses(tprf, zprf, pprf, pvprf,
-                   plow=850., phigh=10., zlow=0.0,
-                   tropopv=2.0, thtest=380., 
-                   verbose=False):
+                    plow=850., phigh=10., zlow=0.0,
+                    tropopv=2.0, thtest=380., 
+                    verbose=False):
 
     tprf  = np.copy(np.asarray(tprf, float))
     pvprf = np.copy(np.asarray(pvprf, float))
@@ -471,7 +458,7 @@ def dyn_tropopauses(tprf, zprf, pprf, pvprf,
                     dynflag[nm] = 1.0
                     tpvals = interp_prfs(thind, thprf, thtest,yprfs[:, :6])
                     (dynalt[nm], dyntemp[nm], dynpres[nm], dynsurf[nm],
-                    dyndTdz[nm], dynSS[nm]) = tpvals
+                     dyndTdz[nm], dynSS[nm]) = tpvals
                     dynTheta[nm] = thtest
                     if np.isfinite(dynalt[nm]):
                         numdyn += 1
@@ -479,7 +466,7 @@ def dyn_tropopauses(tprf, zprf, pprf, pvprf,
                     dynflag[nm] = 0.0
                     tpvals = interp_prfs(indup[nm], np.abs(pvprf), pvtest,yprfs)
                     (dynalt[nm], dyntemp[nm], dynpres[nm], dynsurf[nm],
-                    dyndTdz[nm], dynSS[nm], dynTheta[nm]) = tpvals
+                     dyndTdz[nm], dynSS[nm], dynTheta[nm]) = tpvals
 
                     if dynTheta[nm] > thtest and thind is not None and thind < ngprf - 1:
                         dynflag[nm] = 1.0
@@ -494,7 +481,7 @@ def dyn_tropopauses(tprf, zprf, pprf, pvprf,
                 for nb in range(nbelow):
                     tpvals = interp_prfs(inddn[nb], np.abs(pvprf), pvtest,yprfs)
                     (tpfalt[nb], tpftem[nb], tpfpre[nb], tpfsurf[nb],
-                    tpfdTdz[nb], tpfSS[nb], tpfTheta[nb]) = tpvals
+                     tpfdTdz[nb], tpfSS[nb], tpfTheta[nb]) = tpvals
                     if tpfTheta[nb] > thtest:
                         tpfalt[nb] = tpftem[nb] = tpfpre[nb] = tpfsurf[nb] = \
                             tpfdTdz[nb] = tpfSS[nb] = tpfTheta[nb] = baddata
@@ -502,19 +489,19 @@ def dyn_tropopauses(tprf, zprf, pprf, pvprf,
                     numtpf += 1
 
     tpf = dict(
-    plow=plow, phigh=phigh, zlow=zlow,
-    tropopv=tropopv, baddata=baddata,
-    numtpf=numtpf, tpfsurf=tpfsurf, tpfalt=tpfalt,
-    tpftemp=tpftem, tpfpres=tpfpre, tpfTheta=tpfTheta,
-    tpfdTdz=tpfdTdz, tpfSS=tpfSS
+        plow=plow, phigh=phigh, zlow=zlow,
+        tropopv=tropopv, baddata=baddata,
+        numtpf=numtpf, tpfsurf=tpfsurf, tpfalt=tpfalt,
+        tpftemp=tpftem, tpfpres=tpfpre, tpfTheta=tpfTheta,
+        tpfdTdz=tpfdTdz, tpfSS=tpfSS
     )
 
     trop = dict(
-    plow=plow, phigh=phigh, zlow=zlow,
-    tropopv=tropopv, baddata=baddata,
-    numdyn=numdyn, dynsurf=dynsurf, dynalt=dynalt,
-    dyntemp=dyntemp, dynpres=dynpres, dynflag=dynflag,
-    dynTheta=dynTheta, dyndTdz=dyndTdz, dynSS=dynSS, folds =tpf
+        plow=plow, phigh=phigh, zlow=zlow,
+        tropopv=tropopv, baddata=baddata,
+        numdyn=numdyn, dynsurf=dynsurf, dynalt=dynalt,
+        dyntemp=dyntemp, dynpres=dynpres, dynflag=dynflag,
+        dynTheta=dynTheta, dyndTdz=dyndTdz, dynSS=dynSS, folds =tpf
     )
 
     return trop
@@ -550,7 +537,7 @@ def reshape_and_flatten(arr, axis):
     return dmy.reshape(dmy.shape[0], -1)
 
 
-def computetropopauses(tem, alt, pre, pv, vertaxis, tropopv = 4.5):
+def computetropopauses(tem, alt, pre, pv, vertaxis, tropopv = 4.5, silent=False):
 
     print('---Computing tropopauses')
     tem = np.copy(tem)
@@ -559,7 +546,6 @@ def computetropopauses(tem, alt, pre, pv, vertaxis, tropopv = 4.5):
     pv  = np.copy(pv)
 
     dims = tem.shape
-    dimsvert = dims[vertaxis]
     dims2flatten = dims[:vertaxis] + dims[vertaxis+1:]
 
     dimflat = np.prod(dims2flatten)
@@ -574,14 +560,16 @@ def computetropopauses(tem, alt, pre, pv, vertaxis, tropopv = 4.5):
     wmopre = np.full(dimflat, np.nan, dtype = float)
     blntem = np.full(dimflat, np.nan, dtype = float)
 
-    for ip in tqdm(np.arange(dimflat)):
-        
+    for ip in np.arange(dimflat):
+        if not silent:
+            print(f'\rComputing tropopause element {ip+1} of {dimflat}', end='')
+
         tprf = tem[:,ip]
         zprf = alt[:,ip]
         pprf = pre[:,ip]
         pvprf = pv[:,ip]
-        
-        
+
+
         bb = blendedtropopause(tprf, zprf, pprf, pvprf, tropopv = tropopv)
         ww = wmo_tropopauses(tprf, zprf, pprf, pvprof = pvprf)
         dd = dyn_tropopauses(tprf, zprf, pprf, pvprf, tropopv = tropopv)
@@ -590,6 +578,8 @@ def computetropopauses(tem, alt, pre, pv, vertaxis, tropopv = 4.5):
         dynpre[ip] = dd['dynpres'][0]
         wmopre[ip] = ww['wmopres'][0]
         blntem[ip] = bb['tem']
+    if not silent:
+        print('\nDone')
 
 
 
@@ -601,10 +591,3 @@ def computetropopauses(tem, alt, pre, pv, vertaxis, tropopv = 4.5):
 
     oo = dict(blnpre = blnpre, dynpre=dynpre, wmopre=wmopre, blntem=blntem)
     return oo
-
-
-
-
-
-
-

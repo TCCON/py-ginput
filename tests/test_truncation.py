@@ -2,8 +2,9 @@ from datetime import datetime
 from ginput.priors import tccon_priors
 from ginput.common_utils.test_utils import compare_dataframes
 import numpy as np
+import pytest
 
-
+@pytest.mark.slow
 def test_truncation(subtests, noaa_gas, mlo_trunc_test_file, smo_trunc_test_file, mlo_smo_default_end_date):
     """This test verifies that the ``truncate_date`` argument of the MLO/SMO gas classes works correctly.
 
