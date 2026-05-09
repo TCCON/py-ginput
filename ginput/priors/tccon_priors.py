@@ -239,7 +239,7 @@ class O2MeanMoleFractionRecord(object):
             raise ValueError('max_extrap_years must be greater than delay_years')
         
         if auto_update_fo2_file:
-            fo2_prep.fo2_update_driver(o2_mole_fraction_file, time_since_mod=auto_update_td, from_tccondata=auto_update_fo2_file)
+            fo2_prep.fo2_update_driver(o2_mole_fraction_file, time_since_mod=auto_update_td, from_tccondata=auto_update_from_tccondata)
         if not os.path.exists(o2_mole_fraction_file):
             raise IOError(f'O2 mole fraction file does not exist at {o2_mole_fraction_file}. Make sure the path is correct and you have run the '
                           '"update_fo2" subcommand of run_ginput.py at least once OR set auto_update_fo2_file = True when instantiating this class.')

@@ -2,6 +2,7 @@ from argparse import ArgumentParser
 from datetime import datetime, timedelta, timezone
 import json
 import numpy as np
+import os
 import pandas as pd
 from pathlib import Path
 import requests
@@ -140,6 +141,8 @@ def fo2_update_driver(fo2_file: Union[str, Path] = DEFAULT_FO2_FILE, dest_file: 
     if from_tccondata:
         if no_download:
             raise ValueError('no_download cannot be True if from_tccondata is as well')
+        if source_url is None:
+            source_url = os.getenv('GINPUT_FO2_URL', None)
         _download_from_tccondata(dest_file=dest_file, source_url=source_url, max_num_backups=max_num_backups)
         return
 
