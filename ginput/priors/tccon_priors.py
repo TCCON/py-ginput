@@ -233,12 +233,13 @@ class O2MeanMoleFractionRecord(object):
                  max_extrap_years: int = 3,
                  extrap_basis_years: int = 5,
                  auto_update_fo2_file: bool = False,
-                 auto_update_td: dt.timedelta = dt.timedelta(days=7)):
+                 auto_update_td: dt.timedelta = dt.timedelta(days=7),
+                 auto_update_from_tccondata: bool = False):
         if max_extrap_years <= delay_years:
             raise ValueError('max_extrap_years must be greater than delay_years')
         
         if auto_update_fo2_file:
-            fo2_prep.fo2_update_driver(o2_mole_fraction_file, time_since_mod=auto_update_td)
+            fo2_prep.fo2_update_driver(o2_mole_fraction_file, time_since_mod=auto_update_td, from_tccondata=auto_update_fo2_file)
         if not os.path.exists(o2_mole_fraction_file):
             raise IOError(f'O2 mole fraction file does not exist at {o2_mole_fraction_file}. Make sure the path is correct and you have run the '
                           '"update_fo2" subcommand of run_ginput.py at least once OR set auto_update_fo2_file = True when instantiating this class.')
@@ -1197,6 +1198,7 @@ class MloSmoTraceGasRecord(TraceGasRecord):
         fit_type = cls._max_trend_poly_deg if fit_type is None else fit_type
         if fit_type == 'exp':
             logger.debug('Using exponential fit to extrapolate {}'.format(cls._gas_name))
+            # Weighting by sqrt(y) recommended in https://stackoverflow.com/a/3433503
             fit = np.polynomial.polynomial.Polynomial.fit(x, np.log(y), 1, w=np.sqrt(y))
             return lambda t: np.exp(fit(t))
 
