@@ -19,6 +19,17 @@ improvements to improve the scientific capabilities of this code sometimes requi
 an update to the API because the new best default behavior requires additional
 user input.
 
+## 1.6.3
+
+This release fixes issues with Pandas 2.x compatibility and changed URLs for
+upstream data needed for the O2 DMF calculation. The `update_fo2` subcommand
+now has an additional flag to download a pre-computed O2 DMF file from a TCCON
+server.
+
+There were also changes to the automation interface to avoid automatically
+generating the O2 DMF file. This was needed to support the TCCON GGG2020.1
+priors automation.
+
 ## 1.6.2
 
 After the 1.6.1 release, we found that `pytz` is not automatically installed

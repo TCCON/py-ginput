@@ -12,8 +12,9 @@
         - Create a copy of the feedstock `meta.yaml` that has `path` under `source` point to the ginput directory
         - In the directory with the `meta.yaml`, do `mkdir -p local-channel && conda build . --output-folder ./local-channel`
         - Try installing with pixi: in an empty directory, do `pixi init`, edit `pixi.toml` to include "local-channel" as the first channel, then `pixi add ginput`
+            - To add `local-channel`, insert the path to it as the first argument in the channel list
             - Verify `__main__` imports (e.g., `pixi run python -c 'from ginput import __main__'`) and the CLI help prints (`pixi run ginput_cli --help`)
-        - Try installing with (micro)mamba: in an empty directory, do `micromamba create -p ./testenv && micromamba activate ./testenv && micromamba install -c ../local-channel -c conda-forge ginput`
+        - Try installing with (micro)mamba: in an empty directory, do `micromamba create -p ./testenv && micromamba activate ./testenv && micromamba install -c /PATH/TO/local-channel -c conda-forge ginput`
             - Verify `__main__` imports (e.g., with the testenv active, do `python -c 'from ginput import __main__'`) and the CLI help prints (`ginput_cli --help`)
 
 ## Metadata
@@ -21,6 +22,7 @@
 - Update HISTORY.md file
 - Update version number in setup.py, CITATION.cff, and ginput/__init__.py
 - Ensure that the latest large test files are uploaded to CaltechData
+    - Worth verifying that the download works with `pytest -k large_files tests/`
 - Tag the commit with the version as "vX.Y.Z"
 - Push to public github and create release
 - Confirm that the PyPI publishing action ran
