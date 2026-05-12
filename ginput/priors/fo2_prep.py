@@ -30,7 +30,7 @@ FO2_FILE_HEADER = [
     '#  - "dco2": the "co2" values with the base year substracted off\n'
     '#\n'
 ]
-DEFAULT_TCCONDATA_URL = 'https://tccondata.org/2b-private-qc/o2_mean_dmf.dat'
+DEFAULT_TCCONDATA_URL = 'https://tccondata.org/auxiliary/o2_mean_dmf.dat'
 
 
 def parse_args(parser: Optional[ArgumentParser]):
@@ -74,6 +74,10 @@ def parse_args(parser: Optional[ArgumentParser]):
                         help='Disables download of the necessary input file. Instead, the required files '
                              '(co2_annmean_gl.txt, monthly_o2_alt.csv, monthly_o2_cgo.csv and monthly_o2_ljo.csv) '
                              'must be present in that directory.')
+    parser.add_argument('--from-tccondata', action='store_true',
+                        help='Set this flag to download the standard TCCON O2 DMF file from tccondata.org rather than '
+                             'downloading the Scripps and NOAA data and computing the O2 DMF locally. This is recommended '
+                             'for TCCON and COCCON users; any other ginput users should prefer to download the Scripps and NOAA data.')
     parser.add_argument('--no-download-subdir', action='store_true',
                         help='If specified, the input files will be downloaded directly into '
                              '--download-dir, with no subdirectory created.')
