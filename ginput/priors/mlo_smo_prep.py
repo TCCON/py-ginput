@@ -667,7 +667,7 @@ def monthly_avg_rapid_data(df: pd.DataFrame, year_field: Optional[str] = None, m
     month_field = _find_column(df, 'month', month_field)
 
 
-    monthly_df = df.groupby([year_field, month_field]).mean().reset_index()
+    monthly_df = df.groupby([year_field, month_field]).mean(numeric_only=True).reset_index()
     monthly_df.index = pd.DatetimeIndex(pd.Timestamp(int(r[year_field]),int(r[month_field]),1) for _,r in monthly_df.iterrows())
     return monthly_df
 

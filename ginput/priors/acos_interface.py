@@ -1157,7 +1157,7 @@ def insitu_record_to_h5_group(output_file, df, gas, record_group='mlo_smo_record
         dset.attrs['description'] = 'Date associated with the MLO/SMO record'
 
 
-        for colname, column in df.iteritems():
+        for colname, column in df.items():
             column = column.to_numpy().copy()
             column[np.isnan(column)] = _fill_val
             dset = grp.create_dataset(colname, data=column, fillvalue=_fill_val)

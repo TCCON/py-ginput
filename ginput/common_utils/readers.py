@@ -68,15 +68,17 @@ def read_out_file(out_file, as_dataframes=False, replace_fills=False):
             if fill_value is None:
                 raise IOError('Could not find fill value in the header of {}'.format(out_file))
 
-            def is_fill(val): return np.isclose(val, fill_value)
+            def is_fill(val):
+                return np.isclose(val, fill_value)
 
     elif replace_fills is not False:
         fill_value = replace_fills
         replace_fills = True
-        def is_fill(val): return val >= fill_value
+        def is_fill(val):
+            return val >= fill_value
 
     if replace_fills:
-        for colname, coldata in df.iteritems():
+        for colname, coldata in df.items():
             try:
                 xx_fills = is_fill(coldata)
             except TypeError:
