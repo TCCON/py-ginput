@@ -39,7 +39,7 @@ def parse_args(parser: Optional[ArgumentParser] = None):
 def download_fo2_inputs(out_dir: Union[str, Path] = DEFAULT_OUT_DIR, make_subdir: bool = True, only_if_new: bool = False) -> (Path, bool):
     """Download the required inputs (NOAA global mean CO2 and Scripps O2/N2 data) to calculate f(O2).
 
-    Scripps data are available at https://scrippso2.ucsd.edu/data.html.
+    Scripps data are available at https://scrippso2.ucsd.edu/data/.
     NOAA data are available at https://gml.noaa.gov/ccgg/trends/gl_data.html.
 
     Parameters
@@ -69,11 +69,11 @@ def download_fo2_inputs(out_dir: Union[str, Path] = DEFAULT_OUT_DIR, make_subdir
     out_dir = Path(out_dir)
     if not out_dir.is_dir():
         raise IOError(f'Target download directory, {out_dir}, does not exist or is not a directory')
-    
+
     urls = {
-        'monthly_o2_alt.csv': 'https://scrippso2.ucsd.edu/assets/data/o2_data/monthly/monthly_o2_alt.csv',
-        'monthly_o2_ljo.csv': 'https://scrippso2.ucsd.edu/assets/data/o2_data/monthly/monthly_o2_ljo.csv',
-        'monthly_o2_cgo.csv': 'https://scrippso2.ucsd.edu/assets/data/o2_data/monthly/monthly_o2_cgo.csv',
+        'monthly_o2_alt.csv': 'https://keelinglabsites.ucsd.edu/websitedatao2/monthly_o2_alt.csv',
+        'monthly_o2_ljo.csv': 'https://keelinglabsites.ucsd.edu/websitedatao2/monthly_o2_ljo.csv',
+        'monthly_o2_cgo.csv': 'https://keelinglabsites.ucsd.edu/websitedatao2/monthly_o2_cgo.csv',
         'co2_annmean_gl.txt': 'https://gml.noaa.gov/webdata/ccgg/trends/co2/co2_annmean_gl.txt',
     }
 
@@ -85,7 +85,7 @@ def download_fo2_inputs(out_dir: Union[str, Path] = DEFAULT_OUT_DIR, make_subdir
         if prev_dir is not None:
             logger.info('MD5 sums match existing files, not saving new files.')
             return (prev_dir, False)
-    
+
     if make_subdir:
         out_dir = out_dir / f'fo2_inputs_{datetime.now():%Y%m%dT%H%M%S}'
         out_dir.mkdir()
@@ -98,7 +98,7 @@ def download_fo2_inputs(out_dir: Union[str, Path] = DEFAULT_OUT_DIR, make_subdir
         logger.info(f'Wrote {out_file}')
 
     return (out_dir, True)
-    
+
 
 def _retrieve_url(url: str) -> bytes:
     r = requests.get(url)
@@ -106,7 +106,7 @@ def _retrieve_url(url: str) -> bytes:
         raise RuntimeError(f'Failed to download {url}, status code = {r.status_code}')
     else:
         return r.content
-    
+
 
 def _check_if_files_changed(out_dir: Path, subdirs: bool, file_content: dict) -> Optional[Path]:
     if subdirs:
@@ -125,7 +125,7 @@ def _check_if_files_changed(out_dir: Path, subdirs: bool, file_content: dict) ->
         prev_file = prev_dir / filename
         if not prev_file.exists():
             return None
-        
+
         content_hash = mod_utils.compute_bytes_checksum(content)
         file_hash = mod_utils.compute_file_checksum(prev_file)
         if content_hash != file_hash:

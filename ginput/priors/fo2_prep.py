@@ -2,8 +2,10 @@ from argparse import ArgumentParser
 from datetime import datetime, timedelta, timezone
 import json
 import numpy as np
+import os
 import pandas as pd
 from pathlib import Path
+import requests
 from ..common_utils import versioning, readers, mod_constants
 from ..download import get_fo2_data
 from ..common_utils.ggg_logging import logger
@@ -28,6 +30,7 @@ FO2_FILE_HEADER = [
     '#  - "dco2": the "co2" values with the base year substracted off\n'
     '#\n'
 ]
+DEFAULT_TCCONDATA_URL = 'https://tccondata.org/auxiliary/o2_mean_dmf.dat'
 
 
 def parse_args(parser: Optional[ArgumentParser]):
@@ -71,6 +74,10 @@ def parse_args(parser: Optional[ArgumentParser]):
                         help='Disables download of the necessary input file. Instead, the required files '
                              '(co2_annmean_gl.txt, monthly_o2_alt.csv, monthly_o2_cgo.csv and monthly_o2_ljo.csv) '
                              'must be present in that directory.')
+    parser.add_argument('--from-tccondata', action='store_true',
+                        help='Set this flag to download the standard TCCON O2 DMF file from tccondata.org rather than '
+                             'downloading the Scripps and NOAA data and computing the O2 DMF locally. This is recommended '
+                             'for TCCON and COCCON users; any other ginput users should prefer to download the Scripps and NOAA data.')
     parser.add_argument('--no-download-subdir', action='store_true',
                         help='If specified, the input files will be downloaded directly into '
                              '--download-dir, with no subdirectory created.')
@@ -92,7 +99,8 @@ def parse_args(parser: Optional[ArgumentParser]):
 
 def fo2_update_driver(fo2_file: Union[str, Path] = DEFAULT_FO2_FILE, dest_file: Union[str, Path, None] = None, extrap_to_year: Union[int, None] = None,
                       download_dir: Union[str, Path] = get_fo2_data.DEFAULT_OUT_DIR, no_download: bool = False, no_download_subdir: bool = False,
-                      max_num_backups: int = 5, time_since_mod: Optional[timedelta] = None):
+                      max_num_backups: int = 5, time_since_mod: Optional[timedelta] = None, from_tccondata: bool = False,
+                      source_url=None):
     """Checks for new versions of the input files needed for f(O2) and updates the f(O2) table file if needed
 
     Parameters
@@ -126,6 +134,7 @@ def fo2_update_driver(fo2_file: Union[str, Path] = DEFAULT_FO2_FILE, dest_file: 
       new input data.
     """
     fo2_file, dest_file = _finalize_file_paths(fo2_file, dest_file)
+
     if time_since_mod is not None and dest_file is not None and dest_file.exists():
         if _check_time_since_modification(dest_file, time_since_mod):
             logger.info('Will check if fO2 file needs updated')
@@ -133,12 +142,40 @@ def fo2_update_driver(fo2_file: Union[str, Path] = DEFAULT_FO2_FILE, dest_file: 
             logger.info('Skipping fO2 file update (modified recently enough)')
             return
 
+    if from_tccondata:
+        if no_download:
+            raise ValueError('no_download cannot be True if from_tccondata is as well')
+        if source_url is None:
+            source_url = os.getenv('GINPUT_FO2_URL', None)
+        _download_from_tccondata(dest_file=dest_file, source_url=source_url, max_num_backups=max_num_backups)
+        return
+
+    # TODO: Use the source URL to determine from where to download the Scripps data, if given. This can
+    # potentially make an assumption of structure if given a string, or accept other types to indicate
+    # specific files, like the download_dir does through the CLI
     if no_download:
         dl_dir = download_dir
     else:
         dl_dir, _ = get_fo2_data.download_fo2_inputs(out_dir=download_dir, make_subdir=not no_download_subdir, only_if_new=True)
     create_or_update_fo2_file(dl_dir, fo2_file, dest_file=dest_file, extrap_to_year=extrap_to_year, max_num_backups=max_num_backups)
 
+
+def _download_from_tccondata(dest_file: Union[str, Path], source_url: Optional[str] = None, max_num_backups: int = 5):
+    if source_url is None:
+        source_url = DEFAULT_TCCONDATA_URL
+
+    r = requests.get(source_url)
+    r.raise_for_status()
+
+    dest_file = Path(dest_file)
+    if dest_file.exists() and max_num_backups > 0:
+        backup_method = versioning.RollingBackupByDate(date_fmt='%Y%m%dT%H%M')
+        prev_file = backup_method.make_rolling_backup(dest_file, max_num_backups=max_num_backups)
+        logger.info(f'Backed up current f(O2) file to {prev_file}')
+    with open(dest_file, 'w') as f:
+        logger.info(f'Downloaded f(O2) file from {source_url}')
+        f.write(r.text)
+        logger.info(f'Updated f(O2) file at {dest_file}')
 
 
 def _finalize_file_paths(fo2_file: Union[str, Path, None], dest_file: Union[str, Path, None]) -> Tuple[Union[Path, None], Path]:
