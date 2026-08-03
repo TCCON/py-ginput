@@ -8,6 +8,9 @@ import os
 from pathlib import Path
 import pytest
 import re
+import xarray as xr 
+
+from ginput.common_utils.pv_utils import compute_pv
 
 from ginput.common_utils import mod_utils, readers
 from ginput.mod_maker.mod_maker import driver as mmdriver
@@ -19,6 +22,65 @@ VMR_TO_MAP = {'profile': {'h2o': 'h2o', 'hdo': 'hdo', 'co2': 'co2', 'n2o': 'n2o'
 MAP_UNIT_SCALES = {'mol/mol': 1.0, 'parts': 1.0, 'ppm': 1e-6, 'ppb': 1e-9, 'ppt': 1e-12}
 DATE_RANGE_2018 = [datetime(2018, 1, 1), datetime(2018, 1, 2)]
 DATE_RANGE_2025 = [datetime(2025, 3, 2, 15), datetime(2025, 3, 3)]
+
+
+# pytest -k test_modpv_merra2 -v -s
+@pytest.mark.slow
+@pytest.mark.altmet
+def test_modpv_merra2(subtests, merra2_dir, comp_pv_file):
+    """This test confirms that .mod files for Ny on 1 Jan 2018 are the same as previously produced.
+    """
+    date = datetime(2018, 1, 1)
+
+
+    met_path = str(merra2_dir)
+    sdate = date.strftime('%Y%m%d')
+
+    fls = glob(met_path+'/met/Nv/*'+sdate+'.nc4')
+    m2file = fls[0]
+
+
+    idx2r = 0
+    with xr.open_dataset(m2file) as ds:
+        lat = ds["lat"].values.copy()
+        lat[np.abs(lat) < 0.001] = 0.0
+        
+        lon = ds["lon"].values
+        
+        T = ds["T"].isel(time=idx2r).values
+        U = ds["U"].isel(time=idx2r).values
+        V = ds["V"].isel(time=idx2r).values
+        
+        P = mod_utils.convert_geos_eta_coord(ds["DELP"].isel(time=idx2r).values)
+        
+        epv = ds["EPV"].isel(time=idx2r).values
+        units = ds["EPV"].attrs.get("units")
+
+        
+    T = T[::-1, :,:]
+    U = U[::-1, :,:]
+    V = V[::-1, :,:]
+    P = P[::-1, :,:]
+    
+    epv = epv[::-1,:,:]
+    
+    T = np.transpose(T, (2,1,0))
+    P = np.transpose(P, (2,1,0))
+    U = np.transpose(U, (2,1,0))
+    V = np.transpose(V, (2,1,0))
+    epv = np.transpose(epv, (2,1,0))
+
+    print('---- computing pv')
+    pv = compute_pv(lon, lat, U, V, T, P, rvcalc="PS")
+
+    print(pv.shape)
+    
+    pv2 = xr.open_dataset(comp_pv_file)["PV"].values
+
+    assert np.allclose(pv, pv2, rtol=1e-4, atol=1e-4, equal_nan = True)
+        
+
+
 
 # pytest -m altmet -v
 @pytest.mark.slow

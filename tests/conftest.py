@@ -51,6 +51,12 @@ def std_vmr_file():
 
 
 @pytest.fixture(scope='session')
+def comp_pv_file():
+    return input_data_dir / 'large-files' / 'modpv' / '20180101_merra2_pv_test.nc4'
+
+
+
+@pytest.fixture(scope='session')
 def fo2_pre2025_csv():
     return fo2_dir / 'monthly_o2_ljo.pre2025.csv'
 
