@@ -44,26 +44,26 @@ def test_modpv_merra2(subtests, merra2_dir, comp_pv_file):
     with xr.open_dataset(m2file) as ds:
         lat = ds["lat"].values.copy()
         lat[np.abs(lat) < 0.001] = 0.0
-        
+
         lon = ds["lon"].values
-        
+
         T = ds["T"].isel(time=idx2r).values
         U = ds["U"].isel(time=idx2r).values
         V = ds["V"].isel(time=idx2r).values
-        
+
         P = mod_utils.convert_geos_eta_coord(ds["DELP"].isel(time=idx2r).values)
-        
+
         epv = ds["EPV"].isel(time=idx2r).values
         units = ds["EPV"].attrs.get("units")
 
-        
+
     T = T[::-1, :,:]
     U = U[::-1, :,:]
     V = V[::-1, :,:]
     P = P[::-1, :,:]
-    
+
     epv = epv[::-1,:,:]
-    
+
     T = np.transpose(T, (2,1,0))
     P = np.transpose(P, (2,1,0))
     U = np.transpose(U, (2,1,0))
@@ -73,12 +73,10 @@ def test_modpv_merra2(subtests, merra2_dir, comp_pv_file):
     print('---- computing pv')
     pv = compute_pv(lon, lat, U, V, T, P, rvcalc="PS")
 
-    print(pv.shape)
-    
     pv2 = xr.open_dataset(comp_pv_file)["PV"].values
 
     assert np.allclose(pv, pv2, rtol=1e-4, atol=1e-4, equal_nan = True)
-        
+
 
 
 

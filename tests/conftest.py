@@ -21,7 +21,7 @@ def pytest_configure(config):
     )
 
 
-LARGE_FILES_DOI='10.22002/skck2-dfz91'
+LARGE_FILES_DOI='10.22002/ayt3a-0kr84' 
 _mydir = Path(__file__).parent.resolve()
 input_data_dir = _mydir / 'test_input_data'
 output_data_dir = _mydir / 'test_output_data'
@@ -51,9 +51,8 @@ def std_vmr_file():
 
 
 @pytest.fixture(scope='session')
-def comp_pv_file():
-    return input_data_dir / 'large-files' / 'modpv' / '20180101_merra2_pv_test.nc4'
-
+def comp_pv_file(large_files_dir):
+    return large_files_dir / 'modpv' / '20180101_merra2_pv_test.nc4'
 
 
 @pytest.fixture(scope='session')
