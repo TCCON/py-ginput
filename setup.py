@@ -17,6 +17,7 @@ setup(
     url='',
     install_requires=[
         'astropy>=3.1.2',
+        'cfgrib>=0.9.0,<1.0.0',
         'cfunits>=3.3.2',
         'cftime>=1.5.1',
         'ephem>=3.7.6.0',

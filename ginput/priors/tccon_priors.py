@@ -1169,6 +1169,7 @@ class MloSmoTraceGasRecord(TraceGasRecord):
         # Now, avg_dmf_detrended is the different in concentration from the quadratic fit. So, for every point to be
         # extrapolated, find out what the fit thinks the concentration should be then add the seasonal offset for that
         # month
+
         delta_dmf = delta_dmf_by_month.reindex(fill_dates.month).to_numpy().squeeze()
         fill_julian_dates = fill_dates.to_julian_date().to_numpy()
         
@@ -1827,7 +1828,7 @@ class MidlatTraceGasRecord(TraceGasRecord):
 
         z = mod_data['profile']['Height']
         p = mod_data['profile']['Pressure']
-        ptrop = mod_data['scalar']['TROPPB']
+        ptrop = mod_data['scalar']['TROPPB']        
         ztrop = mod_utils.interp_tropopause_height_from_pressure(p_trop_met=ptrop, p_met=p, z_met=z)
 
         # I kept the geographic lat here because this is doing both the troposphere and stratosphere. This could
@@ -2338,7 +2339,7 @@ class CORecord(TraceGasRecord):
         # GEOS IT vs. HIPPO was not exactly 1, but it was close enough that I didn't feel the need to scale. (Also the GEOS FP-IT
         # vs. HIPPO comparison was similar enough to the comparison with ATom that I felt that using HIPPO was a reasonable
         # comparison.)
-        if co_source in {GeosSource.FPIT, GeosSource.FP}:
+        if co_source in {GeosSource.FPIT, GeosSource.FP, GeosSource.merra2}:
             logger.debug('Using GEOS FP/FP-IT CO scaling')
             atom_scale_fac = 1.23
         elif co_source == GeosSource.IT:
@@ -2386,17 +2387,26 @@ class CORecord(TraceGasRecord):
 
         :return: the modified gas profile and a dictionary on ancillary information (currently empty).
         """
-        co = mod_data['profile']['CO'] * 1e9
         pres = mod_data['profile']['Pressure']
         theta = mod_data['profile']['PT']
         trop_pres = mod_data['scalar']['TROPPB']
         trop_theta = mod_utils.calculate_potential_temperature(trop_pres, mod_data['scalar']['TROPT'])
+        
+        if 'CO' in mod_data['profile']:
+            co = mod_data['profile']['CO'] * 1e9
 
-        # Comparison with ATom and ACE-FTS showed a general low bias in the GEOS CO. We scale the CO by a
-        # level-dependent factor to bring it in line with those observations.
-        prof_gas[:] = co * self.compute_co_scale(prof_pres=pres, prof_theta=theta,
-                                                 trop_pres=trop_pres, trop_theta=trop_theta,
-                                                 co_source=co_source)
+    
+            # Comparison with ATom and ACE-FTS showed a general low bias in the GEOS CO. We scale the CO by a
+            # level-dependent factor to bring it in line with those observations.
+            prof_gas[:] = co * self.compute_co_scale(prof_pres=pres, prof_theta=theta,
+                                                     trop_pres=trop_pres, trop_theta=trop_theta,
+                                                     co_source=co_source)
+
+        else:
+            print(' ')
+            print('%%%----CO prior will be empty, need to update CO')
+            print(' ')
+            prof_gas[:] = 0.0
 
         # these are computed only for inclusion in the ancillary data since they go in the .vmr header
         trop_eff_lat, midtrop_theta = get_trop_eq_lat(theta, pres, obs_lat, obs_date)

@@ -16,9 +16,12 @@ def pytest_configure(config):
     config.addinivalue_line(
         "markers", "glacial: mark test as extremely long running (deselect with `-m 'not glacial'`)"
     )
+    config.addinivalue_line(
+        "markers", "altmet: mark test as testing an alternate meteorology (deselect with `-m 'not altmet'`)"
+    )
 
 
-LARGE_FILES_DOI='10.22002/skck2-dfz91'
+LARGE_FILES_DOI='10.22002/ayt3a-0kr84' 
 _mydir = Path(__file__).parent.resolve()
 input_data_dir = _mydir / 'test_input_data'
 output_data_dir = _mydir / 'test_output_data'
@@ -48,6 +51,11 @@ def std_vmr_file():
 
 
 @pytest.fixture(scope='session')
+def comp_pv_file(large_files_dir):
+    return large_files_dir / 'modpv' / '20180101_merra2_pv_test.nc4'
+
+
+@pytest.fixture(scope='session')
 def fo2_pre2025_csv():
     return fo2_dir / 'monthly_o2_ljo.pre2025.csv'
 
@@ -55,6 +63,14 @@ def fo2_pre2025_csv():
 @pytest.fixture(scope='session')
 def geos_dir(large_files_dir):
     return large_files_dir / 'geos'
+
+@pytest.fixture(scope='session')
+def merra2_dir(large_files_dir):
+    return large_files_dir / 'merra2'
+
+@pytest.fixture(scope='session')
+def era5_dir(large_files_dir):
+    return large_files_dir / 'era5'
 
 
 @pytest.fixture(scope='session')

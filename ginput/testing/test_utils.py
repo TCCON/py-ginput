@@ -8,8 +8,8 @@ import os
 import shutil
 import sys
 
-from ..download import get_GEOS5
-from ..common_utils import mod_utils
+from ginput.download import get_GEOS5
+from ginput.common_utils import mod_utils
 
 _mydir = os.path.abspath(os.path.realpath(os.path.dirname(__file__)))
 

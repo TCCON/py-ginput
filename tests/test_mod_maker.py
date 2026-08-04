@@ -8,6 +8,9 @@ import os
 from pathlib import Path
 import pytest
 import re
+import xarray as xr 
+
+from ginput.common_utils.pv_utils import compute_pv
 
 from ginput.common_utils import mod_utils, readers
 from ginput.mod_maker.mod_maker import driver as mmdriver
@@ -20,19 +23,131 @@ MAP_UNIT_SCALES = {'mol/mol': 1.0, 'parts': 1.0, 'ppm': 1e-6, 'ppb': 1e-9, 'ppt'
 DATE_RANGE_2018 = [datetime(2018, 1, 1), datetime(2018, 1, 2)]
 DATE_RANGE_2025 = [datetime(2025, 3, 2, 15), datetime(2025, 3, 3)]
 
+
+# pytest -k test_modpv_merra2 -v -s
 @pytest.mark.slow
-def test_mod_files_jan2018(subtests, mod_input_dir, mod_output_dir, test_plots_dir, generate_files_with_defaults):
-    """This test confirms that .mod files for Lamont on 1 Jan 2018 are the same as previously produced.
+@pytest.mark.altmet
+def test_modpv_merra2(subtests, merra2_dir, comp_pv_file):
+    """This test confirms that .mod files for Ny on 1 Jan 2018 are the same as previously produced.
     """
-    # generate_files_with_defaults is needed to ensure the output files are created - it's
-    # a setup fixture.
+    date = datetime(2018, 1, 1)
+
+
+    met_path = str(merra2_dir)
+    sdate = date.strftime('%Y%m%d')
+
+    fls = glob(met_path+'/met/Nv/*'+sdate+'.nc4')
+    m2file = fls[0]
+
+
+    idx2r = 0
+    with xr.open_dataset(m2file) as ds:
+        lat = ds["lat"].values.copy()
+        lat[np.abs(lat) < 0.001] = 0.0
+
+        lon = ds["lon"].values
+
+        T = ds["T"].isel(time=idx2r).values
+        U = ds["U"].isel(time=idx2r).values
+        V = ds["V"].isel(time=idx2r).values
+
+        P = mod_utils.convert_geos_eta_coord(ds["DELP"].isel(time=idx2r).values)
+
+        epv = ds["EPV"].isel(time=idx2r).values
+        units = ds["EPV"].attrs.get("units")
+
+
+    T = T[::-1, :,:]
+    U = U[::-1, :,:]
+    V = V[::-1, :,:]
+    P = P[::-1, :,:]
+
+    epv = epv[::-1,:,:]
+
+    T = np.transpose(T, (2,1,0))
+    P = np.transpose(P, (2,1,0))
+    U = np.transpose(U, (2,1,0))
+    V = np.transpose(V, (2,1,0))
+    epv = np.transpose(epv, (2,1,0))
+
+    print('---- computing pv')
+    pv = compute_pv(lon, lat, U, V, T, P, rvcalc="PS")
+
+    pv2 = xr.open_dataset(comp_pv_file)["PV"].values
+
+    assert np.allclose(pv, pv2, rtol=1e-4, atol=1e-4, equal_nan = True)
+
+
+
+
+# pytest -m altmet -v
+@pytest.mark.slow
+@pytest.mark.altmet
+def test_mod_files_merra2(subtests, mod_input_dir, mod_output_dir, test_plots_dir, merra2_dir):
+    """This test confirms that .mod files for Ny on 1 Jan 2018 are the same as previously produced.
+    """
+    date_range = [datetime(2018, 1, 1), datetime(2018, 1, 2)]
+    site_abbrv = ['ny']
+
+    met_path = '/oco2-data/tccon-nobak/met/merra2/'
+    chem_path = '/oco2-data/tccon-nobak/chm/merra2/'
+
+    met_path = merra2_dir / 'met/'
+    chem_path = merra2_dir / 'chm/'
+    include_chm = True
+
+
+    save_path = mod_output_dir
+    mode = 'merra2'
+    mmdriver(date_range, met_path, chem_path=chem_path, save_path=save_path,
+             keep_latlon_prec=False, save_in_utc=True, muted=False,
+             slant=False, alt=None, lon=None, lat=None, site_abbrv=site_abbrv,
+             mode=mode, include_chm=include_chm, flat_outdir=False)
+
+
     comparison_helper(
         subtests,
         partial(iter_mod_file_pairs, date_range=DATE_RANGE_2018),
-        mod_input_dir / 'fpit',
-        mod_output_dir / 'fpit',
+        mod_input_dir / 'merra2',
+        mod_output_dir / 'merra2',
         plots_dir=test_plots_dir
     )
+
+#pytest -m altmet -v
+@pytest.mark.glacial
+@pytest.mark.slow
+@pytest.mark.altmet
+def test_mod_files_era5(subtests, mod_input_dir, mod_output_dir, test_plots_dir, era5_dir):
+    """This test confirms that .mod files for Ny on 1 Jan 2018 are the same as previously produced.
+    """
+    date_range = [datetime(2018, 1, 1), datetime(2018, 1, 2)]
+    site_abbrv = ['ny']
+
+
+    met_path = era5_dir 
+    chem_path = None
+    include_chm = False
+
+    save_path = mod_output_dir
+    mode = 'era5'
+    mmdriver(date_range, met_path, chem_path=chem_path, save_path=save_path,
+             keep_latlon_prec=False, save_in_utc=True, muted=False,
+             slant=False, alt=None, lon=None, lat=None, site_abbrv=site_abbrv,
+             mode=mode, include_chm=include_chm, flat_outdir=False)
+
+
+    comparison_helper(
+        subtests,
+        partial(iter_mod_file_pairs, date_range=DATE_RANGE_2018),
+        mod_input_dir / 'era5',
+        mod_output_dir / 'era5',
+        plots_dir=test_plots_dir
+    )
+
+
+
+
+
 
 
 @pytest.mark.slow
