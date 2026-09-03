@@ -5,6 +5,11 @@ from ginput.common_utils.test_utils import simple_xco2_calc
 import h5py
 from matplotlib.lines import Line2D
 import matplotlib.pyplot as plt
+try:
+    from matplotlib import colormaps
+    get_cmap = colormaps.get_cmap
+except ImportError:
+    from matplotlib.pyplot import get_cmap
 import numpy as np
 import os
 import pytest
@@ -282,7 +287,7 @@ def _plot_lat_binned_priors_inner(lats, priors, pres, ls, mkr, ax):
     lats = lats.ravel()
     priors = priors.reshape(-1, nlev)
     pres = pres.reshape(-1, nlev)
-    colors = plt.get_cmap('tab10')
+    colors = get_cmap('tab10')
     lat_bin_edges = np.arange(-90.0, 91.0, 20.0)
 
     ibin = -1
