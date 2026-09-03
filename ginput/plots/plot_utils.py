@@ -1,4 +1,10 @@
-from matplotlib.cm import ScalarMappable, get_cmap
+from matplotlib.cm import ScalarMappable
+try:
+    from matplotlib import colormaps
+    get_cmap = colormaps.get_cmap
+except ImportError:
+    from matplotlib.cm import get_cmap
+
 from matplotlib.colors import BoundaryNorm, Normalize
 import numpy as np
 
