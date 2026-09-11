@@ -10,3 +10,6 @@ build/**/*
 dist/**/*
 .condaenv/**/*
 **/.ipynb_checkpoints
+# pixi environments
+.pixi/*
+!.pixi/config.toml

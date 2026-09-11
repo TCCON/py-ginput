@@ -1,10 +1,117 @@
+[project]
+name = "ginput"
+dynamic = ["version"]
+description = "Python code that creates the .mod and .vmr files used in GGG"
+readme = "README.md"
+authors = [
+    { name = "Joshua Laughner", email = "jllacct119@gmail.com" },
+    { name = "Sebastien Roche" },
+    { name = "Matthaeus Kiel" },
+]
+requires-python = ">=3.10"
+
+# Note: for now, dependencies must be specified both here and below
+# for pixi; this section is used for PyPI and the pixi section for
+# installing with pixi (to use conda-forge built dependencies instead
+# of PyPI wheels).
+dependencies = [
+    "astropy>=3.1.2",
+    "cfgrib>=0.9.0,<1.0.0",
+    "cfunits>=3.3.2",
+    "cftime>=1.5.1",
+    "ephem>=3.7.6.0",
+    "h5py>=2.9.0",
+    "jplephem>=2.9",
+    "matplotlib>=3.0.3",
+    "netcdf4>=1.4.2",
+    "numpy>=1.23.0,<2.0.0",
+    "pandas>=1.0.0,<3.0.0",
+    "pydap>=3.2.2",
+    "python-dateutil>=2.8.2",
+    "pytz>=2023.3",
+    "requests>=2.14.2",
+    "scipy>=1.5.4",
+    "sgp4>=1.4",
+    "skyfield>=1.10",
+    "xarray>=2025.7.1",
+]
+
+[project.urls]
+Repository = "https://github.com/TCCON/py-ginput"
+
+
+[project.scripts]
+ginput_cli = "ginput.__main__:main"
+
 [build-system]
-requires = ["setuptools >= 59.0"]
+requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
 
-# TODO: convert to hatchling build system so we can include these
-# [project.optional-dependencies]
-# testing = [
-#     "pytest",
-#     "pytest-subtests"
-# ]
+[tool.setuptools.packages.find]
+# Equivalent to setup.py's packages=find_packages()
+
+[tool.setuptools]
+include-package-data = true  # equivalent to include_package_data=True
+
+[tool.setuptools.dynamic]
+version = { attr = "ginput.__version__" }
+
+# --------------------------- #
+# Pixi-specific configuration #
+# --------------------------- #
+
+[tool.pixi.workspace]
+name = "ginput"
+channels = ["conda-forge"]
+platforms = ["linux-64"]
+
+[tool.pixi.pypi-dependencies]
+ginput = { path = ".", editable = true }
+
+[tool.pixi.tasks]
+install-runscript = { cmd = "./install-runscript.sh", cwd = "." }
+
+[tool.pixi.feature.pre-py312.dependencies]
+# As noted above, we deliberately repeat the dependency
+# lists since if pixi sees dependencies in the main
+# [dependencies] list, it'll use pypi for them. We don't
+# want that, since mixing pypi and conda-forge dependencies
+# can cause headaches.
+python = "<3.13.0"
+astropy = ">=3.1.2"
+cfgrib = ">=0.9.0,<1.0.0"
+cfunits = ">=3.3.2"
+cftime = ">=1.5.1"
+ephem = ">=3.7.6.0"
+h5py = ">=2.9.0"
+jplephem = ">=2.9"
+matplotlib = ">=3.0.3"
+netcdf4 = ">=1.4.2"
+numpy = ">=1.23.0,<2.0.0"
+pandas = ">=1.0.0,<3.0.0"
+pydap = ">=3.2.2"
+python-dateutil = ">=2.8.2"
+pytz = ">=2023.3"
+requests = ">=2.14.2"
+scipy = ">=1.5.4"
+sgp4 = ">=1.4"
+skyfield = ">=1.10"
+xarray = ">=2025.7.1"
+
+[tool.pixi.feature.dev.dependencies]
+pytest = "*"
+pytest-subtests = "*"
+sphinx = "*"
+sphinx_rtd_theme = "*"
+myst-parser = "*"
+linkify-it-py = "*"
+
+[tool.pixi.feature.dev.tasks]
+quicktest = "pytest -v -m 'not slow and not glacial' tests/"
+stdtest = "pytest -v -m 'not glacial' tests/"
+fulltest = "pytest -v tests/"
+build-docs = { cmd = "make html", cwd = "doc" }
+
+[tool.pixi.environments.py312-dev]
+dependencies = { python = "3.12.*" }
+features = ["pre-py312", "dev"]

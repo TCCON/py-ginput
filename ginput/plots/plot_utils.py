@@ -1,5 +1,6 @@
-from matplotlib.cm import ScalarMappable, get_cmap
+from matplotlib.cm import ScalarMappable
 from matplotlib.colors import BoundaryNorm, Normalize
+from matplotlib.pyplot import get_cmap
 import numpy as np
 
 
