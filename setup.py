@@ -26,7 +26,7 @@ setup(
         'netCDF4>=1.4.2',
         'numpy>=1.23.0,<2.0.0',
         'pandas>=1.0.0,<3.0.0',
-        'pydap>=3.2.2',
+        'pydap>=3.2.2,<3.5.11',
         'python-dateutil>=2.8.2',
         'pytz>=2023.3',
         'requests>=2.14.2',
