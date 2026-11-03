@@ -18,6 +18,7 @@ from functools import lru_cache
 import h5py
 from itertools import repeat, product
 import logging
+import multiprocessing as mp
 from multiprocessing import Pool
 import numpy as np
 import pandas as pd
@@ -837,7 +838,9 @@ def _eqlat_parallel(sounding_pv, sounding_theta, sounding_datenums, sounding_qfl
     See :func:`_eqlat_serial` for the other parameters and return type.
     """
     logger.info('Running eq. lat. calculation in parallel with {} processes'.format(nprocs))
-    with Pool(processes=nprocs) as pool, _eqlat_pickle_manager(eqlat_fxns, eqlat_pickle_dir) as eqlat_pickles:
+    # py312 defaults to fork, py315 to forkserver, which fails here, explicitly use fork
+    ctx = mp.get_context("fork") 
+    with ctx.Pool(processes=nprocs) as pool, _eqlat_pickle_manager(eqlat_fxns, eqlat_pickle_dir) as eqlat_pickles:
         result = pool.starmap(_eqlat_helper, zip(range(sounding_pv.shape[0]), sounding_pv, sounding_theta,
                                                  sounding_datenums, sounding_qflags,
                                                  repeat(eqlat_pickles), repeat(geos_datenums), repeat(prior_flags),

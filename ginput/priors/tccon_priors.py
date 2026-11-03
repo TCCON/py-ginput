@@ -744,7 +744,7 @@ class MloSmoTraceGasRecord(TraceGasRecord):
 
         # set datetime index in df (requires 'day' column)
         df['day'] = 1
-        df.set_index(pd.to_datetime(df[['year', 'month', 'day']]), inplace=True)
+        df = df.set_index(pd.to_datetime(df[['year', 'month', 'day']]))
 
         return df
 
@@ -986,7 +986,7 @@ class MloSmoTraceGasRecord(TraceGasRecord):
         """
         df_mlo = cls.read_insitu_gas(mlo_file, allow_negative_values=allow_negative_insitu_values)
         df_smo = cls.read_insitu_gas(smo_file, allow_negative_values=allow_negative_insitu_values)
-        df_combined = pd.concat([df_mlo, df_smo], axis=1)
+        df_combined = pd.concat([df_mlo, df_smo], axis=1, sort=True)
         if truncate_date is not None and df_combined.index.max() < truncate_date: 
             # Do this before dropping NaNs, as we need to allow for the possibility that there is not NOAA
             # data for a month at the end of the record (that is, there *should* be NOAA data, but their instrument
