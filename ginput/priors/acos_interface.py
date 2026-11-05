@@ -18,7 +18,7 @@ from functools import lru_cache
 import h5py
 from itertools import repeat, product
 import logging
-from multiprocessing import Pool
+import multiprocessing as mp
 import numpy as np
 import pandas as pd
 from pathlib import Path
@@ -350,8 +350,8 @@ def acos_interface_main(instrument, met_resampled_file, geos_files, output_file,
         profiles['gas_record_date'] = np.array(gas_date_dec_years).reshape(profiles['gas_record_date'].shape)
         units['gas_record_date'] = 'Date as decimal year (decimal part = 0-based day-of-year / {})'.format(mod_constants.days_per_year)
 
-        # And convert the stratum to a short integer and update the unit to be more descriptive
-        profiles['atmospheric_stratum'] = profiles['atmospheric_stratum'].astype(np.uint8)
+        # Here stratum is float64 with nans, uint8 conversion gives 0 but that behaviour is not guaranteed, so convert explicitly here
+        profiles['atmospheric_stratum'] = np.nan_to_num(profiles['atmospheric_stratum'], nan=0, posinf=0, neginf=0).astype(np.uint8)
         units['atmospheric_stratum'] = 'flag (1 = troposphere, 2 = middleworld, 3 = overworld)'
 
         # If running for GOSAT, we have an extra dimension between the exposure and level which is just 1 long and was only
@@ -372,6 +372,10 @@ def acos_interface_main(instrument, met_resampled_file, geos_files, output_file,
         if gas != 'co':
             insitu_record_to_h5_group(output_file, gas_record.conc_seasonal, gas, record_group=record_group.format(gas))
 
+
+def _prior_helper_star(args):
+    """wrapper to run _prior_helper with imap"""
+    return _prior_helper(*args)
 
 
 def _prior_helper(i_sounding, i_foot, qflag, mod_data, gas_record, var_mapping, var_type_info, use_trop_eqlat=False,
@@ -589,11 +593,22 @@ def _prior_parallel(orig_shape, var_mapping, var_type_info, met_data, gas_record
     mod_dicts = map(_construct_mod_dict, repeat(met_data), sounding_inds, footprint_inds)
     qflags = [met_data['quality_flags'][isound, ifoot] for isound, ifoot in zip(sounding_inds, footprint_inds)]
 
-    with Pool(processes=nprocs) as pool:
-        result = pool.starmap(_prior_helper, zip(sounding_inds, footprint_inds, qflags, mod_dicts,
-                                                 repeat(gas_record), repeat(var_mapping), repeat(var_type_info),
-                                                 repeat(use_trop_eqlat), repeat(fo2_file), repeat(prior_flags),
-                                                 repeat(error_handler)))
+    ctx = mp.get_context("fork")
+    with ctx.Pool(processes=nprocs) as pool:
+        args = zip(
+            sounding_inds,
+            footprint_inds,
+            qflags, mod_dicts,
+            repeat(gas_record),
+            repeat(var_mapping),
+            repeat(var_type_info),
+            repeat(use_trop_eqlat),
+            repeat(fo2_file),
+            repeat(prior_flags),
+            repeat(error_handler),
+        )
+        chunksize = max(1, (len(sounding_inds) + 4 * nprocs - 1) // (4 * nprocs))
+        result = list(pool.imap(_prior_helper_star, args, chunksize=chunksize,))
 
     # At this point, result will be a list of tuples of pairs of dicts, the first dict the profiles dict, the second
     # the units dict or None if the prior calculation did not run. We need to combine the profiles into one array per
@@ -735,7 +750,7 @@ def _eqlat_helper(idx, pv_vec, theta_vec, datenum, quality_flag, eqlat_fxns, geo
     try:
         i_last_geos = _find_helper(geos_datenums <= datenum, order='last')
         i_next_geos = _find_helper(geos_datenums > datenum, order='first')
-    except IndexError as err:
+    except IndexError:
         logger.important('Sounding {}: could not find GEOS file by time. Assuming fill value for time'.format(idx))
         error_handler.set_flag(err_code_name='cannot_find_geos', flags=prior_flags, inds=idx)
         return default_return, prior_flags[idx]
@@ -826,6 +841,11 @@ def _eqlat_serial(sounding_pv, sounding_theta, sounding_datenums, sounding_qflag
     return sounding_eqlat
 
 
+def _eqlat_star(args):
+    """wrapper for calling _eqlat_helper with imap"""
+    return _eqlat_helper(*args)
+
+
 def _eqlat_parallel(sounding_pv, sounding_theta, sounding_datenums, sounding_qflags, geos_datenums, eqlat_fxns, nprocs,
                     prior_flags=None, error_handler=_def_errh, eqlat_pickle_dir='.'):
     """
@@ -837,11 +857,27 @@ def _eqlat_parallel(sounding_pv, sounding_theta, sounding_datenums, sounding_qfl
     See :func:`_eqlat_serial` for the other parameters and return type.
     """
     logger.info('Running eq. lat. calculation in parallel with {} processes'.format(nprocs))
-    with Pool(processes=nprocs) as pool, _eqlat_pickle_manager(eqlat_fxns, eqlat_pickle_dir) as eqlat_pickles:
-        result = pool.starmap(_eqlat_helper, zip(range(sounding_pv.shape[0]), sounding_pv, sounding_theta,
-                                                 sounding_datenums, sounding_qflags,
-                                                 repeat(eqlat_pickles), repeat(geos_datenums), repeat(prior_flags),
-                                                 repeat(error_handler)))
+    # py312 defaults to fork, py315 to forkserver, which fails here, explicitly use fork
+    ctx = mp.get_context("fork") 
+    n = sounding_pv.shape[0]
+    with _eqlat_pickle_manager(eqlat_fxns, eqlat_pickle_dir) as eqlat_pickles:
+        args = zip(
+            range(n),
+            sounding_pv,
+            sounding_theta,
+            sounding_datenums,
+            sounding_qflags,
+            repeat(eqlat_pickles),
+            repeat(geos_datenums),
+            repeat(prior_flags),
+            repeat(error_handler),
+        )
+        # using imap instead of starmap allows to exit on first raise instead of
+        # waiting for all processes to finish first, this will speed up running
+        # glacial tests when they do raise, chunsize is set to approx starmap
+        chunksize = max(1, (n + 4 * nprocs - 1) // (4 * nprocs))
+        with ctx.Pool(processes=nprocs) as pool:
+            result = list(pool.imap(_eqlat_star, args, chunksize=chunksize))
 
     eqlats, flags = zip(*result)
     sounding_eqlat = np.array(eqlats)
@@ -1110,8 +1146,22 @@ def write_prior_h5(output_file, profile_variables, units, prior_group='priors'):
             # Replace NaNs with numeric fill values
             if np.issubdtype(var_data.dtype, np.number):
                 filled_data = var_data.copy()
-                filled_data[np.isnan(filled_data)] = _fill_val
-                this_fill_val = _fill_val
+                if np.issubdtype(var_data.dtype, np.integer):
+                    # make sure we know what _fill_val is used inside the hdf5 file
+                    # eg for uint8 _fill_val doesn't fit in 0-255
+                    # hdf5 create_dataset silently converts it to.. something, that may not
+                    # always be the same thing based on platform or hdf5 version
+                    info = np.iinfo(var_data.dtype)
+                    if _fill_val < info.min or _fill_val > info.max:
+                        this_fill_val = info.min  # eg 0 for uint8
+                    else:
+                        this_fill_val = _fill_val
+                    # Integer arrays cannot contain NaNs, so no NaN replacement is needed.
+                else:
+                    missing = np.isnan(filled_data)
+                    if missing.any():
+                        filled_data[missing] = _fill_val
+                    this_fill_val = _fill_val
             elif np.issubdtype(var_data.dtype, np.string_):
                 filled_data = var_data.copy()
                 this_fill_val = _string_fill
@@ -1276,7 +1326,7 @@ def _make_el_profile(pv, theta, interpolator):
     """
     el = np.full_like(pv, np.nan)
     for i in range(el.size):
-        el[i] = interpolator(pv[i], theta[i])
+        el[i] = np.asarray(interpolator(pv[i], theta[i])).item()
     return el
 
 

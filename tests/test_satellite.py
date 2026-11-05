@@ -170,12 +170,14 @@ def _generate_prior_h5_file(
         '--truncate-mlo-smo-by', '1',
         '--fo2-file', str(mlo_smo_input_dir / 'o2_dmf_yearly_2024.txt'),
         '--nprocs', nprocs,
+        '--raise-errors',  # makes glacial tests faster when debugging
         geos_files,
         str(met_file),
         str(out_prior_file)
     ]
 
     main(cli_args)
+
 
 def compare_prior_h5_files(expected_file, current_file, met_file, instrument='oco', plot_file=None):
     expected_data = _load_prior_h5_file(expected_file, met_file, instrument=instrument)
