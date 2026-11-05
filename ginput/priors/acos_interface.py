@@ -750,7 +750,7 @@ def _eqlat_helper(idx, pv_vec, theta_vec, datenum, quality_flag, eqlat_fxns, geo
     try:
         i_last_geos = _find_helper(geos_datenums <= datenum, order='last')
         i_next_geos = _find_helper(geos_datenums > datenum, order='first')
-    except IndexError as err:
+    except IndexError:
         logger.important('Sounding {}: could not find GEOS file by time. Assuming fill value for time'.format(idx))
         error_handler.set_flag(err_code_name='cannot_find_geos', flags=prior_flags, inds=idx)
         return default_return, prior_flags[idx]
@@ -1146,8 +1146,22 @@ def write_prior_h5(output_file, profile_variables, units, prior_group='priors'):
             # Replace NaNs with numeric fill values
             if np.issubdtype(var_data.dtype, np.number):
                 filled_data = var_data.copy()
-                filled_data[np.isnan(filled_data)] = _fill_val
-                this_fill_val = _fill_val
+                if np.issubdtype(var_data.dtype, np.integer):
+                    # make sure we know what _fill_val is used inside the hdf5 file
+                    # eg for uint8 _fill_val doesn't fit in 0-255
+                    # hdf5 create_dataset silently converts it to.. something, that may not
+                    # always be the same thing based on platform or hdf5 version
+                    info = np.iinfo(var_data.dtype)
+                    if _fill_val < info.min or _fill_val > info.max:
+                        this_fill_val = info.min  # eg 0 for uint8
+                    else:
+                        this_fill_val = _fill_val
+                    # Integer arrays cannot contain NaNs, so no NaN replacement is needed.
+                else:
+                    missing = np.isnan(filled_data)
+                    if missing.any():
+                        filled_data[missing] = _fill_val
+                    this_fill_val = _fill_val
             elif np.issubdtype(var_data.dtype, np.string_):
                 filled_data = var_data.copy()
                 this_fill_val = _string_fill
