@@ -159,7 +159,7 @@ def getera5data(file3d, file2d, quickPV = True):
     pre = pp['pre'] #hPa
         
     with xr.open_dataset(file3d) as ds:
-        lat = ds['latitude'].to_numpy(copy=True)
+        lat = ds['latitude'].to_numpy().copy()
         lon = ds['longitude'].to_numpy()
         tem = np.squeeze(ds['t'].to_numpy())   #Kelvins
         vor = np.squeeze(ds['vo'].to_numpy())   #relative vorticity s^-1
