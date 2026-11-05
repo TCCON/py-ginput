@@ -21,7 +21,6 @@ dependencies = [
     "cftime>=1.5.1",
     "ephem>=3.7.6.0",
     "h5py>=2.9.0",
-    "jplephem>=2.9",
     "matplotlib>=3.0.3",
     "netcdf4>=1.4.2",
     "numpy>=1.23.0",
@@ -81,7 +80,6 @@ cfunits = ">=3.3.2"
 cftime = ">=1.5.1"
 ephem = ">=3.7.6.0"
 h5py = ">=2.9.0"
-jplephem = ">=2.9"
 matplotlib = ">=3.0.3"
 netcdf4 = ">=1.4.2"
 numpy = ">=1.3.0"
@@ -92,7 +90,7 @@ pytz = ">=2023.3"
 requests = ">=2.14.2"
 scipy = ">=1.5.4"
 xarray = ">=2025.6.1"
-#skyfield = ">=1.10" # doesn't yet have updated conda-forge builds for py315
+skyfield = ">=1.10"
 
 [tool.pixi.feature.dev.dependencies]
 pytest = "*"
