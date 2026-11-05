@@ -301,8 +301,8 @@ def _lltopsvec(mgrd, arll, arlp, nhem, stlat, lam0, r0,
     arpsy = np.full((ngrd, ngrd), dud if finite_baddata else np.nan)
 
 
-    ilam = np.fix(lam).astype(np.int64)
-    iphi = np.fix(phi).astype(np.int64)
+    ilam = np.trunc(lam).astype(np.int64)
+    iphi = np.trunc(phi).astype(np.int64)
 
 
     xd = lam - ilam
