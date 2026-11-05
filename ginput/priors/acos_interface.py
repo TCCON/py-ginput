@@ -1326,7 +1326,7 @@ def _make_el_profile(pv, theta, interpolator):
     """
     el = np.full_like(pv, np.nan)
     for i in range(el.size):
-        el[i] = interpolator(pv[i], theta[i])
+        el[i] = np.asarray(interpolator(pv[i], theta[i])).item()
     return el
 
 
