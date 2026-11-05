@@ -350,8 +350,8 @@ def acos_interface_main(instrument, met_resampled_file, geos_files, output_file,
         profiles['gas_record_date'] = np.array(gas_date_dec_years).reshape(profiles['gas_record_date'].shape)
         units['gas_record_date'] = 'Date as decimal year (decimal part = 0-based day-of-year / {})'.format(mod_constants.days_per_year)
 
-        # And convert the stratum to a short integer and update the unit to be more descriptive
-        profiles['atmospheric_stratum'] = profiles['atmospheric_stratum'].astype(np.uint8)
+        # Here stratum is float64 with nans, uint8 conversion gives 0 but that behaviour is not guaranteed, so convert explicitly here
+        profiles['atmospheric_stratum'] = np.nan_to_num(profiles['atmospheric_stratum'], nan=0, posinf=0, neginf=0).astype(np.uint8)
         units['atmospheric_stratum'] = 'flag (1 = troposphere, 2 = middleworld, 3 = overworld)'
 
         # If running for GOSAT, we have an extra dimension between the exposure and level which is just 1 long and was only
