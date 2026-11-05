@@ -3281,7 +3281,7 @@ def generate_single_tccon_prior(mod_file_data, utc_offset, concentration_record,
     gas_prof = np.full((n_lev,), np.nan)
     gas_date_prof = np.full((n_lev,), None)
     latency_profs = np.full((n_lev,), np.nan)
-    stratum_flag = np.full((n_lev,), -1)
+    stratum_flag = np.full((n_lev,), -1)  # this is int64, converting to uint8 changes -1 to 255
 
     # gas_prof is modified in-place
     _, ancillary_trop = concentration_record.add_trop_prior(gas_prof, obs_utc_date, obs_lat, mod_file_data,
