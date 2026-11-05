@@ -19,7 +19,6 @@ import h5py
 from itertools import repeat, product
 import logging
 import multiprocessing as mp
-from multiprocessing import Pool
 import numpy as np
 import pandas as pd
 from pathlib import Path
@@ -374,6 +373,10 @@ def acos_interface_main(instrument, met_resampled_file, geos_files, output_file,
             insitu_record_to_h5_group(output_file, gas_record.conc_seasonal, gas, record_group=record_group.format(gas))
 
 
+def _prior_helper_star(args):
+    """wrapper to run _prior_helper with imap"""
+    return _prior_helper(*args)
+
 
 def _prior_helper(i_sounding, i_foot, qflag, mod_data, gas_record, var_mapping, var_type_info, use_trop_eqlat=False,
                   fo2_file=fo2_prep.DEFAULT_FO2_FILE, prior_flags=None, error_handler=_def_errh):
@@ -590,11 +593,22 @@ def _prior_parallel(orig_shape, var_mapping, var_type_info, met_data, gas_record
     mod_dicts = map(_construct_mod_dict, repeat(met_data), sounding_inds, footprint_inds)
     qflags = [met_data['quality_flags'][isound, ifoot] for isound, ifoot in zip(sounding_inds, footprint_inds)]
 
-    with Pool(processes=nprocs) as pool:
-        result = pool.starmap(_prior_helper, zip(sounding_inds, footprint_inds, qflags, mod_dicts,
-                                                 repeat(gas_record), repeat(var_mapping), repeat(var_type_info),
-                                                 repeat(use_trop_eqlat), repeat(fo2_file), repeat(prior_flags),
-                                                 repeat(error_handler)))
+    ctx = mp.get_context("fork")
+    with ctx.Pool(processes=nprocs) as pool:
+        args = zip(
+            sounding_inds,
+            footprint_inds,
+            qflags, mod_dicts,
+            repeat(gas_record),
+            repeat(var_mapping),
+            repeat(var_type_info),
+            repeat(use_trop_eqlat),
+            repeat(fo2_file),
+            repeat(prior_flags),
+            repeat(error_handler),
+        )
+        chunksize = max(1, (len(sounding_inds) + 4 * nprocs - 1) // (4 * nprocs))
+        result = list(pool.imap(_prior_helper_star, args, chunksize=chunksize,))
 
     # At this point, result will be a list of tuples of pairs of dicts, the first dict the profiles dict, the second
     # the units dict or None if the prior calculation did not run. We need to combine the profiles into one array per
@@ -827,6 +841,11 @@ def _eqlat_serial(sounding_pv, sounding_theta, sounding_datenums, sounding_qflag
     return sounding_eqlat
 
 
+def _eqlat_star(args):
+    """wrapper for calling _eqlat_helper with imap"""
+    return _eqlat_helper(*args)
+
+
 def _eqlat_parallel(sounding_pv, sounding_theta, sounding_datenums, sounding_qflags, geos_datenums, eqlat_fxns, nprocs,
                     prior_flags=None, error_handler=_def_errh, eqlat_pickle_dir='.'):
     """
@@ -840,11 +859,25 @@ def _eqlat_parallel(sounding_pv, sounding_theta, sounding_datenums, sounding_qfl
     logger.info('Running eq. lat. calculation in parallel with {} processes'.format(nprocs))
     # py312 defaults to fork, py315 to forkserver, which fails here, explicitly use fork
     ctx = mp.get_context("fork") 
-    with ctx.Pool(processes=nprocs) as pool, _eqlat_pickle_manager(eqlat_fxns, eqlat_pickle_dir) as eqlat_pickles:
-        result = pool.starmap(_eqlat_helper, zip(range(sounding_pv.shape[0]), sounding_pv, sounding_theta,
-                                                 sounding_datenums, sounding_qflags,
-                                                 repeat(eqlat_pickles), repeat(geos_datenums), repeat(prior_flags),
-                                                 repeat(error_handler)))
+    n = sounding_pv.shape[0]
+    with _eqlat_pickle_manager(eqlat_fxns, eqlat_pickle_dir) as eqlat_pickles:
+        args = zip(
+            range(n),
+            sounding_pv,
+            sounding_theta,
+            sounding_datenums,
+            sounding_qflags,
+            repeat(eqlat_pickles),
+            repeat(geos_datenums),
+            repeat(prior_flags),
+            repeat(error_handler),
+        )
+        # using imap instead of starmap allows to exit on first raise instead of
+        # waiting for all processes to finish first, this will speed up running
+        # glacial tests when they do raise, chunsize is set to approx starmap
+        chunksize = max(1, (n + 4 * nprocs - 1) // (4 * nprocs))
+        with ctx.Pool(processes=nprocs) as pool:
+            result = list(pool.imap(_eqlat_star, args, chunksize=chunksize))
 
     eqlats, flags = zip(*result)
     sounding_eqlat = np.array(eqlats)
