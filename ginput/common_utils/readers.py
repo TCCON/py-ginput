@@ -309,7 +309,7 @@ def _read_map_txt_file(map_file, as_dataframes=False, skip_header=False):
 
     df = pd.read_csv(map_file, header=n_header_lines-2, skiprows=[n_header_lines-1], na_values='NAN')
     # Sometimes extra space gets kept in the headers - remove that
-    df.rename(columns=lambda h: h.strip(), inplace=True)
+    df = df.rename(columns=lambda h: h.strip())
     if not as_dataframes:
         data = {k: v.values for k, v in df.items()}
     else:

@@ -555,12 +555,12 @@ def compare_two_files(subtests, check_file, new_file, plots_dir, variable_mappin
                 new_var = variable_mapping[category_name][variable_name]
                 this_new_data = new_data[category_name][new_var]
                 try:
-                    # This will also affect the data in new_data, which is what we want so that the plotting
-                    # is correct
-                    this_new_data *= variable_scaling[category_name][new_var]
+                    this_new_data = this_new_data * variable_scaling[category_name][new_var]
                 except KeyError:
                     # Variable does not exist in the scaling dict - so don't scale it
                     pass
+                else:
+                    new_data[category_name][new_var] = this_new_data
 
                 this_atol = atol_overrides.get(variable_name)
                 test_result = _test_single_variable(variable_data, this_new_data, atol=this_atol)

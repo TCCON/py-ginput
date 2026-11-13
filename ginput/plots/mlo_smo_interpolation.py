@@ -248,7 +248,7 @@ def _wrap_months(months):
     if ii.size == 0:
         return months.to_numpy()
     else:
-        months = months.to_numpy()
+        months = months.to_numpy(copy=True)
         for i in ii:
             months[i+1:] += 12
         return months

@@ -744,7 +744,7 @@ class MloSmoTraceGasRecord(TraceGasRecord):
 
         # set datetime index in df (requires 'day' column)
         df['day'] = 1
-        df.set_index(pd.to_datetime(df[['year', 'month', 'day']]), inplace=True)
+        df = df.set_index(pd.to_datetime(df[['year', 'month', 'day']]))
 
         return df
 
@@ -986,7 +986,7 @@ class MloSmoTraceGasRecord(TraceGasRecord):
         """
         df_mlo = cls.read_insitu_gas(mlo_file, allow_negative_values=allow_negative_insitu_values)
         df_smo = cls.read_insitu_gas(smo_file, allow_negative_values=allow_negative_insitu_values)
-        df_combined = pd.concat([df_mlo, df_smo], axis=1)
+        df_combined = pd.concat([df_mlo, df_smo], axis=1, sort=True)
         if truncate_date is not None and df_combined.index.max() < truncate_date: 
             # Do this before dropping NaNs, as we need to allow for the possibility that there is not NOAA
             # data for a month at the end of the record (that is, there *should* be NOAA data, but their instrument
@@ -1703,7 +1703,7 @@ class MloSmoTraceGasRecord(TraceGasRecord):
         :return: the concentration data for the requested date(s), as a numpy vector or data frame. The data frame will
          also include the latency (how many years the concentrations had to be extrapolated).
         """
-        gas_dates = [ref_date - dt.timedelta(days=a*365.25) for a in age]
+        gas_dates = [ref_date - dt.timedelta(days=float(a)*365.25) for a in age]
         return self.get_gas_for_dates(pd.DatetimeIndex(gas_dates), deseasonalize=deseasonalize,
                                       as_dataframe=as_dataframe)
 
@@ -3281,7 +3281,7 @@ def generate_single_tccon_prior(mod_file_data, utc_offset, concentration_record,
     gas_prof = np.full((n_lev,), np.nan)
     gas_date_prof = np.full((n_lev,), None)
     latency_profs = np.full((n_lev,), np.nan)
-    stratum_flag = np.full((n_lev,), -1)
+    stratum_flag = np.full((n_lev,), -1)  # this is int64, converting to uint8 changes -1 to 255
 
     # gas_prof is modified in-place
     _, ancillary_trop = concentration_record.add_trop_prior(gas_prof, obs_utc_date, obs_lat, mod_file_data,

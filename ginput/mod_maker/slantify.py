@@ -12,7 +12,6 @@ from datetime import datetime, timedelta
 from matplotlib import pyplot as pl
 from mpl_toolkits.mplot3d import Axes3D
 import ephem
-from skyfield.api import load, utc
 import pytz
 
 def ssp(date):
@@ -54,6 +53,9 @@ def sun_earth_distance(date):
     Output:
         - Sun-Earth distance (meters)
     """
+    # TODO: Workaround for skyfield not importing on linux in Python 3.15 as of 12 Nov 2026
+    # Move back to a top-level import later
+    from skyfield.api import load, utc
 
     planets = load('de421.bsp')
 
@@ -233,6 +235,9 @@ def slantify(date,lat,lon,alt,vertical_distances,pres=0,temp=0,plots=False):
     """
 
     # if the date in naive, make it aware as UTC
+    # TODO: Workaround for skyfield not importing on linux in Python 3.15 as of 12 Nov 2026
+    # Move back to a top-level import later
+    from skyfield.api import utc
     if date.tzinfo is None:
         date = pytz.utc.localize(date)
 

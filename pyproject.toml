@@ -21,24 +21,21 @@ dependencies = [
     "cftime>=1.5.1",
     "ephem>=3.7.6.0",
     "h5py>=2.9.0",
-    "jplephem>=2.9",
     "matplotlib>=3.0.3",
     "netcdf4>=1.4.2",
-    "numpy>=1.23.0,<2.0.0",
-    "pandas>=1.0.0,<3.0.0",
-    "pydap>=3.2.2",
+    "numpy>=1.23.0",
+    "pandas>=1.0.0",
+    "pydap>=3.2.2,<3.5.11",
     "python-dateutil>=2.8.2",
     "pytz>=2023.3",
     "requests>=2.14.2",
     "scipy>=1.5.4",
-    "sgp4>=1.4",
     "skyfield>=1.10",
-    "xarray>=2025.7.1",
+    "xarray>=2025.6.1",
 ]
 
 [project.urls]
 Repository = "https://github.com/TCCON/py-ginput"
-
 
 [project.scripts]
 ginput_cli = "ginput.__main__:main"
@@ -71,32 +68,29 @@ ginput = { path = ".", editable = true }
 [tool.pixi.tasks]
 install-runscript = { cmd = "./install-runscript.sh", cwd = "." }
 
-[tool.pixi.feature.pre-py312.dependencies]
+[tool.pixi.feature.py3.dependencies]
 # As noted above, we deliberately repeat the dependency
 # lists since if pixi sees dependencies in the main
 # [dependencies] list, it'll use pypi for them. We don't
 # want that, since mixing pypi and conda-forge dependencies
 # can cause headaches.
-python = "<3.13.0"
 astropy = ">=3.1.2"
 cfgrib = ">=0.9.0,<1.0.0"
 cfunits = ">=3.3.2"
 cftime = ">=1.5.1"
 ephem = ">=3.7.6.0"
 h5py = ">=2.9.0"
-jplephem = ">=2.9"
 matplotlib = ">=3.0.3"
 netcdf4 = ">=1.4.2"
-numpy = ">=1.23.0,<2.0.0"
-pandas = ">=1.0.0,<3.0.0"
-pydap = ">=3.2.2"
+numpy = ">=1.3.0"
+pandas = ">=1.0.0"
+pydap = ">=3.2.2,<3.5.11"
 python-dateutil = ">=2.8.2"
 pytz = ">=2023.3"
 requests = ">=2.14.2"
 scipy = ">=1.5.4"
-sgp4 = ">=1.4"
+xarray = ">=2025.6.1"
 skyfield = ">=1.10"
-xarray = ">=2025.7.1"
 
 [tool.pixi.feature.dev.dependencies]
 pytest = "*"
@@ -112,6 +106,14 @@ stdtest = "pytest -v -m 'not glacial' tests/"
 fulltest = "pytest -v tests/"
 build-docs = { cmd = "make html", cwd = "doc" }
 
+[tool.pixi.environments.py310-dev]
+dependencies = { python = "3.10.*" }
+features = ["py3", "dev"]
+
 [tool.pixi.environments.py312-dev]
 dependencies = { python = "3.12.*" }
-features = ["pre-py312", "dev"]
+features = ["py3", "dev"]
+
+[tool.pixi.environments.py315-dev]
+dependencies = { python = "3.15.*" }
+features = ["py3", "dev"]
