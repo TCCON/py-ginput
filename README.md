@@ -28,6 +28,16 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
   
 For more install options, run `make help`. 
 
+## Installing for development
+
+* Make sure you have [pixi installed](https://pixi.prefix.dev/latest/installation/) on your system.
+* Run `pixi run --locked --environment py312-dev install-runscript`
+
+This will install the dev dependencies (from `conda-forge`) and set up the `run_ginput.py` script to
+run with the dev environment.
+If you need to only install the dev dependencies without setting up the script, use
+`pixi install --locked --environment py312-dev` instead.
+
 ## Is it working correctly?
 
 To check whether your installation is working, there are example .mod, .vmr, .map, 
