@@ -351,8 +351,9 @@ def acos_interface_main(instrument, met_resampled_file, geos_files, output_file,
         units['gas_record_date'] = 'Date as decimal year (decimal part = 0-based day-of-year / {})'.format(mod_constants.days_per_year)
 
         # And convert the stratum to a short integer and update the unit to be more descriptive
+        # Pre-numpy 2 would grumpily convert NaNs to 0s, 
         profiles['atmospheric_stratum'] = profiles['atmospheric_stratum'].astype(np.uint8)
-        units['atmospheric_stratum'] = 'flag (1 = troposphere, 2 = middleworld, 3 = overworld)'
+        units['atmospheric_stratum'] = 'flag (1 = troposphere, 2 = middleworld, 3 = overworld, 0 = unknown/fill)'
 
         # If running for GOSAT, we have an extra dimension between the exposure and level which is just 1 long and was only
         # a placeholder to provide compatibility with the loops over sounding group/sounding for OCO. Remove those singleton

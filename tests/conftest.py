@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 from dateutil.relativedelta import relativedelta
 from hashlib import md5, sha1
 import os
@@ -26,11 +26,14 @@ _mydir = Path(__file__).parent.resolve()
 input_data_dir = _mydir / 'test_input_data'
 output_data_dir = _mydir / 'test_output_data'
 fo2_dir = input_data_dir / 'fo2'
+sat_subset_dir = input_data_dir / 'sat'
+sat_subset_out_dir = output_data_dir / 'sat'
 gap_test_dir = input_data_dir / 'noaa-interp-extrap' / 'monthly-inputs' / 'gap-tests'
 gap_test_expected_dir = input_data_dir / 'noaa-interp-extrap' / 'expected' / 'gap-tests'
 gap_test_out_dir = output_data_dir / 'noaa-interp-extrap' / 'expected' / 'gap-tests'
 _large_file_dir = input_data_dir / 'large-files'
 _large_file_out_dir = output_data_dir / 'large-files'
+_large_file_check_time_file = _large_file_dir / '.last-large-file-check'
 
 @pytest.fixture(scope='session')
 def check_geos_hashes():
@@ -306,6 +309,10 @@ def test_site():
 
 
 @pytest.fixture(scope='session')
+def sat_file_dir():
+    return sat_subset_dir
+
+@pytest.fixture(scope='session')
 def large_files_dir(pytestconfig):
     _download_large_files(pytestconfig)
     return _large_file_dir
@@ -321,6 +328,12 @@ def gosat_empty_file_dir(large_files_dir):
 @pytest.fixture(scope='session')
 def gosat_nonempty_file_dir(large_files_dir):
     return large_files_dir / 'gosat' / 'nonempty' 
+
+@pytest.fixture(scope='session')
+def sat_file_out_dir():
+    sat_subset_out_dir.mkdir(parents=True, exist_ok=True)
+    _ensure_gitignored(sat_subset_out_dir)
+    return sat_subset_out_dir
 
 @pytest.fixture(scope='session')
 def oco_file_out_dir():
@@ -498,19 +511,30 @@ class GapTestResultFile:
 
 
 def _download_large_files(pytestconfig):
-    skip_check = os.getenv('GINPUT_TEST_SKIP_LARGE_FILE_CHECK', '0')
-    if skip_check == '1':
-        return
-
-    clobber = os.getenv('GINPUT_TEST_CLOBBER_LARGE_FILES', '0') == '1'
     # In order to show that we're downloading and checksumming big files,
     # we disable the stdout capturing for the duration of the download
     # function.
     capmanager = pytestconfig.pluginmanager.getplugin("capturemanager")
     with capmanager.global_and_fixture_disabled():
+        skip_check = os.getenv('GINPUT_TEST_SKIP_LARGE_FILE_CHECK', '-1')
+        if skip_check == '1':
+            return
+        if skip_check == '-1' and _skip_large_file_check():
+            return
+
+        clobber = os.getenv('GINPUT_TEST_CLOBBER_LARGE_FILES', '0') == '1'
         print('\n--> Checking if large input files need downloaded')
         _download_from_large_file_record('ginput-large-files.md5')
         to_extract = _check_large_files(clobber=clobber)
+
+        # Only write the file for when we checked the large files, not every time this
+        # function runs (i.e., why this is here, not in the _skip_large_file_check() function).
+        # We want to check the large files once/day, so we don't want to update this
+        # file if we only checked that it's been < 24 hours!
+        with open(_large_file_check_time_file, 'w') as f:
+            now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            f.write(now)
+
         if len(to_extract) == 0:
             return
 
@@ -525,6 +549,18 @@ def _download_large_files(pytestconfig):
         tarball_file.unlink()
         print(f'--> Removing tarball downloaded from CaltechData ({tarball_file})')
 
+
+
+def _skip_large_file_check() -> bool:
+    if not _large_file_check_time_file.exists():
+        return False
+    else:
+        with open(_large_file_check_time_file) as f:
+            s = f.read()
+            d = datetime.strptime(s.strip(), '%Y-%m-%d %H:%M:%S')
+        cutoff = datetime.now() - timedelta(days=1)
+        print(f'\nSkipping large file check (last checked at {d}, which is after {cutoff}')
+        return d > cutoff
 
 def _check_large_files(md5_file = _large_file_dir / 'ginput-large-files.md5', clobber=False):
     """Get the current .md5 file from the CaltechData repo and see if any input files need downloaded"""

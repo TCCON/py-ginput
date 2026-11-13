@@ -9,6 +9,50 @@ import numpy as np
 import os
 import pytest
 
+@pytest.mark.slow
+def test_oco2_priors_subset(
+    geos_3d_met_files_by_datetime,
+    sat_file_dir,
+    sat_file_out_dir,
+    smo_real_gap_input_dir,
+    test_plots_dir
+):
+    """Run a test to generate a small subset of an OCO-2 priors file and compare against a benchmark.
+
+    In case you need to re-run the comparison without generating the .h5 file again
+    (because that is slow), set the GINPUT_TEST_SKIP_GEN environmental variable to 1.
+    """
+    skip_gen = os.getenv('GINPUT_TEST_SKIP_GEN', '0')
+    met_file = sat_file_dir / 'oco2_L2MetND_56742a_250302_subset.h5'
+    out_prior_file = sat_file_out_dir / 'oco2_priors_56742a_250302_subset.h5'
+
+    if skip_gen != '1':
+        # This test will use the command line interface, since that is
+        # how OCO ops interacts with this code.
+        geos_dates = [
+            datetime(2025,3,2,15),
+            datetime(2025,3,2,18),
+            datetime(2025,3,2,21),
+        ]
+        _generate_prior_h5_file(
+            instrument='oco',
+            met_file=met_file,
+            out_prior_file=out_prior_file,
+            geos_dates=geos_dates,
+            geos_3d_met_files_by_datetime=geos_3d_met_files_by_datetime,
+            mlo_smo_input_dir=smo_real_gap_input_dir
+        )
+    elif not out_prior_file.exists():
+        raise FileNotFoundError(f'Output file {out_prior_file} does not exist. (GINPUT_TEST_SKIP_GEN was set to {skip_gen}, causing file generation to be skipped.)')
+
+    expected_file = sat_file_dir / 'oco2_priors_56742a_250302_subset.h5'
+    plot_file = test_plots_dir / 'test_oco2_priors.png'
+    compare_prior_h5_files(
+        expected_file=expected_file,
+        current_file=out_prior_file,
+        met_file=met_file,
+        plot_file=plot_file
+    )
 
 @pytest.mark.glacial
 @pytest.mark.slow
