@@ -1146,31 +1146,7 @@ def write_prior_h5(output_file, profile_variables, units, prior_group='priors'):
     with h5py.File(output_file, 'a') as h5obj:
         h5grp = h5obj.create_group(prior_group)
         for var_name, var_data in profile_variables.items():
-            # Replace NaNs with numeric fill values
-            if np.issubdtype(var_data.dtype, np.number):
-                filled_data = var_data.copy()
-                if np.issubdtype(var_data.dtype, np.integer):
-                    # make sure we know what _fill_val is used inside the hdf5 file
-                    # eg for uint8 _fill_val doesn't fit in 0-255
-                    # hdf5 create_dataset silently converts it to.. something, that may not
-                    # always be the same thing based on platform or hdf5 version
-                    info = np.iinfo(var_data.dtype)
-                    if _fill_val < info.min or _fill_val > info.max:
-                        this_fill_val = info.min  # eg 0 for uint8
-                    else:
-                        this_fill_val = _fill_val
-                    # Integer arrays cannot contain NaNs, so no NaN replacement is needed.
-                else:
-                    missing = np.isnan(filled_data)
-                    if missing.any():
-                        filled_data[missing] = _fill_val
-                    this_fill_val = _fill_val
-            elif np.issubdtype(var_data.dtype, np.string_):
-                filled_data = var_data.copy()
-                this_fill_val = _string_fill
-            else:
-                raise NotImplementedError('No method to handle fill values for data type "{}" implemented'.format(var_data.dtype))
-
+            filled_data, this_fill_val = _replace_nans_for_numeric_array(var_data)
             # Write the data
             var_unit = units[var_name]
             dset = h5grp.create_dataset(var_name, data=filled_data, fillvalue=this_fill_val)
@@ -1212,9 +1188,66 @@ def insitu_record_to_h5_group(output_file, df, gas, record_group='mlo_smo_record
 
         for colname, column in df.items():
             column = column.to_numpy().copy()
-            column[np.isnan(column)] = _fill_val
-            dset = grp.create_dataset(colname, data=column, fillvalue=_fill_val)
+            column, this_fill_val = _replace_nans_for_numeric_array(column)
+            dset = grp.create_dataset(colname, data=column, fillvalue=this_fill_val)
             dset.attrs['units'] = get_unit(colname)
+
+
+def _replace_nans_for_numeric_array(var_data):
+    # Replace NaNs with numeric fill values
+    # make sure we know what _fill_val is used inside the hdf5 file
+    # eg for uint8 _fill_val doesn't fit in 0-255
+    # hdf5 create_dataset silently converts it to.. something, that may not
+    # always be the same thing based on platform or hdf5 version
+    filled_data = var_data.copy()
+    this_fill_val = _get_fill_val_for_type(var_data.dtype)
+    if np.issubdtype(var_data.dtype, np.integer):
+        # Assume integers do not need values replaced (can't have NaNs)
+        pass
+    elif np.issubdtype(var_data.dtype, np.number):
+        missing = np.isnan(filled_data)
+        if missing.any():
+            filled_data[missing] = this_fill_val
+    elif np.issubdtype(var_data.dtype, np.string_):
+        # Assume strings do not need values replaced (can't have NaNs)
+        pass
+    else:
+        raise NotImplementedError('No method to handle fill values for data type "{}" implemented'.format(var_data.dtype))
+
+    return filled_data, this_fill_val
+
+
+def _get_fill_val_for_type(dtype):
+    """Return the proper fill value to use for the given data type
+    """
+
+    # Tested with numpy >= 2 and numpy 1.23.2; np.bytes_ is the proper
+    # way to check for at least the strings resulting from calls to 
+    # _convert_to_acos_time_strings.
+    if np.issubdtype(dtype, np.bytes_):
+        return _string_fill
+
+    # Some integer types can't hold the default -999999 fill value,
+    # so we have to use their limits. Unsigned integers should not
+    # use their min value, that's liable to be a real value.
+    if np.issubdtype(dtype, np.signedinteger):
+        int_min = np.iinfo(dtype).min
+        int_max = np.iinfo(dtype).max
+        if _fill_val < int_min or _fill_val > int_max:
+            return int_min
+        else:
+            return dtype.type(_fill_val)
+    if np.issubdtype(dtype, np.unsignedinteger):
+        int_min = np.iinfo(dtype).min
+        int_max = np.iinfo(dtype).max
+        if _fill_val < int_min or _fill_val > int_max:
+            return int_max
+        else:
+            return dtype.type(_fill_val)
+
+    # Assume anything else is a float
+    return _fill_val
+
 
 
 def _convert_acos_time_strings(time_string_array, format='datetime', flag_array=None, error_handler=_def_errh):
