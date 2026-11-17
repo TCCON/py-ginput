@@ -1,14 +1,28 @@
 [project]
 name = "ginput"
+license = "Apache-2.0"
+license-files = ["LICENSE.txt"]
 dynamic = ["version"]
 description = "Python code that creates the .mod and .vmr files used in GGG"
 readme = "README.md"
 authors = [
-    { name = "Joshua Laughner", email = "jllacct119@gmail.com" },
+    { name = "Joshua Laughner" },
     { name = "Sebastien Roche" },
     { name = "Matthaeus Kiel" },
 ]
+maintainers = [
+    { name = "Joshua Laughner", email = "jllacct119@gmail.com" },
+]
 requires-python = ">=3.10"
+classifiers = [
+  "Development Status :: 5 - Production/Stable",
+  "Intended Audience :: Science/Research",
+  "Topic :: Scientific/Engineering :: Atmospheric Science",
+  "Programming Language :: Python :: 3",
+  "Operating System :: POSIX :: Linux",
+  "Operating System :: MacOS",
+  "Operating System :: Microsoft :: Windows",
+]
 
 # Note: for now, dependencies must be specified both here and below
 # for pixi; this section is used for PyPI and the pixi section for
@@ -16,6 +30,7 @@ requires-python = ">=3.10"
 # of PyPI wheels).
 dependencies = [
     "astropy>=3.1.2",
+    "cdsapi>=0.7,<0.8",
     "cfgrib>=0.9.0,<1.0.0",
     "cfunits>=3.3.2",
     "cftime>=1.5.1",
@@ -34,18 +49,30 @@ dependencies = [
     "xarray>=2025.6.1",
 ]
 
+[project.optional-dependencies]
+# cdsapi is used for downloading ERA5 data, not fully supported yet.
+# dask is used when caching EqL in GEOS files; this is a custom use
+# case for MethaneSat.
+experimental = ["dask>=2026.8"]
+
+
 [project.urls]
 Repository = "https://github.com/TCCON/py-ginput"
+Documentation = "https://ginput.readthedocs.io/en/latest/"
+Issues = "https://github.com/TCCON/py-ginput/issues"
+Changelog = "https://github.com/TCCON/py-ginput/blob/main/HISTORY.md"
 
 [project.scripts]
 ginput_cli = "ginput.__main__:main"
 
 [build-system]
-requires = ["setuptools>=61.0"]
+requires = ["setuptools>=77.0"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
 # Equivalent to setup.py's packages=find_packages()
+# Specify only ginput to avoid installing tests/
+include = ["ginput*"]
 
 [tool.setuptools]
 include-package-data = true  # equivalent to include_package_data=True
@@ -60,7 +87,7 @@ version = { attr = "ginput.__version__" }
 [tool.pixi.workspace]
 name = "ginput"
 channels = ["conda-forge"]
-platforms = ["linux-64"]
+platforms = ["linux-64", "osx-arm64", "osx-64", "win-64"]
 
 [tool.pixi.pypi-dependencies]
 ginput = { path = ".", editable = true }
@@ -75,6 +102,7 @@ install-runscript = { cmd = "./install-runscript.sh", cwd = "." }
 # want that, since mixing pypi and conda-forge dependencies
 # can cause headaches.
 astropy = ">=3.1.2"
+cdsapi = ">=0.7,<0.8"
 cfgrib = ">=0.9.0,<1.0.0"
 cfunits = ">=3.3.2"
 cftime = ">=1.5.1"
@@ -82,7 +110,7 @@ ephem = ">=3.7.6.0"
 h5py = ">=2.9.0"
 matplotlib = ">=3.0.3"
 netcdf4 = ">=1.4.2"
-numpy = ">=1.3.0"
+numpy = ">=1.23.0"
 pandas = ">=1.0.0"
 pydap = ">=3.2.2,<3.5.11"
 python-dateutil = ">=2.8.2"
@@ -91,6 +119,9 @@ requests = ">=2.14.2"
 scipy = ">=1.5.4"
 xarray = ">=2025.6.1"
 skyfield = ">=1.10"
+
+[tool.pixi.feature.experimental.dependencies]
+dask = ">=2026.8"
 
 [tool.pixi.feature.dev.dependencies]
 pytest = "*"
@@ -106,14 +137,21 @@ stdtest = "pytest -v -m 'not glacial' tests/"
 fulltest = "pytest -v tests/"
 build-docs = { cmd = "make html", cwd = "doc" }
 
+[tool.pixi.environments.default]
+# As of 17 Nov 2026, 3.15 has been out for a little while, but conda-forge
+# might still be catching up, so I've made the default 3.14 to stay relatively
+# modern but fully supported.
+dependencies = { python = "3.14.*" }
+features = ["py3"]
+
 [tool.pixi.environments.py310-dev]
 dependencies = { python = "3.10.*" }
-features = ["py3", "dev"]
+features = ["py3", "dev", "experimental"]
 
 [tool.pixi.environments.py312-dev]
 dependencies = { python = "3.12.*" }
-features = ["py3", "dev"]
+features = ["py3", "dev", "experimental"]
 
 [tool.pixi.environments.py315-dev]
 dependencies = { python = "3.15.*" }
-features = ["py3", "dev"]
+features = ["py3", "dev", "experimental"]
