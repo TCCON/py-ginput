@@ -18,15 +18,14 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 
 ## Quickstart
 
-* Make sure you have a Python installation with the `conda` package manager
-  on your system. We currently recommend [miniforge](https://github.com/conda-forge/miniforge).
-* Run `make install`
-* Run `./run_ginput.py --help` to see available subcommands
-* For more detailed help, try `man ginput` after running `make install`. 
-  (If that doesn't work, try `man man/build/man/ginput.1` from this 
-  directory or add `man/build/man/` to your `MANPATH`).
-  
-For more install options, run `make help`. 
+* Make sure you have [pixi installed](https://pixi.prefix.dev/latest/installation/) on your system.
+* Run `pixi install --locked` to install `ginput` in an isolated environment
+* Call `ginput` from this directory with `pixi run ginput_cli`.
+
+If you need to run `ginput` easily from any directory, do the following:
+
+* In the repo, run `pixi run which ginput_cli` to get the full path to the CLI script
+* Symlink that script to a directory on your `PATH`
 
 ## Installing for development
 
@@ -37,6 +36,12 @@ This will install the dev dependencies (from `conda-forge`) and set up the `run_
 run with the dev environment.
 If you need to only install the dev dependencies without setting up the script, use
 `pixi install --locked --environment py312-dev` instead.
+Notes:
+
+1. There are multiple dev environments for different Python versions.
+   See `pyproject.toml` for the list.
+1. Running the tests will require a network connection the first time,
+   as the test code automatically checks if large files need to be downloaded.
 
 ## Is it working correctly?
 
