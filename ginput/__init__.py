@@ -1,3 +1,2 @@
-# be sure to update in setup.py as well
-# and man/conf.py
-__version__ = '1.6.3'
+# be sure to update in CITATION.cff as well
+__version__ = '1.6.4'

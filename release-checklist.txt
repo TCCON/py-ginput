@@ -20,7 +20,7 @@
 ## Metadata
 
 - Update HISTORY.md file
-- Update version number in setup.py, CITATION.cff, and ginput/__init__.py
+- Update version number in CITATION.cff and ginput/__init__.py
 - Ensure that the latest large test files are uploaded to CaltechData
     - Worth verifying that the download works with `pytest -k large_files tests/`
 - Tag the commit with the version as "vX.Y.Z"

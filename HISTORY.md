@@ -19,6 +19,22 @@ improvements to improve the scientific capabilities of this code sometimes requi
 an update to the API because the new best default behavior requires additional
 user input.
 
+## 1.6.4
+
+This release fixes issues with Numpy 2.x and Pandas 3.x compatibility,
+allowing installation under Python 3.13+, and switches package management
+to [pixi](https://pixi.prefix.dev/latest/). Users installing from PyPI or
+conda-forge will not be affected, but anyone installing from source who
+previously used the `make` commands or `environment*.yml` files will need
+to migrate to `pixi`. We have made this change because pixi provides better
+capability than `conda` for managing dependencies across different Python
+versions as well as separating truly required dependencies from development
+dependencies. 
+
+This release also adds experimental support for MERRA-2 and ERA 5 data as
+input to generate `.mod` files. If you wish to use those data as input,
+understand that support for them will be "best effort" only.
+
 ## 1.6.3
 
 This release fixes issues with Pandas 2.x compatibility and changed URLs for
